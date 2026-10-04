@@ -25,14 +25,14 @@
 	<key>NSCameraReactionEffectGesturesEnabledDefault</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>AVA Recorder films the presenter through the iPhone camera.</string>
+	<string>AVA Recorder records the camera for your video.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>AVA Recorder shows the live view on your other laptop or phone over the home Wi-Fi.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>AVA Recorder records the presenter's voice from the mic.</string>
+	<string>AVA Recorder records your voice from the mic.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>AVA Recorder listens on this Mac so the prompter follows the presenter's voice. Nothing leaves the Mac.</string>
+	<string>AVA Recorder listens on this Mac so the prompter follows your voice. Nothing leaves the Mac.</string>
 </dict>
 </plist>

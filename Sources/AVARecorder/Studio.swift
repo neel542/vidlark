@@ -48,8 +48,10 @@ final class Studio: ObservableObject {
     @Published private(set) var screenAllowed = false
     @Published private(set) var power = PowerState(pluggedIn: true, percent: nil)
     @Published private(set) var freeGB: Double?
-    /// macOS hand-gesture Reactions. When on, a thumbs-up puts balloons in the camera file, and the detection costs CPU all the time.
+    /// macOS Reactions. With gestures on, a thumbs-up puts balloons in the camera file. Even with
+    /// gestures off, Reactions being on keeps hand detection running, about 10% CPU (measured 4 Oct).
     @Published private(set) var reactionsOn = false
+    @Published private(set) var gesturesOn = false
     /// Extra cameras, recorded as camera-2.mov, camera-3.mov and so on, in the order they were added.
     @Published var extraCameraIDs: [String] = UserDefaults.standard.stringArray(forKey: "extraCameras") ?? [] {
         didSet {
@@ -61,6 +63,15 @@ final class Studio: ObservableObject {
         didSet { applyLive() }
     }
     @Published private(set) var tunnelAddress: String?
+    /// Her face in a shape that IS part of the screen recording (Nate Herk style). The face box never is.
+    @Published var faceInVideo = UserDefaults.standard.bool(forKey: "faceInVideo") {
+        didSet { if !Snapshots.active { UserDefaults.standard.set(faceInVideo, forKey: "faceInVideo") } }
+    }
+    @Published var bubbleShape = BubbleShape(rawValue: UserDefaults.standard.string(forKey: "bubbleShape") ?? "") ?? .circle {
+        didSet { if !Snapshots.active { UserDefaults.standard.set(bubbleShape.rawValue, forKey: "bubbleShape") } }
+    }
+    /// macOS Studio Light: brightens her face and softens the background, inside the camera itself.
+    @Published private(set) var touchUpOn = false
     @Published private(set) var liveFailure: String?
 
     // Voice follow
@@ -72,6 +83,8 @@ final class Studio: ObservableObject {
     @Published private(set) var hearing = false
 
     let camera = CameraRecorder()
+    /// The panel's camera picture, joined to the session once at boot (see PreviewLayerView).
+    let mainPreview = PreviewNSView()
     private let screen = ScreenRecorder()
     private var extras: [CameraRecorder] = []
     private var extraOrder: [String] = []
@@ -80,6 +93,10 @@ final class Studio: ObservableObject {
     private let tunnel = Tunnel()
     private var liveTaps: [String: LiveTap] = [:]
     private var liveToken = UserDefaults.standard.string(forKey: "liveToken") ?? ""
+    /// The camera watchdog: how much camera.mov held at the last look, and when that last grew.
+    private var cameraWritten: (seconds: Double, at: CFTimeInterval) = (0, 0)
+    private var lastWatch: CFTimeInterval = 0
+    private var cameraLostAt: TimeInterval?
     private var log: EventLog?
     private var folder: URL?
     private var t0: CFTimeInterval = 0
@@ -102,6 +119,14 @@ final class Studio: ObservableObject {
     func boot() {
         guard !booted else { return }
         booted = true
+        if let i = CommandLine.arguments.firstIndex(of: "--camera-test"), i + 1 < CommandLine.arguments.count {
+            CameraTest.run(dir: URL(fileURLWithPath: CommandLine.arguments[i + 1]))
+            return
+        }
+        if let i = CommandLine.arguments.firstIndex(of: "--camera-cpu-test"), i + 1 < CommandLine.arguments.count {
+            CameraCPUTest.run(dir: URL(fileURLWithPath: CommandLine.arguments[i + 1]))
+            return
+        }
         try? Library.makeDirectory(Library.root)
         queue = Library.loadQueue()
         currentID = queue.first(where: { $0.recordings == 0 })?.id ?? queue.first?.id
@@ -110,6 +135,7 @@ final class Studio: ObservableObject {
             DispatchQueue.main.async { self?.takeLevel(avg, pk) }
         }
         bootLive()
+        mainPreview.preview.session = camera.session
 
         let defaults = UserDefaults.standard
         refreshDevices(preferredCamera: defaults.string(forKey: "camera"), preferredMic: defaults.string(forKey: "mic"))
@@ -184,7 +210,9 @@ final class Studio: ObservableObject {
         screenAllowed = screenAllowed || CGPreflightScreenCaptureAccess()
         cameraAllowed = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
         micAllowed = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
-        reactionsOn = AVCaptureDevice.reactionEffectGesturesEnabled
+        reactionsOn = AVCaptureDevice.reactionEffectsEnabled
+        gesturesOn = AVCaptureDevice.reactionEffectGesturesEnabled
+        touchUpOn = AVCaptureDevice.isStudioLightEnabled
     }
 
     private func refreshDevices(preferredCamera: String?, preferredMic: String?) {
@@ -289,8 +317,8 @@ final class Studio: ObservableObject {
 
         var label: String {
             if id.hasPrefix("camera-") { return "Camera \(id.dropFirst(7))" }
-            return ["camera": "Camera", "effects": "Effects", "mic": "Mic", "screen": "Record", "prompter": "Prompter",
-                    "space": "Space", "power": "Power", "live": "Live"][id] ?? id
+            return ["camera": "Camera", "effects": "Effects", "touchup": "Touch up", "mic": "Mic", "screen": "Record",
+                    "face": "In video", "prompter": "Prompter", "mac": "Mac", "live": "Live"][id] ?? id
         }
     }
 
@@ -299,7 +327,7 @@ final class Studio: ObservableObject {
         if !cameraAllowed {
             out.append(Check(id: "camera", state: .fail, value: "Not allowed", problem: "Allow the camera in System Settings, Privacy."))
         } else if let name = cameraName {
-            out.append(Check(id: "camera", state: .ok, value: name))
+            out.append(Check(id: "camera", state: .ok, value: touchUpOn ? "\(name) · touched up" : name))
         } else {
             out.append(Check(id: "camera", state: .warn, value: "None found", problem: "Connect the iPhone. It will appear here."))
         }
@@ -310,9 +338,12 @@ final class Studio: ObservableObject {
             }
         }
 
-        if reactionsOn {
+        if gesturesOn {
             out.append(Check(id: "effects", state: .warn, value: "Reactions on",
                              problem: "Turn off Reactions, or a thumbs-up puts balloons in the video. Click the Effects row."))
+        } else if reactionsOn {
+            out.append(Check(id: "effects", state: .warn, value: "Reactions on",
+                             problem: "Turn off Reactions to save battery. Click the Effects row."))
         }
 
         if !micAllowed {
@@ -329,19 +360,20 @@ final class Studio: ObservableObject {
         } else {
             out.append(Check(id: "screen", state: display == nil ? .warn : .ok, value: display?.name ?? "No screen"))
         }
+        out.append(Check(id: "face", state: faceInVideo ? .ok : .off,
+                         value: faceInVideo ? "Face, \(bubbleShape.title.lowercased())" : "Screen only"))
 
         out.append(Check(id: "prompter", state: following ? .ok : .off, value: voiceValue))
 
-        if let gb = freeGB {
-            let state: LampState = gb < 5 ? .fail : gb < 20 ? .warn : .ok
-            out.append(Check(id: "space", state: state, value: "\(Int(gb)) GB free",
-                             problem: state == .ok ? nil : "Free up space. A 15 minute video needs about 3 GB."))
-        }
-
-        let pct = power.percent.map { " · \($0)%" } ?? ""
-        out.append(Check(id: "power", state: power.pluggedIn ? .ok : .warn,
-                         value: (power.pluggedIn ? "Plugged in" : "On battery") + pct,
-                         problem: power.pluggedIn ? nil : "Plug in the charger before a long take."))
+        // Disk space and power share a row: both are about the Mac lasting the whole take.
+        let spaceState: LampState = freeGB.map { $0 < 5 ? .fail : $0 < 20 ? .warn : .ok } ?? .ok
+        let powerText = power.pluggedIn ? "plugged in" : "on battery" + (power.percent.map { " \($0)%" } ?? "")
+        let macText = [freeGB.map { "\(Int($0)) GB free" }, powerText].compactMap { $0 }.joined(separator: " · ")
+        out.append(Check(id: "mac",
+                         state: spaceState == .fail ? .fail : (spaceState == .warn || !power.pluggedIn) ? .warn : .ok,
+                         value: macText.prefix(1).uppercased() + macText.dropFirst(),
+                         problem: spaceState != .ok ? "Free up space. A 15 minute video needs about 3 GB."
+                             : power.pluggedIn ? nil : "Plug in the charger before a long take."))
         out.append(liveCheck)
         return out
     }
@@ -438,6 +470,8 @@ final class Studio: ObservableObject {
                     try? item.script.write(to: folder.appendingPathComponent("script.md"), atomically: true, encoding: .utf8)
                 }
                 self.folder = folder
+                camera.prepareForTake()
+                extras.forEach { $0.prepareForTake() }
 
                 if withScreen {
                 let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
@@ -456,7 +490,10 @@ final class Studio: ObservableObject {
                     Task { @MainActor in self?.rolling(from: time) }
                 }
                 camera.onFinished = { [weak self] error in
-                    Task { @MainActor in self?.cameraEndedEarly(error) }
+                    Task { @MainActor in
+                        guard let self else { return }
+                        if self.phase == .starting { self.cameraEndedEarly(error) } else { self.cameraStopped(error) }
+                    }
                 }
                 camera.startRecording(to: folder.appendingPathComponent("camera.mov"))
                 for (i, recorder) in extras.enumerated() {
@@ -508,6 +545,9 @@ final class Studio: ObservableObject {
         guard phase == .starting, let folder else { return }
         t0 = time
         phase = .recording
+        cameraWritten = (0, time)
+        lastWatch = time
+        cameraLostAt = nil
         log = EventLog(url: folder.appendingPathComponent("events.jsonl"), t0: time)
         let wall = ISO8601DateFormatter().string(from: Date())
         log?.write(["type": "start", "wall": wall, "title": script.title.isEmpty ? (currentItem?.title ?? "Untitled") : script.title,
@@ -552,6 +592,10 @@ final class Studio: ObservableObject {
     private func tick() {
         let now = CACurrentMediaTime()
         elapsed = now - t0
+        if now - lastWatch > 2 {
+            lastWatch = now
+            watchCamera(now)
+        }
         cardElapsed = countdown == nil ? now - cardStart : 0
         if listener != nil {
             if let move = follower?.tick(at: now, loudAt: lastLoud) { voiceMove(to: move) }
@@ -611,10 +655,12 @@ final class Studio: ObservableObject {
         log?.write(["type": "stop"])
 
         Task {
+            let once = Once()
             let cameraError: Error? = await withCheckedContinuation { done in
-                camera.onFinished = { error in done.resume(returning: error) }
+                camera.onFinished = { error in if once.first() { done.resume(returning: error) } }
                 camera.stopRecording()
             }
+            camera.onFinished = nil
             await stopExtras()
             await screen.stop()
             liveFrames.forget("screen")
@@ -623,6 +669,13 @@ final class Studio: ObservableObject {
             applyInputs()
 
             guard let folder else { phase = .idle; return }
+            if let lost = cameraLostAt {
+                cameraLostAt = nil
+                let at = String(format: "%02d:%02d", Int(lost) / 60, Int(lost) % 60)
+                phase = .failed("The camera stopped recording at \(at), so the take was stopped there. "
+                                + "Everything up to then is in the folder. Check the camera, then press Start again.")
+                return
+            }
             if let cameraError {
                 phase = .failed("The camera file did not close cleanly: \(cameraError.localizedDescription). The screen file is in the folder.")
                 return
@@ -650,6 +703,29 @@ final class Studio: ObservableObject {
             applyInputs()
             phase = .failed("The camera and mic did not start\(error.map { ": \($0.localizedDescription)" } ?? ""). Check the camera and mic rows, then try again.")
         }
+    }
+
+    /// Every 2 seconds in a take: camera.mov must keep growing. If it has not grown for 6 seconds,
+    /// the camera has stopped, and filming on would only make a take with no camera in it.
+    private func watchCamera(_ now: CFTimeInterval) {
+        camera.written { [weak self] seconds in
+            Task { @MainActor in
+                guard let self, self.phase == .recording else { return }
+                if let seconds, seconds > self.cameraWritten.seconds + 0.01 {
+                    self.cameraWritten = (seconds, now)
+                } else if now - self.cameraWritten.at > 6 {
+                    self.cameraStopped(nil)
+                }
+            }
+        }
+    }
+
+    private func cameraStopped(_ error: Error?) {
+        guard phase == .recording else { return }
+        log?.write(["type": "camera-error", "file": "camera.mov",
+                    "message": error?.localizedDescription ?? "camera.mov stopped growing"])
+        cameraLostAt = elapsed
+        stop(thenFinish: false)
     }
 
     private func stopExtras() async {
@@ -749,7 +825,7 @@ extension Studio {
     var voiceValue: String {
         guard followVoice else { return "Key only" }
         switch voice {
-        case .checking, .ready: return "Follows her voice"
+        case .checking, .ready: return "Follows the voice"
         case .notAllowed: return "Key only · speech not allowed"
         case .unavailable: return "Key only · voice unavailable"
         }
@@ -913,6 +989,7 @@ extension Studio {
         freeGB = 212
         power = PowerState(pluggedIn: true, percent: 86)
         liveMode = .wifi
+        faceInVideo = true
         if let script {
             let item = VideoItem(title: "Sample", script: script)
             queue = [item, VideoItem(title: "Second", script: "# Inbound placement fees, explained\n- one"),
@@ -928,6 +1005,7 @@ extension Studio {
 
     func stageReactions(_ on: Bool) {
         reactionsOn = on
+        gesturesOn = on
     }
 
     func stageVoice(spoken: Int, hearing: Bool) {

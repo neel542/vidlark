@@ -77,8 +77,11 @@ final class LiveFrames: @unchecked Sendable {
 final class LiveTap: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     let output = AVCaptureVideoDataOutput()
     let name: String
+    /// The camera this tap is attached to. Frames are switched on and off through it.
+    weak var camera: CameraRecorder?
     private let frames: LiveFrames
     private let queue: DispatchQueue
+    private var asleep = false
 
     init(name: String, frames: LiveFrames) {
         self.name = name
@@ -91,11 +94,15 @@ final class LiveTap: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     }
 
     func wake() {
-        output.connection(with: .video)?.isEnabled = true
+        queue.async { [self] in asleep = false }
+        camera?.setFrames(output, on: true)
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        guard frames.watching(name) else { connection.isEnabled = false; return }
+        guard frames.watching(name) else {
+            if !asleep { asleep = true; camera?.setFrames(output, on: false) }
+            return
+        }
         guard let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         frames.offer(name, pixels, maxWidth: 960, interval: 1.0 / 8)
     }
@@ -333,6 +340,7 @@ header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-
 .bar i.hot { background: var(--amber); }
 .grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; align-items: start; }
 .side { display: grid; gap: 12px; }
+.grid:has(.side:empty) { grid-template-columns: minmax(0, 1fr); max-width: 980px; }
 @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
 figure { margin: 0; background: var(--face); border: 1px solid var(--hair); border-radius: 12px; overflow: hidden; position: relative; }
 figure .pic { aspect-ratio: 16 / 9; background: var(--well); display: flex; align-items: center; justify-content: center; position: relative; }

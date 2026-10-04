@@ -19,6 +19,25 @@ final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSam
     /// Width over height of the camera picture.
     @Published private(set) var aspect: CGFloat = 16 / 9
 
+    /// The face framing widened or narrowed to another shape (width over height), so a wide or
+    /// oval bubble is never stretched. Stays inside the picture.
+    func framing(aspect target: CGFloat) -> CGRect {
+        var w = crop.height * target / aspect
+        var h = crop.height
+        if w > 1 { h *= 1 / w; w = 1 }
+        if h > 1 { w *= 1 / h; h = 1 }
+        let x = min(max(crop.midX - w / 2, 0), 1 - w)
+        let y = min(max(crop.midY - h / 2, 0), 1 - h)
+        return CGRect(x: x, y: y, width: w, height: h)
+    }
+
+    /// A square crop of `side` pixels centred near (cx, cy), kept inside the picture, normalised.
+    private func square(side: CGFloat, cx: CGFloat, cy: CGFloat, _ width: CGFloat, _ height: CGFloat) -> CGRect {
+        let x = min(max(cx, side / 2), width - side / 2)
+        let y = min(max(cy, side / 2), height - side / 2)
+        return CGRect(x: (x - side / 2) / width, y: (y - side / 2) / height, width: side / width, height: side / height)
+    }
+
     /// The whole picture fitted inside a square, with bars, never stretched.
     var wholePicture: CGRect {
         aspect >= 1 ? CGRect(x: 0, y: (1 - aspect) / 2, width: 1, height: aspect)
@@ -26,20 +45,25 @@ final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSam
     }
 
     let output = AVCaptureVideoDataOutput()
+    /// The camera this tracker is attached to. Frames are switched on and off through it.
+    weak var camera: CameraRecorder?
     private let queue = DispatchQueue(label: "ava.face")
     private let lock = NSLock()
     private var running = false
     private var last: CFTimeInterval = 0
     private var smoothed: CGRect?
+    /// Where the framing is heading. Only changes when she moves past the dead zone.
+    private var goal: CGRect?
     private var misses = 0
 
     /// Off unless the face box or bubble is showing. Off also stops the camera handing frames
-    /// to this output at all, which saves CPU while the app sits idle.
+    /// to this output at all, which saves CPU while the app sits idle (not during a take, see
+    /// `CameraRecorder.setFrames`).
     var active: Bool {
         get { lock.withLock { running } }
         set {
-            lock.withLock { running = newValue }
-            output.connection(with: .video)?.isEnabled = newValue
+            let changed = lock.withLock { () -> Bool in defer { running = newValue }; return running != newValue }
+            if changed { camera?.setFrames(output, on: newValue) }
         }
     }
 
@@ -51,49 +75,63 @@ final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSam
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        guard active else {
-            // The connection only exists once the camera is set up, so switch it off on first contact.
-            connection.isEnabled = false
-            return
-        }
+        guard active else { return }
         let now = CACurrentMediaTime()
         guard now - last > 0.2, let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         last = now
 
         let width = CGFloat(CVPixelBufferGetWidth(pixels))
         let height = CGFloat(CVPixelBufferGetHeight(pixels))
-        let request = VNDetectFaceRectanglesRequest()
-        try? VNImageRequestHandler(cvPixelBuffer: pixels, orientation: .up).perform([request])
-        let face = (request.results ?? []).max { $0.boundingBox.width * $0.boundingBox.height < $1.boundingBox.width * $1.boundingBox.height }
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixels, orientation: .up)
+        let faces = VNDetectFaceRectanglesRequest()
+        try? handler.perform([faces])
+        let face = (faces.results ?? []).max { $0.boundingBox.width * $0.boundingBox.height < $1.boundingBox.width * $1.boundingBox.height }
 
-        let target: CGRect
+        var target: CGRect?
         if let box = face?.boundingBox {
             misses = 0
             // Head and shoulders: about 2.8 face heights, centred a little below the face.
             let side = min(height, width, max(box.height * height * 2.8, height * 0.25))
-            var cx = box.midX * width
-            var cy = box.midY * height - box.height * height * 0.15
-            cx = min(max(cx, side / 2), width - side / 2)
-            cy = min(max(cy, side / 2), height - side / 2)
-            target = CGRect(x: (cx - side / 2) / width, y: (cy - side / 2) / height, width: side / width, height: side / height)
+            target = square(side: side, cx: box.midX * width, cy: box.midY * height - box.height * height * 0.15, width, height)
         } else {
             misses += 1
-            // Keep the last framing through a brief miss, then fall back to the middle of the picture.
-            guard misses > 10 || smoothed == nil else { return }
-            let side = min(width, height)
-            target = CGRect(x: (width - side) / 2 / width, y: 0, width: side / width, height: side / height)
+            // Looking down at notes or turned away: hold the framing for 2 seconds, then follow her body.
+            if misses > 10 {
+                let bodies = VNDetectHumanRectanglesRequest()
+                bodies.upperBodyOnly = true
+                try? handler.perform([bodies])
+                if let body = (bodies.results ?? []).max(by: { $0.boundingBox.height < $1.boundingBox.height })?.boundingBox {
+                    let side = min(height, width, max(body.width * width * 1.25, height * 0.35))
+                    target = square(side: side, cx: body.midX * width, cy: body.maxY * height - side * 0.45, width, height)
+                } else if misses > 25 || smoothed == nil {
+                    let side = min(width, height)
+                    target = CGRect(x: (width - side) / 2 / width, y: 0, width: side / width, height: side / height)
+                }
+            }
         }
 
+        // Hold still while she talks and moves a little; glide only when she really moves.
+        if let target {
+            if let goal, let current = smoothed {
+                let drift = hypot(target.midX - goal.midX, (target.midY - goal.midY) * height / width) / current.width
+                let grow = abs(target.width / goal.width - 1)
+                if drift > 0.12 || grow > 0.18 { self.goal = target }
+            } else {
+                goal = target
+            }
+        }
+        guard let goal else { return }
         let next: CGRect
         if let old = smoothed {
-            let k: CGFloat = 0.35
-            next = CGRect(x: old.minX + (target.minX - old.minX) * k, y: old.minY + (target.minY - old.minY) * k,
-                          width: old.width + (target.width - old.width) * k, height: old.height + (target.height - old.height) * k)
+            let k: CGFloat = 0.3
+            next = CGRect(x: old.minX + (goal.minX - old.minX) * k, y: old.minY + (goal.minY - old.minY) * k,
+                          width: old.width + (goal.width - old.width) * k, height: old.height + (goal.height - old.height) * k)
+            if abs(next.minX - old.minX) < 0.0005, abs(next.minY - old.minY) < 0.0005, abs(next.width - old.width) < 0.0005 { return }
         } else {
-            next = target
+            next = goal
         }
         smoothed = next
-        let hasFace = face != nil
+        let hasFace = face != nil || misses <= 10
         let ratio = width / height
         DispatchQueue.main.async {
             self.crop = next
@@ -104,15 +142,13 @@ final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSam
 }
 
 /// The live camera picture, cropped to `crop` by sizing and offsetting the preview layer.
+/// The view is made once and handed in: a preview layer joining or leaving the camera session
+/// mid-take changes the session, which can end the camera file.
 struct FaceZoomView: NSViewRepresentable {
-    var session: AVCaptureSession
+    var view: ZoomPreviewNSView
     var crop: CGRect
 
-    func makeNSView(context: Context) -> ZoomPreviewNSView {
-        let view = ZoomPreviewNSView()
-        view.preview.session = session
-        return view
-    }
+    func makeNSView(context: Context) -> ZoomPreviewNSView { view }
 
     func updateNSView(_ view: ZoomPreviewNSView, context: Context) {
         view.show(crop)
@@ -167,28 +203,59 @@ final class PillState: ObservableObject {
         didSet { UserDefaults.standard.set(expanded, forKey: "faceBoxOpen") }
     }
     @Published var faceZoom = true
-    /// Nate Herk style: her face in a circle that IS part of the screen recording.
-    @Published var bubble = UserDefaults.standard.bool(forKey: "faceInVideo") {
-        didSet { UserDefaults.standard.set(bubble, forKey: "faceInVideo") }
+}
+
+/// The shape her face takes in the video.
+enum BubbleShape: String, CaseIterable, Identifiable {
+    case circle, square, oval, wide
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .circle: "Circle"
+        case .square: "Square"
+        case .oval: "Oval"
+        case .wide: "Wide"
+        }
+    }
+
+    var size: CGSize {
+        switch self {
+        case .circle, .square: CGSize(width: 200, height: 200)
+        case .oval: CGSize(width: 176, height: 228)
+        case .wide: CGSize(width: 288, height: 162)
+        }
+    }
+
+    var outline: AnyShape {
+        switch self {
+        case .circle: AnyShape(Circle())
+        case .square: AnyShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
+        case .oval: AnyShape(Ellipse())
+        case .wide: AnyShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        }
     }
 }
 
-/// The round face that goes into the video. Only her face: no time, no buttons.
+/// Her face as it goes into the video. Only her face: no time, no buttons.
 struct FaceBubbleView: View {
-    var session: AVCaptureSession
+    var preview: ZoomPreviewNSView
+    @ObservedObject var studio: Studio
     @ObservedObject var tracker: FaceTracker
 
     var body: some View {
+        let shape = studio.bubbleShape
         Group {
             if Snapshots.active {
                 LinearGradient(colors: [Color(hex: 0x3A403C), Color(hex: 0x141716)], startPoint: .top, endPoint: .bottom)
             } else {
-                FaceZoomView(session: session, crop: tracker.crop)
+                FaceZoomView(view: preview, crop: tracker.framing(aspect: shape.size.width / shape.size.height))
             }
         }
-        .frame(width: 200, height: 200)
-        .clipShape(Circle())
-        .overlay(Circle().strokeBorder(Color.white.opacity(0.85), lineWidth: 3))
+        .frame(width: shape.size.width, height: shape.size.height)
+        .clipShape(shape.outline)
+        .overlay(shape.outline.stroke(Color.white.opacity(0.85), lineWidth: 3))
         .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
         .padding(14)
     }
@@ -198,6 +265,7 @@ struct RecordingPillView: View {
     @ObservedObject var studio: Studio
     @ObservedObject var state: PillState
     @ObservedObject var tracker: FaceTracker
+    var preview: ZoomPreviewNSView
     @State private var breathe = false
 
     var body: some View {
@@ -219,14 +287,14 @@ struct RecordingPillView: View {
                     if Snapshots.active {
                         LinearGradient(colors: [Color(hex: 0x3A403C), Color(hex: 0x141716)], startPoint: .top, endPoint: .bottom)
                     } else {
-                        FaceZoomView(session: studio.camera.session, crop: state.faceZoom ? tracker.crop : tracker.wholePicture)
+                        FaceZoomView(view: preview, crop: state.faceZoom ? tracker.crop : tracker.wholePicture)
                     }
                 }
                     .frame(width: 236, height: 236)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Palette.hairline))
                     .onTapGesture { state.faceZoom.toggle() }
-                    .help("Click to switch between her face and the whole picture")
+                    .help("Click to switch between the face and the whole picture")
                 Text(caption)
                     .engraved(Palette.ink)
                     .padding(.horizontal, 8)
@@ -265,12 +333,13 @@ struct RecordingPillView: View {
             LiveMeter(meter: studio.meter)
                 .frame(width: state.expanded ? 52 : 44)
             if state.expanded {
-                RoundButton(symbol: state.bubble ? "person.crop.circle.fill" : "person.crop.circle", lit: state.bubble,
-                            help: state.bubble ? "Take her face out of the video" : "Put her face in the video, in a circle") {
-                    state.bubble.toggle()
+                RoundButton(symbol: studio.faceInVideo ? "person.crop.circle.fill" : "person.crop.circle", lit: studio.faceInVideo,
+                            help: studio.faceInVideo ? "Take the face out of the video"
+                                : "Put the face in the video (\(studio.bubbleShape.title.lowercased()))") {
+                    studio.faceInVideo.toggle()
                 }
             }
-            RoundButton(symbol: state.expanded ? "minus" : "person.crop.square", help: state.expanded ? "Hide the face box" : "Show her face") {
+            RoundButton(symbol: state.expanded ? "minus" : "person.crop.square", help: state.expanded ? "Hide the face box" : "Show the face") {
                 state.expanded.toggle()
             }
             RoundButton(stop: true, help: "Stop recording") { studio.stop() }
@@ -281,7 +350,7 @@ struct RecordingPillView: View {
 
     private var caption: String {
         let base = !state.faceZoom ? "Whole picture" : tracker.found ? "Face" : "Looking for a face"
-        return state.bubble ? base + " · in video" : base
+        return studio.faceInVideo ? base + " · in video" : base
     }
 
     private var label: String {
@@ -335,6 +404,8 @@ final class RecordingPillController {
     private weak var hiddenWindow: NSWindow?
     private let bubble: PrompterPanel
     private var bubblePlaced = false
+    private let boxPreview = ZoomPreviewNSView()
+    private let bubblePreview = ZoomPreviewNSView()
 
     init(studio: Studio) {
         bubble = PrompterPanel(contentRect: NSRect(x: 0, y: 0, width: 228, height: 228),
@@ -352,7 +423,9 @@ final class RecordingPillController {
         panel.isOpaque = false
         panel.hasShadow = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
-        panel.contentView = NSHostingView(rootView: RecordingPillView(studio: studio, state: state, tracker: tracker))
+        boxPreview.preview.session = studio.camera.session
+        bubblePreview.preview.session = studio.camera.session
+        panel.contentView = NSHostingView(rootView: RecordingPillView(studio: studio, state: state, tracker: tracker, preview: boxPreview))
 
         for window in [bubble] {
             window.isFloatingPanel = true
@@ -364,9 +437,11 @@ final class RecordingPillController {
             window.hasShadow = false
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         }
-        bubble.contentView = NSHostingView(rootView: FaceBubbleView(session: studio.camera.session, tracker: tracker))
+        bubble.contentView = NSHostingView(rootView: FaceBubbleView(preview: bubblePreview, studio: studio, tracker: tracker))
+        fitBubble()
 
-        studio.camera.attach(tracker.output)
+        tracker.camera = studio.camera
+        studio.camera.attach(tracker.output, framesOn: false)
 
         watches.append(studio.$phase
             .removeDuplicates()
@@ -377,19 +452,23 @@ final class RecordingPillController {
             .receive(on: RunLoop.main)
             .sink { [weak self] open in
                 guard let self else { return }
-                tracker.active = (open || state.bubble) && panel.isVisible
+                tracker.active = (open || studio.faceInVideo) && panel.isVisible
                 DispatchQueue.main.async { self.resize() }
             })
-        watches.append(state.$bubble
+        watches.append(studio.$faceInVideo
             .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in DispatchQueue.main.async { self?.syncBubble() } })
+        watches.append(studio.$bubbleShape
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in DispatchQueue.main.async { self?.fitBubble() } })
     }
 
     /// Shows or hides the round face and tells the recorder to let it into the video.
     private func syncBubble() {
-        let wanted = state.bubble && panel.isVisible
-        tracker.active = (state.expanded || state.bubble) && panel.isVisible
+        let wanted = studio.faceInVideo && panel.isVisible
+        tracker.active = (state.expanded || studio.faceInVideo) && panel.isVisible
         if wanted {
             if !bubblePlaced, let visible = (studio.displayID.flatMap(DisplayChoice.screen(for:)) ?? NSScreen.main)?.visibleFrame {
                 // Bottom right of the recorded screen, where a face cam usually sits.
@@ -400,7 +479,7 @@ final class RecordingPillController {
             // The window has to be on screen before the recorder can find it.
             let id = CGWindowID(bubble.windowNumber)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-                guard let self, self.state.bubble, self.panel.isVisible else { return }
+                guard let self, self.studio.faceInVideo, self.panel.isVisible else { return }
                 self.studio.showInRecording([id])
             }
         } else {
@@ -412,7 +491,7 @@ final class RecordingPillController {
     private func follow(_ phase: Studio.Phase) {
         switch phase {
         case .starting, .recording, .stopping:
-            tracker.active = state.expanded || state.bubble
+            tracker.active = state.expanded || studio.faceInVideo
             guard !panel.isVisible else {
                 if phase == .recording { syncBubble() }
                 return
@@ -437,6 +516,15 @@ final class RecordingPillController {
 
     private var fitting: NSSize {
         panel.contentView?.fittingSize ?? NSSize(width: 280, height: 340)
+    }
+
+    /// Sizes the bubble window to its shape, keeping its bottom right corner where it is.
+    private func fitBubble() {
+        let shape = studio.bubbleShape.size
+        let size = NSSize(width: shape.width + 28, height: shape.height + 28)
+        let old = bubble.frame
+        guard old.size != size else { return }
+        bubble.setFrame(NSRect(x: old.maxX - size.width, y: old.minY, width: size.width, height: size.height), display: true)
     }
 
     /// Top right of the recorded screen, unless it has been dragged somewhere else this session.

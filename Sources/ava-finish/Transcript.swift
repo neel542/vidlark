@@ -21,7 +21,6 @@ func findModel(override: String?) -> (path: String?, searched: [String]) {
     let dirs = [
         (home as NSString).appendingPathComponent(".cache/whisper"),
         "/Users/Shared/AVA Recordings/.models",
-        "/Users/you/.cache/whisper",
     ]
     let candidates = modelFileNames.flatMap { name in dirs.map { ($0 as NSString).appendingPathComponent(name) } }
     return (candidates.first { FileManager.default.isReadableFile(atPath: $0) }, candidates)

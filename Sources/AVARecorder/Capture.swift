@@ -61,6 +61,10 @@ final class CameraRecorder: NSObject {
     private var audioInput: AVCaptureDeviceInput?
     private var lastLevel: CFTimeInterval = 0
     private var onAudio: ((CMSampleBuffer) -> Void)?
+    /// Extra frame outputs (face tracker, live view) and whether each wants frames. Camera queue only.
+    private var frameOutputs: [(output: AVCaptureOutput, wanted: Bool)] = []
+    /// True from the start of a take until its file closes. Camera queue only.
+    private var taking = false
 
     var onLevel: ((Float, Float) -> Void)?
     var onStarted: ((CFTimeInterval) -> Void)?
@@ -91,6 +95,7 @@ final class CameraRecorder: NSObject {
             if let connection = movie.connection(with: .video) {
                 movie.setOutputSettings([AVVideoCodecKey: AVVideoCodecType.hevc], for: connection)
             }
+            if !taking { frameOutputs.forEach { $0.output.connection(with: .video)?.isEnabled = $0.wanted } }
             if !session.isRunning { session.startRunning() }
         }
     }
@@ -116,7 +121,55 @@ final class CameraRecorder: NSObject {
     }
 
     func startRecording(to url: URL) {
-        queue.async { [self] in movie.startRecording(to: url, recordingDelegate: self) }
+        queue.async { [self] in
+            let changed = frameOutputsOnForTake()
+            // Give a just-changed session a moment to settle before the file opens.
+            if changed {
+                queue.asyncAfter(deadline: .now() + 0.5) { [self] in movie.startRecording(to: url, recordingDelegate: self) }
+            } else {
+                movie.startRecording(to: url, recordingDelegate: self)
+            }
+        }
+    }
+
+    /// Switches every extra output on ahead of a take, so nothing about the session changes once
+    /// the file is open. Turning one on or off mid-take is what lost a whole camera file on 4 Oct.
+    func prepareForTake() {
+        queue.async { [self] in _ = frameOutputsOnForTake() }
+    }
+
+    /// Asks for frames to an extra output, or stops them. During a take the change waits until
+    /// the file has closed; the output just drops the frames it does not want until then.
+    func setFrames(_ output: AVCaptureOutput, on: Bool) {
+        queue.async { [self] in
+            guard let i = frameOutputs.firstIndex(where: { $0.output === output }) else { return }
+            frameOutputs[i].wanted = on
+            if !taking { output.connection(with: .video)?.isEnabled = on }
+        }
+    }
+
+    /// How many seconds the open movie file holds, or nil when no file is open.
+    func written(_ reply: @escaping (Double?) -> Void) {
+        queue.async { [self] in reply(movie.isRecording ? movie.recordedDuration.seconds : nil) }
+    }
+
+    /// Camera queue only. Returns true if any connection had to be switched on.
+    private func frameOutputsOnForTake() -> Bool {
+        taking = true
+        var changed = false
+        for item in frameOutputs {
+            if let connection = item.output.connection(with: .video), !connection.isEnabled {
+                connection.isEnabled = true
+                changed = true
+            }
+        }
+        return changed
+    }
+
+    /// Camera queue only. The take is over, so outputs go back to what they asked for.
+    private func takeEnded() {
+        taking = false
+        frameOutputs.forEach { $0.output.connection(with: .video)?.isEnabled = $0.wanted }
     }
 
     /// Lets go of the camera and mic, for an extra camera that is no longer wanted.
@@ -133,21 +186,24 @@ final class CameraRecorder: NSObject {
 
     func stopRecording() {
         queue.async { [self] in
-            if movie.isRecording { movie.stopRecording() } else { onFinished?(nil) }
+            if movie.isRecording { movie.stopRecording() } else { takeEnded(); onFinished?(nil) }
         }
     }
 
-    /// Hands every mic buffer to the voice follower as well. Set on the tap queue, where it is read.
-    /// Adds another output to the camera session, such as the face tracker's frame tap.
-    func attach(_ output: AVCaptureOutput) {
+    /// Adds another output to the camera session, such as the face tracker's frame tap. Its frames
+    /// start off or on as asked; change that later with `setFrames`, never on the connection itself.
+    func attach(_ output: AVCaptureOutput, framesOn: Bool = true) {
         queue.async { [self] in
             guard !session.outputs.contains(output), session.canAddOutput(output) else { return }
             session.beginConfiguration()
             session.addOutput(output)
             session.commitConfiguration()
+            frameOutputs.append((output, framesOn))
+            if !taking { output.connection(with: .video)?.isEnabled = framesOn }
         }
     }
 
+    /// Hands every mic buffer to the voice follower as well. Set on the tap queue, where it is read.
     func forwardAudio(_ handler: ((CMSampleBuffer) -> Void)?) {
         tapQueue.async { [self] in onAudio = handler }
     }
@@ -170,7 +226,10 @@ extension CameraRecorder: AVCaptureFileOutputRecordingDelegate {
         if let e = error as NSError?, (e.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? Bool) == true {
             result = nil
         }
-        onFinished?(result)
+        queue.async { [self] in
+            takeEnded()
+            onFinished?(result)
+        }
     }
 }
 

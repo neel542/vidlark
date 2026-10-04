@@ -21,23 +21,23 @@ enum Snapshots {
             write(PrompterView(studio: s).frame(width: 920, height: 230), size: CGSize(width: 920, height: 230), to: dir.appendingPathComponent("prompter-\(name).png"))
         }
 
-        panel("ready") { $0.stage(phase: .idle, camera: "the presenter's iPhone Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
-        panel("recording") { $0.stage(phase: .recording, camera: "the presenter's iPhone Camera", mic: "Wireless Mic Rx", level: -14, elapsed: 462, cardIndex: 5, cardElapsed: 41, countdown: nil, screenAllowed: true, script: script) }
-        panel("finishing") { $0.stage(phase: .finishing(step: "Writing the transcript", progress: 0.5), camera: "the presenter's iPhone Camera", mic: "Wireless Mic Rx", level: -60, elapsed: 905, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
+        panel("ready") { $0.stage(phase: .idle, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
+        panel("recording") { $0.stage(phase: .recording, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -14, elapsed: 462, cardIndex: 5, cardElapsed: 41, countdown: nil, screenAllowed: true, script: script) }
+        panel("finishing") { $0.stage(phase: .finishing(step: "Writing the transcript", progress: 0.5), camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -60, elapsed: 905, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
         panel("reactions-on") {
-            $0.stage(phase: .idle, camera: "the presenter's iPhone Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script)
+            $0.stage(phase: .idle, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script)
             $0.stageReactions(true)
         }
         panel("not-ready") { $0.stage(phase: .idle, camera: nil, mic: "MacBook Air Microphone", level: -70, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: false, script: nil) }
-        panel("done") { $0.stage(phase: .done(folder: URL(fileURLWithPath: "/tmp"), note: nil), camera: "the presenter's iPhone Camera", mic: "Wireless Mic Rx", level: -50, elapsed: 905, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
+        panel("done") { $0.stage(phase: .done(folder: URL(fileURLWithPath: "/tmp"), note: nil), camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -50, elapsed: 905, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
 
         func wide(_ name: String, _ setup: (Studio) -> Void) {
             let s = Studio()
             setup(s)
             write(PanelView(studio: s).preferredColorScheme(.dark), size: CGSize(width: 1512, height: 945), to: dir.appendingPathComponent("wide-\(name).png"))
         }
-        wide("ready") { $0.stage(phase: .idle, camera: "the presenter's iPhone Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
-        wide("recording") { $0.stage(phase: .recording, camera: "the presenter's iPhone Camera", mic: "Wireless Mic Rx", level: -14, elapsed: 462, cardIndex: 5, cardElapsed: 41, countdown: nil, screenAllowed: true, script: script) }
+        wide("ready") { $0.stage(phase: .idle, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
+        wide("recording") { $0.stage(phase: .recording, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -14, elapsed: 462, cardIndex: 5, cardElapsed: 41, countdown: nil, screenAllowed: true, script: script) }
 
         for open in [true, false] {
             let s = Studio()
@@ -45,10 +45,18 @@ enum Snapshots {
             let state = PillState()
             state.expanded = open
             let size = open ? CGSize(width: 290, height: 340) : CGSize(width: 290, height: 70)
-            write(RecordingPillView(studio: s, state: state, tracker: FaceTracker()), size: size,
+            write(RecordingPillView(studio: s, state: state, tracker: FaceTracker(), preview: ZoomPreviewNSView()), size: size,
                   to: dir.appendingPathComponent(open ? "pill-open.png" : "pill-closed.png"))
         }
         UserDefaults.standard.removeObject(forKey: "faceBoxOpen")
+
+        for shape in BubbleShape.allCases {
+            let s = Studio()
+            s.bubbleShape = shape
+            write(FaceBubbleView(preview: ZoomPreviewNSView(), studio: s, tracker: FaceTracker()).background(Color(hex: 0x5A6E8C)),
+                  size: CGSize(width: shape.size.width + 28, height: shape.size.height + 28),
+                  to: dir.appendingPathComponent("bubble-\(shape.rawValue).png"))
+        }
 
         prompter("waiting") { $0.stage(phase: .idle, camera: "x", mic: "x", level: -30, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
         prompter("countdown") { $0.stage(phase: .recording, camera: "x", mic: "x", level: -30, elapsed: 1, cardIndex: 0, cardElapsed: 0, countdown: 2, screenAllowed: true, script: script) }

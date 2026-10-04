@@ -28,6 +28,8 @@ A native Mac app for filming the presenter's YouTube videos. It replaces Loom. I
 | 11 | Simple for the presenter | She only ever sees the prompter |
 | 12 | Batch day | A queue of videos for the day; the next one loads after each finishes |
 | 13 | Extra cameras | Added 4 Oct: any other camera can record its own file (`camera-2.mov` on) next to the main one, with the same mic for sync |
+| 15 | Face in video, any shape | Added 4 Oct: circle, square, oval or wide. The camera file is always separate, so the shape can also change in editing |
+| 16 | Camera watchdog | Added 4 Oct: if camera.mov stops growing for 6 seconds the take stops and says so. Previews are made once at launch, because a preview joining the camera mid-take ends camera.mov (measured with `--camera-test`) |
 | 14 | Live view | Added 4 Oct: a no-login web page with every camera, the screen while recording, the mic level and the checks. Served by the Mac on port 8790 behind a secret link; Anywhere mode adds a Cloudflare quick tunnel. Pictures are only made while someone watches |
 
 Not building: the Shorts cutter, and iPhone remote control.

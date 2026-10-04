@@ -28,7 +28,7 @@ struct PanelView: View {
     }
 
     private var viewfinder: some View {
-        Viewfinder(session: studio.camera.session, hasCamera: studio.cameraName != nil && studio.cameraAllowed,
+        Viewfinder(preview: studio.mainPreview, hasCamera: studio.cameraName != nil && studio.cameraAllowed,
                    rolling: studio.isRolling)
     }
 
@@ -150,15 +150,28 @@ struct PanelView: View {
             let extra = studio.cameras.filter { $0.uniqueID != studio.cameraID }.map { d in
                 MenuChoice(title: "Also record \(d.localizedName)", selected: studio.extraCameraIDs.contains(d.uniqueID)) { studio.toggleExtra(d.uniqueID) }
             }
-            return main + extra
+            // Touch up is macOS Studio Light, set in Video Effects. Only the person at the Mac can switch it.
+            let touchUp = MenuChoice(title: studio.touchUpOn ? "Touch up the face: on" : "Touch up the face", selected: studio.touchUpOn) {
+                studio.openVideoEffects()
+            }
+            return main + extra + [touchUp]
         case "mic":
             return studio.mics.map { d in MenuChoice(title: d.localizedName, selected: d.uniqueID == studio.micID) { studio.micID = d.uniqueID } }
         case "screen":
             guard studio.screenAllowed else { return nil }
             return studio.displays.map { d in MenuChoice(title: d.name, selected: d.id == studio.displayID) { studio.displayID = d.id } }
         case "prompter":
-            return [MenuChoice(title: "Follows her voice", selected: studio.followVoice) { studio.followVoice = true },
+            return [MenuChoice(title: "Follows the voice", selected: studio.followVoice) { studio.followVoice = true },
                     MenuChoice(title: "Key only", selected: !studio.followVoice) { studio.followVoice = false }]
+        case "face":
+            var choices = [MenuChoice(title: "Screen only", selected: !studio.faceInVideo) { studio.faceInVideo = false }]
+            for shape in BubbleShape.allCases {
+                choices.append(MenuChoice(title: "Face in video, \(shape.title.lowercased())", selected: studio.faceInVideo && studio.bubbleShape == shape) {
+                    studio.bubbleShape = shape
+                    studio.faceInVideo = true
+                })
+            }
+            return choices
         case "live":
             var choices = [
                 MenuChoice(title: "Off", selected: studio.liveMode == .off) { studio.liveMode = .off },
@@ -186,6 +199,7 @@ struct PanelView: View {
                 Text(problem)
                     .font(.system(size: 12))
                     .foregroundStyle(Palette.dim)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .transition(.opacity)
             }
@@ -247,7 +261,7 @@ struct PanelView: View {
         case .starting:
             Text("Starting the camera and screen.").guidanceStyle()
         case .recording:
-            Text(studio.countdown != nil ? "Rolling. the presenter starts after the count." : "Recording. Press to stop.")
+            Text(studio.countdown != nil ? "Rolling. Start talking after the count." : "Recording. Press to stop.")
                 .guidanceStyle()
         case .stopping:
             Text("Closing the files.").guidanceStyle()
@@ -497,7 +511,7 @@ private struct KeyPress: ButtonStyle {
 // MARK: - Viewfinder
 
 struct Viewfinder: View {
-    var session: AVCaptureSession
+    var preview: PreviewNSView
     var hasCamera: Bool
     var rolling: Bool
 
@@ -509,7 +523,7 @@ struct Viewfinder: View {
                 Text("Camera picture").font(.system(size: 12)).foregroundStyle(Palette.engraved)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if hasCamera {
-                PreviewLayerView(session: session)
+                PreviewLayerView(view: preview)
             } else {
                 VStack(spacing: 6) {
                     Image(systemName: "video.slash")
@@ -540,14 +554,12 @@ struct Viewfinder: View {
     }
 }
 
+/// Shows a preview made once at launch. A preview joining or leaving the camera session during a
+/// take ends camera.mov on the spot (measured 4 Oct), so SwiftUI must never make or drop one.
 struct PreviewLayerView: NSViewRepresentable {
-    var session: AVCaptureSession
+    var view: PreviewNSView
 
-    func makeNSView(context: Context) -> PreviewNSView {
-        let view = PreviewNSView()
-        view.preview.session = session
-        return view
-    }
+    func makeNSView(context: Context) -> PreviewNSView { view }
 
     func updateNSView(_ view: PreviewNSView, context: Context) {}
 }
