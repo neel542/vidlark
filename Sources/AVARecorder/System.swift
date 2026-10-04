@@ -19,6 +19,8 @@ final class PrompterKeys {
             var key = EventHotKeyID()
             GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
                               nil, MemoryLayout<EventHotKeyID>.size, nil, &key)
+            // Only this key's own hot keys; the remote's have their own signature.
+            guard key.signature == OSType(0x4156_4152) else { return OSStatus(eventNotHandledErr) }
             DispatchQueue.main.async {
                 if key.id == 1 { PrompterKeys.shared.onNext?() } else { PrompterKeys.shared.onBack?() }
             }

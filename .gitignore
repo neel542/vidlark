@@ -5,3 +5,4 @@
 .swiftpm/
 Tests/fixtures/out/
 .claude/
+.impeccable/

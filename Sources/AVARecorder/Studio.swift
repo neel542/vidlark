@@ -1,5 +1,7 @@
 import AVFoundation
+import CoreAudio
 import AppKit
+import Combine
 import ScreenCaptureKit
 import SwiftUI
 
@@ -19,7 +21,9 @@ final class Studio: ObservableObject {
     }
 
     // Take state
-    @Published private(set) var phase: Phase = .idle
+    @Published private(set) var phase: Phase = .idle {
+        didSet { updateRemote() }
+    }
     @Published private(set) var elapsed: TimeInterval = 0
     @Published private(set) var cardElapsed: TimeInterval = 0
     @Published private(set) var cardIndex = 0
@@ -83,17 +87,39 @@ final class Studio: ObservableObject {
     @Published var screenAudio = UserDefaults.standard.bool(forKey: "screenAudio") {
         didSet { if !Snapshots.active { UserDefaults.standard.set(screenAudio, forKey: "screenAudio") } }
     }
+    /// Make video.mp4 after a take with a screen. Off saves time and space; the camera and screen
+    /// files are kept either way.
+    @Published var makeVideo = UserDefaults.standard.object(forKey: "makeVideo") as? Bool ?? true {
+        didSet { if !Snapshots.active { UserDefaults.standard.set(makeVideo, forKey: "makeVideo") } }
+    }
+    @Published var cameraQuality = CameraQuality(rawValue: UserDefaults.standard.string(forKey: "cameraQuality") ?? "") ?? .best {
+        didSet { if !Snapshots.active { UserDefaults.standard.set(cameraQuality.rawValue, forKey: "cameraQuality") }; applyInputs() }
+    }
+    /// 60 frames a second where the camera can, for smoother motion.
+    @Published var smoothMotion = UserDefaults.standard.bool(forKey: "smoothMotion") {
+        didSet { if !Snapshots.active { UserDefaults.standard.set(smoothMotion, forKey: "smoothMotion") }; applyInputs() }
+    }
+    /// What the main camera is recording right now.
+    @Published private(set) var cameraFormat: CameraFormat?
+    /// macOS camera effects that change the picture for every app. Only the person at the Mac can
+    /// switch them, in Video Effects.
+    @Published private(set) var portraitOn = false
+    @Published private(set) var centerStageOn = false
     /// The screen is being recorded in the take in progress: from the start, or since it was shared.
     @Published private(set) var takeHasScreen = true
     /// What the finished video shows right now. Both files keep recording either way; the finisher
     /// makes video.mp4 follow each switch with a short fade.
     enum Show: String { case camera, screen }
     @Published private(set) var showing: Show = .camera
+    /// Bumped when the remote asks for the screen in a camera-first take: the face box asks first.
+    @Published private(set) var shareRequest = 0
+    private var remoteWatch: [AnyCancellable] = []
     /// Why sharing the screen mid-take did not work, shown in the face box.
     @Published var shareProblem: String?
     /// True while the screen recorder is starting for a mid-take share.
     private var sharing = false
     private var takeWantsTranscript = true
+    private var takeWantsVideo = true
     /// macOS Studio Light: brightens her face and softens the background, inside the camera itself.
     @Published private(set) var touchUpOn = false
     @Published private(set) var liveFailure: String?
@@ -155,6 +181,10 @@ final class Studio: ObservableObject {
             FramingTest.run(movie: URL(fileURLWithPath: CommandLine.arguments[i + 1]), out: URL(fileURLWithPath: CommandLine.arguments[i + 2]))
             return
         }
+        if let i = CommandLine.arguments.firstIndex(of: "--remote-test"), i + 1 < CommandLine.arguments.count {
+            RemoteTest.run(dir: URL(fileURLWithPath: CommandLine.arguments[i + 1]))
+            return
+        }
         if let i = CommandLine.arguments.firstIndex(of: "--screen-camera-test"), i + 1 < CommandLine.arguments.count {
             ScreenCameraTest.run(dir: URL(fileURLWithPath: CommandLine.arguments[i + 1]))
             return
@@ -169,6 +199,9 @@ final class Studio: ObservableObject {
 
         camera.onLevel = { [weak self] avg, pk in
             DispatchQueue.main.async { self?.takeLevel(avg, pk) }
+        }
+        camera.onFormat = { [weak self] format in
+            DispatchQueue.main.async { self?.cameraFormat = format }
         }
         bootLive()
         camera.attach(feed.output)
@@ -195,6 +228,48 @@ final class Studio: ObservableObject {
             Task { @MainActor in self?.runChecks() }
         }
         applyLive()
+        bootRemote()
+    }
+
+    /// Bluetooth remote and clicker buttons, learned in Settings. They listen during a take, and
+    /// while ready too when one of them starts and stops recording.
+    private func bootRemote() {
+        let remote = RemoteControl.shared
+        remote.onAction = { [weak self] action in self?.remotePressed(action) }
+        remoteWatch = [
+            remote.$buttons.map { _ in () }.merge(with: remote.$learning.map { _ in () })
+                .receive(on: RunLoop.main)
+                .sink { [weak self] in DispatchQueue.main.async { self?.updateRemote() } },
+        ]
+        // Access granted in System Settings only shows once the app looks again.
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { RemoteControl.shared.refreshTrust() }
+        }
+        updateRemote()
+    }
+
+    private func updateRemote() {
+        guard booted, !Snapshots.active else { return }
+        let remote = RemoteControl.shared
+        guard remote.learning == nil else { return }
+        var ready = false
+        switch phase {
+        case .idle, .done, .failed: ready = remote.buttons[.startStop] != nil
+        default: break
+        }
+        remote.setActive(isRolling || ready)
+    }
+
+    private func remotePressed(_ action: RemoteAction) {
+        switch action {
+        case .nextLine: next()
+        case .previousLine: back()
+        case .switchView:
+            guard phase == .recording else { return }
+            if showing == .screen { show(.camera) } else if takeHasScreen { show(.screen) } else { shareRequest += 1 }
+        case .startStop:
+            if isRolling { stop() } else if canStart { start() }
+        }
     }
 
     private func requestPermissions() {
@@ -250,6 +325,8 @@ final class Studio: ObservableObject {
         reactionsOn = AVCaptureDevice.reactionEffectsEnabled
         gesturesOn = AVCaptureDevice.reactionEffectGesturesEnabled
         touchUpOn = AVCaptureDevice.isStudioLightEnabled
+        portraitOn = AVCaptureDevice.isPortraitEffectEnabled
+        centerStageOn = AVCaptureDevice.isCenterStageEnabled
     }
 
     private func refreshDevices(preferredCamera: String?, preferredMic: String?) {
@@ -277,7 +354,7 @@ final class Studio: ObservableObject {
         guard !isBusy, !Snapshots.active else { return }
         let cam = cameraAllowed ? cameras.first { $0.uniqueID == cameraID } : nil
         let mic = micAllowed ? mics.first { $0.uniqueID == micID } : nil
-        camera.use(camera: cam, mic: mic)
+        camera.use(camera: cam, mic: mic, quality: cameraQuality, smooth: smoothMotion)
 
         // Each extra camera writes its own file with the same mic, so the finisher can line it up by sound.
         let wanted = cameraAllowed ? activeExtras : []
@@ -290,8 +367,10 @@ final class Studio: ObservableObject {
             extras = wanted.indices.map { i in
                 let recorder = CameraRecorder()
                 let tap = LiveTap(name: "camera-\(i + 2)", frames: liveFrames)
+                tap.camera = recorder
                 liveTaps[tap.name] = tap
-                recorder.attach(tap.output)
+                // Off until someone opens the live page; it wakes itself when asked for.
+                recorder.attach(tap.output, framesOn: false)
                 return recorder
             }
             extraOrder = wanted.map(\.uniqueID)
@@ -438,6 +517,69 @@ final class Studio: ObservableObject {
         }
     }
 
+    /// The one thing that needs fixing before a take, in plain words, with what fixes it. Nil when
+    /// everything is ready. The panel shows only this, never a wall of rows.
+    struct Attention: Equatable {
+        enum Fix: Equatable { case privacy(String), screenAccess, videoEffects }
+        var level: LampState
+        var text: String
+        var fix: Fix?
+        var fixTitle: String?
+        var learnMore: SettingsPage?
+    }
+
+    var attention: Attention? {
+        if !cameraAllowed {
+            return Attention(level: .fail, text: "AVA Recorder is not allowed to use the camera yet.",
+                             fix: .privacy("Privacy_Camera"), fixTitle: "Allow")
+        }
+        if !micAllowed {
+            return Attention(level: .fail, text: "AVA Recorder is not allowed to use the microphone yet.",
+                             fix: .privacy("Privacy_Microphone"), fixTitle: "Allow")
+        }
+        if micName == nil {
+            return Attention(level: .fail, text: "No microphone found. Plug in the mic receiver or connect a Bluetooth mic.")
+        }
+        if recordScreen && !screenAllowed {
+            return Attention(level: .fail, text: "Screen recording is not allowed yet, so only the camera can be recorded.",
+                             fix: .screenAccess, fixTitle: "Allow")
+        }
+        if let freeGB, freeGB < 20 {
+            return Attention(level: freeGB < 5 ? .fail : .warn,
+                             text: "Only \(Int(freeGB)) GB free. A 15 minute take needs about 3 GB.", learnMore: .mac)
+        }
+        if let liveFailure { return Attention(level: .fail, text: liveFailure, learnMore: .live) }
+        if reactionsOn || gesturesOn {
+            return Attention(level: .warn,
+                             text: "macOS Reactions are on. A thumbs-up can fill your video with balloons, and they use battery.",
+                             fix: .videoEffects, fixTitle: "Turn off", learnMore: .effects)
+        }
+        if !power.pluggedIn {
+            return Attention(level: .warn, text: "On battery\(power.percent.map { " (\($0)%)" } ?? ""). Plug in the charger before a long take.",
+                             learnMore: .mac)
+        }
+        return nil
+    }
+
+    func fix(_ fix: Attention.Fix) {
+        switch fix {
+        case .privacy(let anchor):
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)") { NSWorkspace.shared.open(url) }
+        case .screenAccess: askForScreenAccess()
+        case .videoEffects: openVideoEffects()
+        }
+    }
+
+    /// How a microphone connects, so "AirPods" and "the mic receiver" are easy to tell apart.
+    static func connection(_ device: AVCaptureDevice) -> String {
+        switch UInt32(bitPattern: device.transportType) {
+        case kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE: "Bluetooth"
+        case kAudioDeviceTransportTypeUSB: "USB"
+        case kAudioDeviceTransportTypeBuiltIn: "Built in"
+        default: "Plugged in"
+        }
+    }
+
     /// Extra cameras that are plugged in, in the order they were added. Never the main camera.
     var activeExtras: [AVCaptureDevice] {
         extraCameraIDs.compactMap { id in id == cameraID ? nil : cameras.first { $0.uniqueID == id } }
@@ -504,6 +646,7 @@ final class Studio: ObservableObject {
         takeHasScreen = withScreen
         shareProblem = nil
         takeWantsTranscript = writeTranscript
+        takeWantsVideo = makeVideo
         phase = .starting
         elapsed = 0
         cardElapsed = 0
@@ -860,6 +1003,7 @@ final class Studio: ObservableObject {
         let process = Process()
         process.executableURL = tool
         process.arguments = [folder.path] + (takeWantsTranscript ? [] : ["--no-transcribe", "--no-chapters"])
+            + (takeWantsVideo ? [] : ["--no-video"])
         let out = Pipe()
         process.standardOutput = out
         process.standardError = FileHandle(forWritingAtPath: "/dev/null")
@@ -1113,6 +1257,7 @@ extension Studio {
         power = PowerState(pluggedIn: true, percent: 86)
         liveMode = .wifi
         faceInVideo = true
+        if camera != nil { cameraFormat = CameraFormat(width: 1920, height: 1080, fps: 30) }
         if let script {
             let item = VideoItem(title: "Sample", script: script)
             queue = [item, VideoItem(title: "Second", script: "# Inbound placement fees, explained\n- one"),
@@ -1203,8 +1348,11 @@ extension Studio {
             Task { @MainActor in self?.liveTaps[name]?.wake() }
         }
         let tap = LiveTap(name: "camera", frames: liveFrames)
+        // Without its camera the tap could never switch itself off, and took 30 frames a second
+        // all day for nothing (found by the 4 Oct audit).
+        tap.camera = camera
         liveTaps[tap.name] = tap
-        camera.attach(tap.output)
+        camera.attach(tap.output, framesOn: false)
         screen.onFrame = { [frames = liveFrames] pixels in
             frames.offer("screen", pixels, maxWidth: 1600, interval: 0.5)
         }

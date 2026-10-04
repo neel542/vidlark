@@ -50,6 +50,44 @@ enum Devices {
 
 // MARK: - Camera and mic
 
+/// How sharp the camera records. Higher is sharper and makes bigger files.
+enum CameraQuality: String, CaseIterable, Identifiable {
+    case best, uhd, fullHD, hd
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .best: "Best it offers"
+        case .uhd: "4K"
+        case .fullHD: "1080p"
+        case .hd: "720p"
+        }
+    }
+
+    /// The picture height asked for; nil takes the biggest.
+    var height: Int32? {
+        switch self {
+        case .best: nil
+        case .uhd: 2160
+        case .fullHD: 1080
+        case .hd: 720
+        }
+    }
+}
+
+/// What the camera is recording right now.
+struct CameraFormat: Equatable {
+    var width: Int
+    var height: Int
+    var fps: Int
+
+    var text: String { "\(width) × \(height), \(fps) fps" }
+
+    /// About how big 15 minutes of camera.mov gets, measured on 4 Oct at 0.08 bits a pixel in HEVC.
+    var gigabytesPer15Minutes: Double { Double(width * height * fps) * 0.08 * 900 / 8 / 1_000_000_000 }
+}
+
 /// iPhone video plus the mic, into camera.mov. Writes 2 second fragments so a crash keeps the take.
 final class CameraRecorder: NSObject {
     let session = AVCaptureSession()
@@ -69,6 +107,8 @@ final class CameraRecorder: NSObject {
     private var settled: CFTimeInterval = 0
 
     var onLevel: ((Float, Float) -> Void)?
+    /// The format the camera ended up recording in, after each `use`. Called on the camera queue.
+    var onFormat: ((CameraFormat?) -> Void)?
     var onStarted: ((CFTimeInterval) -> Void)?
     var onFinished: ((Error?) -> Void)?
 
@@ -78,7 +118,7 @@ final class CameraRecorder: NSObject {
         levelTap.setSampleBufferDelegate(self, queue: tapQueue)
     }
 
-    func use(camera: AVCaptureDevice?, mic: AVCaptureDevice?) {
+    func use(camera: AVCaptureDevice?, mic: AVCaptureDevice?, quality: CameraQuality = .best, smooth: Bool = false) {
         queue.async { [self] in
             session.beginConfiguration()
             if let v = videoInput { session.removeInput(v); videoInput = nil }
@@ -93,7 +133,7 @@ final class CameraRecorder: NSObject {
             if !session.outputs.contains(levelTap), session.canAddOutput(levelTap) { session.addOutput(levelTap) }
             session.commitConfiguration()
 
-            if let camera { Self.useLargestFormat(camera) }
+            onFormat?(camera.flatMap { Self.useFormat($0, quality: quality, fps: smooth ? 60 : 30) })
             if let connection = movie.connection(with: .video) {
                 movie.setOutputSettings([AVVideoCodecKey: AVVideoCodecType.hevc], for: connection)
             }
@@ -102,24 +142,41 @@ final class CameraRecorder: NSObject {
         }
     }
 
-    /// The biggest picture the camera offers at 30 frames a second or more.
-    private static func useLargestFormat(_ device: AVCaptureDevice) {
-        func pixels(_ f: AVCaptureDevice.Format) -> Int32 {
-            let d = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
-            return d.width * d.height
+    /// The picture asked for: the quality's height (or the biggest), widescreen first, at `fps`
+    /// when the camera can, otherwise at 30. Returns what it set.
+    private static func useFormat(_ device: AVCaptureDevice, quality: CameraQuality, fps wanted: Int) -> CameraFormat? {
+        func size(_ f: AVCaptureDevice.Format) -> CMVideoDimensions { CMVideoFormatDescriptionGetDimensions(f.formatDescription) }
+        func runs(_ f: AVCaptureDevice.Format, _ rate: Int) -> Bool {
+            f.videoSupportedFrameRateRanges.contains { $0.maxFrameRate >= Double(rate) - 0.1 && $0.minFrameRate <= Double(rate) + 0.1 }
         }
-        let candidates = device.formats.filter { f in
-            f.videoSupportedFrameRateRanges.contains { $0.maxFrameRate >= 29.9 && $0.minFrameRate <= 30.1 }
+        func widescreen(_ f: AVCaptureDevice.Format) -> Bool {
+            let d = size(f)
+            return abs(Double(d.width) / Double(max(d.height, 1)) - 16.0 / 9.0) < 0.02
         }
-        guard let best = candidates.max(by: { pixels($0) < pixels($1) }) else { return }
+        func pick(_ rate: Int) -> AVCaptureDevice.Format? {
+            let able = device.formats.filter { runs($0, rate) }
+            // Widescreen is what YouTube shows; a square or 4:3 picture only when nothing else fits.
+            let pool = able.contains(where: widescreen) ? able.filter(widescreen) : able
+            let fitting = quality.height.map { h in pool.filter { size($0).height <= h } } ?? pool
+            let choices = fitting.isEmpty ? pool : fitting
+            return choices.max { Int(size($0).width) * Int(size($0).height) < Int(size($1).width) * Int(size($1).height) }
+        }
+        var rate = wanted
+        var format = pick(rate)
+        if format == nil, rate != 30 { rate = 30; format = pick(30) }
+        guard let format else { return nil }
         do {
             try device.lockForConfiguration()
-            device.activeFormat = best
-            let thirty = CMTime(value: 1, timescale: 30)
-            device.activeVideoMinFrameDuration = thirty
-            device.activeVideoMaxFrameDuration = thirty
+            device.activeFormat = format
+            let frame = CMTime(value: 1, timescale: CMTimeScale(rate))
+            device.activeVideoMinFrameDuration = frame
+            device.activeVideoMaxFrameDuration = frame
             device.unlockForConfiguration()
-        } catch {}
+        } catch {
+            return nil
+        }
+        let d = size(format)
+        return CameraFormat(width: Int(d.width), height: Int(d.height), fps: rate)
     }
 
     func startRecording(to url: URL) {

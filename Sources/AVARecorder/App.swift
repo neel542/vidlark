@@ -31,6 +31,10 @@ struct AVARecorderApp: App {
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .newItem) {}
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") { SettingsWindow.show() }
+                    .keyboardShortcut(",", modifiers: .command)
+            }
         }
     }
 }

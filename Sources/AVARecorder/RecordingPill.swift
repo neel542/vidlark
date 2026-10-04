@@ -233,12 +233,15 @@ enum BubbleShape: String, CaseIterable, Identifiable {
         }
     }
 
-    var outline: AnyShape {
+    var outline: AnyShape { outline(scale: 1) }
+
+    /// The shape drawn at `scale` of its bubble size, corners scaled with it.
+    func outline(scale: CGFloat) -> AnyShape {
         switch self {
         case .circle: AnyShape(Circle())
-        case .square: AnyShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
+        case .square: AnyShape(RoundedRectangle(cornerRadius: 34 * scale, style: .continuous))
         case .oval: AnyShape(Ellipse())
-        case .wide: AnyShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        case .wide: AnyShape(RoundedRectangle(cornerRadius: 22 * scale, style: .continuous))
         }
     }
 }
@@ -624,6 +627,15 @@ final class RecordingPillController {
                     guard let self, self.studio.phase == .recording else { return }
                     self.applyShowing(animated: true)
                 }
+            })
+        // The remote's Screen button in a camera-first take: ask first, as a click does.
+        watches.append(studio.$shareRequest
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self, self.studio.isRolling, !self.studio.takeHasScreen else { return }
+                self.studio.shareProblem = nil
+                self.state.askingToShare = true
             })
         // Sharing the screen mid-take brings the bubble in, if the face goes in the video.
         watches.append(studio.$takeHasScreen

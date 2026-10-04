@@ -7,8 +7,8 @@ import SwiftUI
 
  OWN-WORLD: An anodised graphite body (#0E1110 to #151917) with engraved uppercase labels in a warm
  grey-green. Status lamps have a hot centre. The level meter is segmented, signal green through
- amber to red. Green is the only accent and it means "live and good". Red appears in one place only:
- the rolling lamp. Labels use the system sans; timecode uses tabular figures.
+ amber to red. Green means "live and good". Red is the record button, like a camera's, and the
+ rolling lamp. Labels use the system sans; timecode uses tabular figures.
 
  STORY: Neel glances at the panel and knows camera, mic and screen are live. He picks today's video
  and presses the lit key. He watches time and level, then sees the files get finished and filed.

@@ -41,7 +41,7 @@ struct PanelView: View {
             viewfinder
                 .frame(height: 200)
                 .padding(.top, 14)
-            inputs(dense: true)
+            setup(dense: true)
                 .padding(.top, 16)
             Spacer(minLength: 12)
             transport(big: false)
@@ -65,7 +65,7 @@ struct PanelView: View {
                     }
                 }
                 VStack(spacing: 0) {
-                    inputs(dense: false)
+                    setup(dense: false)
                     Spacer(minLength: 24)
                     transport(big: true)
                 }
@@ -80,9 +80,25 @@ struct PanelView: View {
     // MARK: Header
 
     private func header(big: Bool) -> some View {
-        HStack(alignment: .center, spacing: big ? 18 : 10) {
+        HStack(alignment: .center, spacing: big ? 10 : 8) {
             queueButton(big: big)
-            RecordingsButton(big: big)
+                .padding(.trailing, big ? 8 : 2)
+            if studio.liveMode != .off {
+                HeaderButton(symbol: "dot.radiowaves.left.and.right", title: "Live", big: big,
+                             help: "Live view is on. Click for the link.", lamp: studio.liveFailure == nil ? .ok : .fail) {
+                    SettingsWindow.show(.live)
+                }
+            }
+            if big {
+                RecordingsButton(big: big)
+            } else {
+                HeaderButton(symbol: "square.grid.2x2", title: "Recordings", big: false,
+                             help: "Every recording (Command-Shift-R)", lamp: nil) { RecordingsWindow.show() }
+            }
+            HeaderButton(symbol: "gearshape", title: "Settings", big: big,
+                         help: "Settings, with what every option does (Command-Comma)", lamp: nil) {
+                SettingsWindow.show()
+            }
         }
     }
 
@@ -122,105 +138,24 @@ struct PanelView: View {
         return parts.joined(separator: " · ")
     }
 
-    // MARK: Inputs
+    // MARK: Setup
 
-    private func inputs(dense: Bool) -> some View {
-        // The prompter row comes back when the prompter does.
-        let checks = studio.checks.filter { $0.id != "prompter" }
-        return VStack(spacing: 0) {
-            ForEach(checks) { check in
-                InputRow(check: check, label: check.label, menu: menu(for: check.id), height: dense ? 33 : 38)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        if check.id == "screen" && !studio.screenAllowed { studio.askForScreenAccess() }
-                        if check.id == "after" { studio.writeTranscript.toggle() }
-                        if check.id == "effects" { studio.openVideoEffects() }
-                    }
-                if check.id == "mic" {
-                    LiveMeter(meter: studio.meter)
-                        .padding(.leading, 17)
-                        .padding(.bottom, 9)
-                }
-                if check.id != checks.last?.id { Rectangle().fill(Palette.hairline).frame(height: 1) }
+    /// The sources, and under them the one thing to fix, if there is one.
+    private func setup(dense: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SourcesPanel(studio: studio, dense: dense)
+            if let attention = studio.attention, !studio.isBusy {
+                AttentionCard(attention: attention) { studio.fix($0) }
+                    .transition(.opacity)
             }
         }
-        .padding(.horizontal, 14)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.face))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Palette.hairline))
-        .allowsHitTesting(!studio.isBusy)
-    }
-
-    private func menu(for id: String) -> [MenuChoice]? {
-        switch id {
-        case "camera":
-            let main = studio.cameras.map { d in MenuChoice(title: d.localizedName, selected: d.uniqueID == studio.cameraID) { studio.cameraID = d.uniqueID } }
-            // Any other camera can record its own file alongside the main one.
-            let extra = studio.cameras.filter { $0.uniqueID != studio.cameraID }.map { d in
-                MenuChoice(title: "Also record \(d.localizedName)", selected: studio.extraCameraIDs.contains(d.uniqueID)) { studio.toggleExtra(d.uniqueID) }
-            }
-            // Touch up is macOS Studio Light, set in Video Effects. Only the person at the Mac can switch it.
-            let touchUp = MenuChoice(title: studio.touchUpOn ? "Touch up the face: on" : "Touch up the face", selected: studio.touchUpOn) {
-                studio.openVideoEffects()
-            }
-            return main + extra + [touchUp]
-        case "mic":
-            return studio.mics.map { d in MenuChoice(title: d.localizedName, selected: d.uniqueID == studio.micID) { studio.micID = d.uniqueID } }
-        case "screen":
-            // Camera first: the take starts with only the camera, and the screen joins when it is
-            // shared from the face box. Never shared, and the video is just the camera.
-            let later = MenuChoice(title: "Camera first, share the screen when ready", selected: !studio.recordScreen) { studio.recordScreen = false }
-            let sound = MenuChoice(title: "Include the Mac's sound", selected: studio.screenAudio) { studio.screenAudio.toggle() }
-            guard studio.screenAllowed else { return studio.recordScreen ? nil : [later] }
-            return studio.displays.map { d in
-                MenuChoice(title: d.name, selected: studio.recordScreen && d.id == studio.displayID) {
-                    studio.displayID = d.id
-                    studio.recordScreen = true
-                }
-            } + [later, sound]
-        case "prompter":
-            return [MenuChoice(title: "Follows the voice", selected: studio.followVoice) { studio.followVoice = true },
-                    MenuChoice(title: "Key only", selected: !studio.followVoice) { studio.followVoice = false }]
-        case "face":
-            var choices = [MenuChoice(title: "Screen only", selected: !studio.faceInVideo) { studio.faceInVideo = false }]
-            for shape in BubbleShape.allCases {
-                choices.append(MenuChoice(title: "Face in video, \(shape.title.lowercased())", selected: studio.faceInVideo && studio.bubbleShape == shape) {
-                    studio.bubbleShape = shape
-                    studio.faceInVideo = true
-                })
-            }
-            return choices
-        case "live":
-            var choices = [
-                MenuChoice(title: "Off", selected: studio.liveMode == .off) { studio.liveMode = .off },
-                MenuChoice(title: "Home Wi-Fi", selected: studio.liveMode == .wifi) { studio.liveMode = .wifi },
-                MenuChoice(title: "Anywhere", selected: studio.liveMode == .anywhere) { studio.liveMode = .anywhere },
-            ]
-            if studio.liveLink != nil {
-                choices.append(MenuChoice(title: "Copy link", selected: false) { studio.copyLiveLink() })
-            }
-            if studio.liveMode != .off {
-                choices.append(MenuChoice(title: "New link (old links stop working)", selected: false) { studio.newLiveLink() })
-            }
-            return choices
-        default:
-            return nil
-        }
+        .animation(.easeOut(duration: 0.2), value: studio.attention)
     }
 
     // MARK: Transport
 
     private func transport(big: Bool) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            if let problem = studio.checks.first(where: { $0.problem != nil && $0.state == .fail })?.problem
-                ?? (studio.isBusy ? nil : studio.checks.first(where: { $0.problem != nil })?.problem) {
-                Text(problem)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Palette.dim)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .transition(.opacity)
-            }
-
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(timecode(studio.elapsed))
@@ -273,7 +208,7 @@ struct PanelView: View {
     @ViewBuilder private var guidance: some View {
         switch studio.phase {
         case .idle:
-            Text(studio.canStart ? "Ready. Press the green key to start." : "Not ready yet. Check the lamps above.")
+            Text(studio.canStart ? "Ready. Press the red button to record." : "Not ready yet. The note above says what to fix.")
                 .guidanceStyle()
         case .starting:
             Text("Starting the camera and screen.").guidanceStyle()
@@ -329,67 +264,6 @@ struct MenuChoice: Identifiable {
     var title: String
     var selected: Bool
     var action: () -> Void
-}
-
-struct InputRow: View {
-    var check: Studio.Check
-    var label: String
-    var menu: [MenuChoice]?
-    var height: CGFloat = 38
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Lamp(state: check.state)
-            Text(label)
-                .engraved()
-                .frame(width: 66, alignment: .leading)
-            if let menu, menu.count > 1, Snapshots.active {
-                // A Menu cannot be drawn off screen, so snapshots show its face.
-                menuFace
-            } else if let menu, menu.count > 1 {
-                Menu {
-                    ForEach(menu) { choice in
-                        Button { choice.action() } label: {
-                            if choice.selected { Label(choice.title, systemImage: "checkmark") } else { Text(choice.title) }
-                        }
-                    }
-                } label: {
-                    menuFace
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-            } else {
-                valueText
-            }
-            Spacer(minLength: 0)
-        }
-        .frame(height: height)
-    }
-
-    private var menuFace: some View {
-        HStack(spacing: 5) {
-            valueText
-            Image(systemName: "chevron.down")
-                .font(.system(size: 8.5, weight: .bold))
-                .foregroundStyle(Palette.engraved)
-        }
-    }
-
-    private var valueText: some View {
-        HStack(spacing: 7) {
-            if let tick = check.tick {
-                Image(systemName: tick ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(tick ? Palette.signal : Palette.engraved)
-            }
-            Text(check.value)
-                .font(.system(size: 12.5))
-                .foregroundStyle(check.state == .fail || check.tick == false ? Palette.dim : Palette.ink)
-                .lineLimit(1)
-                .truncationMode(.middle)
-        }
-    }
 }
 
 struct LiveMeter: View {
@@ -486,7 +360,8 @@ struct RecordingsButton: View {
     }
 }
 
-/// The one lit key. Green and ready, a stop square while rolling, a progress ring while finishing.
+/// The record button, like a camera's: a red disc in a white ring. Recording, the disc closes
+/// into a red stop square; finishing, a green arc fills the ring.
 struct RecordKey: View {
     enum Look: Equatable {
         case ready, unavailable, rolling
@@ -495,42 +370,34 @@ struct RecordKey: View {
 
     var look: Look
     var action: () -> Void
-    @State private var breathe = false
     @State private var hover = false
 
     var body: some View {
         Button(action: action) {
             ZStack {
-                Circle().strokeBorder(Palette.hairline, lineWidth: 1).frame(width: 84, height: 84)
+                Circle()
+                    .strokeBorder(ringColor, lineWidth: 3)
+                    .frame(width: 84, height: 84)
                 switch look {
-                case .ready:
-                    Circle()
-                        .fill(LinearGradient(colors: [Palette.signalHot.opacity(0.9), Palette.signal], startPoint: .top, endPoint: .bottom))
-                        .frame(width: 62, height: 62)
-                        .overlay(Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.5))
-                        .shadow(color: .black.opacity(0.45), radius: 6, y: 3)
-                        .brightness(hover ? 0.05 : 0)
+                case .ready, .rolling:
+                    // One shape that closes from a disc into a square, the way a camera's button does.
+                    let rolling = look == .rolling
+                    RoundedRectangle(cornerRadius: rolling ? 7 : 34, style: .continuous)
+                        .fill(LinearGradient(colors: [Color(hex: 0xFF6A5C), Palette.red], startPoint: .top, endPoint: .bottom))
+                        .frame(width: rolling ? 32 : 68, height: rolling ? 32 : 68)
+                        .brightness(hover ? 0.06 : 0)
+                        .shadow(color: .black.opacity(0.4), radius: 5, y: 2)
                 case .unavailable:
-                    Circle().fill(Palette.raised).frame(width: 62, height: 62)
+                    Circle().fill(Palette.raised).frame(width: 68, height: 68)
                         .overlay(Circle().strokeBorder(Palette.hairline, lineWidth: 1))
-                case .rolling:
-                    Circle()
-                        .strokeBorder(Palette.red.opacity(breathe ? 0.9 : 0.35), lineWidth: 2)
-                        .frame(width: 84, height: 84)
-                    Circle().fill(Palette.raised).frame(width: 62, height: 62)
-                        .overlay(Circle().strokeBorder(Palette.hairline, lineWidth: 1))
-                        .shadow(color: .black.opacity(0.45), radius: 6, y: 3)
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(Palette.ink)
-                        .frame(width: 21, height: 21)
                 case .busy(let progress):
-                    Circle().fill(Palette.raised).frame(width: 62, height: 62)
+                    Circle().fill(Palette.raised).frame(width: 68, height: 68)
                     if let progress {
                         Circle()
                             .trim(from: 0, to: max(0.02, progress))
-                            .stroke(Palette.signal, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                            .stroke(Palette.signal, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                             .rotationEffect(.degrees(-90))
-                            .frame(width: 83, height: 83)
+                            .frame(width: 81, height: 81)
                             .animation(.easeOut(duration: 0.4), value: progress)
                     } else {
                         ProgressView().controlSize(.small).tint(Palette.dim)
@@ -539,16 +406,19 @@ struct RecordKey: View {
             }
             .frame(width: 88, height: 88)
             .contentShape(Circle())
+            .animation(.spring(response: 0.32, dampingFraction: 0.82), value: look)
         }
         .buttonStyle(KeyPress())
         .onHover { hover = $0 }
-        .onChange(of: look) { _, new in
-            breathe = false
-            if new == .rolling {
-                withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) { breathe = true }
-            }
-        }
         .accessibilityLabel(look == .rolling ? "Stop recording" : "Start recording")
+    }
+
+    private var ringColor: Color {
+        switch look {
+        case .ready, .rolling: Color.white.opacity(0.9)
+        case .unavailable: Palette.hairline
+        case .busy: Color.white.opacity(0.12)
+        }
     }
 }
 

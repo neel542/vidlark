@@ -70,6 +70,16 @@ enum Snapshots {
                   to: dir.appendingPathComponent("bubble-\(shape.rawValue).png"))
         }
 
+        for page in SettingsPage.allCases {
+            let s = Studio()
+            s.stage(phase: .idle, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: nil)
+            s.stageReactions(page == .effects)
+            let selection = SettingsSelection()
+            selection.current = page
+            write(SettingsView(studio: s, selection: selection).preferredColorScheme(.dark), size: CGSize(width: 920, height: 660),
+                  to: dir.appendingPathComponent("settings-\(page.rawValue).png"))
+        }
+
         prompter("waiting") { $0.stage(phase: .idle, camera: "x", mic: "x", level: -30, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
         prompter("countdown") { $0.stage(phase: .recording, camera: "x", mic: "x", level: -30, elapsed: 1, cardIndex: 0, cardElapsed: 0, countdown: 2, screenAllowed: true, script: script) }
         prompter("hook") { $0.stage(phase: .recording, camera: "x", mic: "x", level: -30, elapsed: 8, cardIndex: 0, cardElapsed: 6, countdown: nil, screenAllowed: true, script: script) }

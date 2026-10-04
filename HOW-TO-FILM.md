@@ -8,7 +8,7 @@
 ## Each filming day
 
 1. Put the iPhone on the tripod with the rear camera facing the presenter, screen locked, in landscape. Plug it into the Mac with a USB-C cable (it charges during the take and is steadier than wireless). It shows up as a camera on its own, through Continuity Camera, which only works when the Mac user and the iPhone are signed in to the same Apple ID. Plug the mic receiver into the Mac.
-2. Open AVA Recorder. It fills the monitor. Check the lamps are green:
+2. Open AVA Recorder. It fills the monitor. The **Sources** list shows what gets recorded, each with a lamp: click a row to change it, or **+ Add** for another camera or the screen. If something needs fixing, one note under the list says what and has the button that fixes it. Everything else is in **Settings** (the gear, or Command-Comma), where each option says in one sentence what it does. The old rows, for reference:
    - Camera (its menu also has **Touch up the face**, which opens macOS Video Effects: switch on Studio Light once and it stays on)
    - Mic (say a few words so the meter moves)
    - Record (the screen that gets recorded from the start, or **Camera first, share the screen when ready**. Its menu also has **Include the Mac's sound**, for a video or a click played on the Mac)
@@ -16,7 +16,7 @@
    - After (tick it for a transcript and chapters; untick it for a quick video that only needs the files)
    - Mac (free space and power)
    - An amber **Effects** row means macOS Reactions are on. Click it and switch Reactions off: they cost battery, and with gestures on a thumbs-up puts balloons in the video.
-3. Press the green key. The big window steps aside, so the presenter has the whole monitor for slides, screenshots and Seller Central. Three short beeps count down 3, 2, 1, and a higher beep means go. The clock starts at 00:00 on go.
+3. Press the red button. The big window steps aside, so the presenter has the whole monitor for slides, screenshots and Seller Central. Three short beeps count down 3, 2, 1, and a higher beep means go. The clock starts at 00:00 on go.
 4. In the top right corner, a small box shows her face, zoomed in automatically:
    - Click the picture to switch between her face and the whole camera view.
    - The minus button shrinks the box to a small pill, and the face button brings it back.
