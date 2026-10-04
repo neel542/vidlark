@@ -1,0 +1,18 @@
+# What the test voice says, one part per line. Expected moves are noted above each part.
+# Hook, read with a few words changed. Expect card 1 -> 2 at the end.
+Most sellers who ask if FBA is still worth it are looking at the wrong number. They all look at the fee table.
+[pause 0.6]
+# Expect card 2 -> 3 at the end.
+But the fee table is not where your money goes.
+[pause 0.6]
+# Expect card 3 -> 4 at the end.
+Over the next fifteen minutes I'll show you three lines in your own Seller Central that decide the answer.
+[pause 1]
+# Card 4, a bullet talked around in other words. Expect no move.
+So let's start with what actually changed this year. With the new update in 2026, Amazon raised fulfilment charges again, and most people only noticed the headline.
+[pause 1]
+# An unscripted tangent of two sentences. Expect no move.
+By the way, my nephew asked me last week if he should start selling candles online. I told him that was a real question, and to talk to an accountant first.
+[pause 1]
+# Card 5, the next bullet. Expect card 4 -> 5 here.
+Now, the per unit fee. On its own it looks small, but it hides what you really pay once storage gets added on top.

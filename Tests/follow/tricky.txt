@@ -1,0 +1,15 @@
+# Harder cases for the follower, as a transcript. Run: --test-follow Tests/follow/tricky.txt Examples/sample-script.md
+# Card 1 with an ad-lib in the middle that uses the card's last words. Expect 1 -> 2 only at the real end.
+Most sellers asking if FBA is still worth it, and trust me the fee table comes up every single week, are looking at the wrong number. They look at the fee table.
+[pause 0.6]
+# Card 2 skipped, she reads card 3. Expect 2 -> 3 as soon as she is reading card 3.
+In the next fifteen minutes I will show you the three lines in your own Seller Central that decide the answer.
+[pause 1]
+# Card 4 talked around, with the real cost and sellers in passing. Expect no move.
+So what changed? The 2026 fee update. Amazon moved the numbers again, and that is a real cost for sellers who never check.
+[pause 1]
+# Expect 4 -> 5.
+Here is the thing about the per unit fee. It hides the real cost of every order.
+[pause 1]
+# Card 5 talked around, then a few words of cards 6 and 7. Too little to move: expect no move.
+Where do you find all of this? Open Seller Central, go to reports, and look for the fee preview.
