@@ -41,7 +41,7 @@ struct PanelView: View {
             viewfinder
                 .frame(height: 200)
                 .padding(.top, 14)
-            inputs
+            inputs(dense: true)
                 .padding(.top, 16)
             Spacer(minLength: 12)
             transport(big: false)
@@ -65,7 +65,7 @@ struct PanelView: View {
                     }
                 }
                 VStack(spacing: 0) {
-                    inputs
+                    inputs(dense: false)
                     Spacer(minLength: 24)
                     transport(big: true)
                 }
@@ -124,15 +124,16 @@ struct PanelView: View {
 
     // MARK: Inputs
 
-    private var inputs: some View {
+    private func inputs(dense: Bool) -> some View {
         // The prompter row comes back when the prompter does.
         let checks = studio.checks.filter { $0.id != "prompter" }
         return VStack(spacing: 0) {
             ForEach(checks) { check in
-                InputRow(check: check, label: check.label, menu: menu(for: check.id))
+                InputRow(check: check, label: check.label, menu: menu(for: check.id), height: dense ? 33 : 38)
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        if check.id == "screen" && !studio.screenAllowed { studio.askForScreenAccess() }
+                        if check.id == "screen" && studio.recordScreen && !studio.screenAllowed { studio.askForScreenAccess() }
+                        if check.id == "after" { studio.writeTranscript.toggle() }
                         if check.id == "effects" { studio.openVideoEffects() }
                     }
                 if check.id == "mic" {
@@ -165,8 +166,15 @@ struct PanelView: View {
         case "mic":
             return studio.mics.map { d in MenuChoice(title: d.localizedName, selected: d.uniqueID == studio.micID) { studio.micID = d.uniqueID } }
         case "screen":
-            guard studio.screenAllowed else { return nil }
-            return studio.displays.map { d in MenuChoice(title: d.name, selected: d.id == studio.displayID) { studio.displayID = d.id } }
+            // Some videos are just the camera: no screen recording at all.
+            let cameraOnly = MenuChoice(title: "Camera only, no screen", selected: !studio.recordScreen) { studio.recordScreen = false }
+            guard studio.screenAllowed else { return studio.recordScreen ? nil : [cameraOnly] }
+            return studio.displays.map { d in
+                MenuChoice(title: d.name, selected: studio.recordScreen && d.id == studio.displayID) {
+                    studio.displayID = d.id
+                    studio.recordScreen = true
+                }
+            } + [cameraOnly]
         case "prompter":
             return [MenuChoice(title: "Follows the voice", selected: studio.followVoice) { studio.followVoice = true },
                     MenuChoice(title: "Key only", selected: !studio.followVoice) { studio.followVoice = false }]
@@ -325,6 +333,7 @@ struct InputRow: View {
     var check: Studio.Check
     var label: String
     var menu: [MenuChoice]?
+    var height: CGFloat = 38
 
     var body: some View {
         HStack(spacing: 10) {
@@ -353,7 +362,7 @@ struct InputRow: View {
             }
             Spacer(minLength: 0)
         }
-        .frame(height: 38)
+        .frame(height: height)
     }
 
     private var menuFace: some View {
@@ -366,11 +375,18 @@ struct InputRow: View {
     }
 
     private var valueText: some View {
-        Text(check.value)
-            .font(.system(size: 12.5))
-            .foregroundStyle(check.state == .fail ? Palette.dim : Palette.ink)
-            .lineLimit(1)
-            .truncationMode(.middle)
+        HStack(spacing: 7) {
+            if let tick = check.tick {
+                Image(systemName: tick ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(tick ? Palette.signal : Palette.engraved)
+            }
+            Text(check.value)
+                .font(.system(size: 12.5))
+                .foregroundStyle(check.state == .fail || check.tick == false ? Palette.dim : Palette.ink)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
     }
 }
 

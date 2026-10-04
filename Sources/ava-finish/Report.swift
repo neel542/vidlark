@@ -20,6 +20,7 @@ struct ReportInput {
     var chapters: [Chapter]
     var chapterSource: String
     var candidateChapters: Int
+    var chaptersWanted = true
     var events: RecordingEvents?
 }
 
@@ -129,7 +130,9 @@ func buildReport(_ r: ReportInput) -> String {
     out.append("")
     out.append("## Chapters")
     out.append("")
-    if r.chapters.isEmpty {
+    if !r.chaptersWanted {
+        out.append("Skipped (the take was recorded with the transcript and chapters box unticked).")
+    } else if r.chapters.isEmpty {
         if r.candidateChapters == 0 {
             out.append("None: there were no \(r.chapterSource) to build chapters from. chapters.txt is empty.")
         } else {

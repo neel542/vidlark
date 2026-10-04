@@ -1,6 +1,6 @@
 import Foundation
 
-// ava-finish <recording folder> [--no-transcribe] [--model <path to ggml model>]
+// ava-finish <recording folder> [--no-transcribe] [--no-chapters] [--model <path to ggml model>]
 // stdout carries only progress for the app: "STEP n/total ...", then "DONE <report.md>" or "FAIL <reason>".
 
 setvbuf(stdout, nil, _IOLBF, 0)
@@ -17,9 +17,10 @@ func fail(_ reason: String) -> Never {
     finish(1)
 }
 
-let usage = "usage: ava-finish <recording folder> [--no-transcribe] [--model <path>]"
+let usage = "usage: ava-finish <recording folder> [--no-transcribe] [--no-chapters] [--model <path>]"
 var folderArg: String?
 var transcribeWanted = true
+var chaptersWanted = true
 var modelOverride: String?
 var argIndex = 1
 let argv = CommandLine.arguments
@@ -27,6 +28,7 @@ while argIndex < argv.count {
     let arg = argv[argIndex]
     switch arg {
     case "--no-transcribe": transcribeWanted = false
+    case "--no-chapters": chaptersWanted = false
     case "--model":
         argIndex += 1
         guard argIndex < argv.count else { fail(usage) }
@@ -43,7 +45,7 @@ while argIndex < argv.count {
 guard let folderArg else { fail(usage) }
 
 let folder = URL(fileURLWithPath: folderArg).standardizedFileURL
-let totalSteps = transcribeWanted ? 6 : 4
+let totalSteps = (transcribeWanted ? 6 : 4) - (chaptersWanted ? 0 : 1)
 var stepNumber = 0
 func step(_ words: String) {
     stepNumber += 1
@@ -187,18 +189,18 @@ do {
     }
 
     // 5. Chapters
-    step("Making chapters")
     let events = readEvents(file("events.jsonl"))
     var chapters: [Chapter] = []
     var chapterSource = "prompter sections"
     var candidates = 0
-    if let events {
+    if chaptersWanted { step("Making chapters") }
+    if chaptersWanted, let events {
         let raw = rawChapters(events)
         chapterSource = raw.source
         candidates = raw.chapters.count
         chapters = youTubeChapters(raw.chapters, end: cameraDuration)
     }
-    try writeText(chaptersText(chapters), to: file("chapters.txt"))
+    if chaptersWanted { try writeText(chaptersText(chapters), to: file("chapters.txt")) }
 
     // 6. Report
     step("Writing the report")
@@ -210,7 +212,7 @@ do {
         folder: folder, title: title, wall: events?.wall,
         cameraDuration: cameraDuration, screenDuration: screenDuration, screenNote: screenNote,
         sync: sync, extraCameras: extraCameras, transcript: transcript, retakes: retakes,
-        chapters: chapters, chapterSource: chapterSource, candidateChapters: candidates,
+        chapters: chapters, chapterSource: chapterSource, candidateChapters: candidates, chaptersWanted: chaptersWanted,
         events: events))
     try writeText(report, to: file("report.md"))
 

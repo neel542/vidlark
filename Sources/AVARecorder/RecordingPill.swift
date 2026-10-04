@@ -276,7 +276,9 @@ struct RecordingPillView: View {
 
     var body: some View {
         Group {
-            if state.expanded { box } else { pill }
+            // One face on screen at a time: when the face goes into the video, the bubble is the
+            // face and this box keeps only the time, the level and the buttons.
+            if state.expanded && !faceInVideo { box } else { pill }
         }
         .padding(10)
         .preferredColorScheme(.dark)
@@ -337,22 +339,27 @@ struct RecordingPillView: View {
                 .foregroundStyle(Palette.ink)
                 .frame(minWidth: 52, alignment: .leading)
             LiveMeter(meter: studio.meter)
-                .frame(width: state.expanded ? 52 : 44)
-            if state.expanded {
+                .frame(width: state.expanded && !faceInVideo ? 52 : 44)
+            if (state.expanded || faceInVideo) && studio.takeHasScreen {
                 RoundButton(symbol: studio.faceInVideo ? "person.crop.circle.fill" : "person.crop.circle", lit: studio.faceInVideo,
                             help: studio.faceInVideo ? "Take the face out of the video"
                                 : "Put the face in the video (\(studio.bubbleShape.title.lowercased()))") {
                     studio.faceInVideo.toggle()
                 }
             }
-            RoundButton(symbol: state.expanded ? "minus" : "person.crop.square", help: state.expanded ? "Hide the face box" : "Show the face") {
-                state.expanded.toggle()
+            if !faceInVideo {
+                RoundButton(symbol: state.expanded ? "minus" : "person.crop.square", help: state.expanded ? "Hide the face box" : "Show the face") {
+                    state.expanded.toggle()
+                }
             }
             RoundButton(stop: true, help: "Stop recording") { studio.stop() }
                 .disabled(!studio.isRolling)
         }
         .frame(height: 38)
     }
+
+    /// The face bubble is showing for this take.
+    private var faceInVideo: Bool { studio.faceInVideo && studio.takeHasScreen }
 
     private var caption: String {
         let base = !state.faceZoom ? "Whole picture" : tracker.found ? "Face" : "Looking for a face"
@@ -458,7 +465,7 @@ final class RecordingPillController {
             .receive(on: RunLoop.main)
             .sink { [weak self] open in
                 guard let self else { return }
-                tracker.active = (open || studio.faceInVideo) && panel.isVisible
+                tracker.active = (open || (studio.faceInVideo && studio.takeHasScreen)) && panel.isVisible
                 DispatchQueue.main.async { self.resize() }
             })
         watches.append(studio.$faceInVideo
@@ -473,8 +480,9 @@ final class RecordingPillController {
 
     /// Shows or hides the round face and tells the recorder to let it into the video.
     private func syncBubble() {
-        let wanted = studio.faceInVideo && panel.isVisible
-        tracker.active = (state.expanded || studio.faceInVideo) && panel.isVisible
+        let wanted = studio.faceInVideo && studio.takeHasScreen && panel.isVisible
+        tracker.active = (state.expanded || wanted) && panel.isVisible
+        DispatchQueue.main.async { [weak self] in self?.resize() }
         if wanted {
             if !bubblePlaced, let visible = (studio.displayID.flatMap(DisplayChoice.screen(for:)) ?? NSScreen.main)?.visibleFrame {
                 // Bottom right of the recorded screen, where a face cam usually sits.
@@ -497,7 +505,7 @@ final class RecordingPillController {
     private func follow(_ phase: Studio.Phase) {
         switch phase {
         case .starting, .recording, .stopping:
-            tracker.active = state.expanded || studio.faceInVideo
+            tracker.active = state.expanded || (studio.faceInVideo && studio.takeHasScreen)
             guard !panel.isVisible else {
                 if phase == .recording { syncBubble() }
                 return

@@ -94,6 +94,15 @@ check "screen offset unchanged by the extra camera" offset_near "$OUT/extracam" 
 check "report names camera-2.mov" grep -q "^- camera-2.mov: offset" "$OUT/extracam/report.md"
 check "sync.json has no cameras list without extra cameras" py 'import json,sys; sys.exit("cameras" in json.load(open(sys.argv[1]+"/sync.json")))' "$OUT/notranscribe"
 
+# the tick box unticked: no transcript and no chapters
+rm -rf "$OUT/nochapters" && cp -R "$OUT/notranscribe" "$OUT/nochapters" && rm -f "$OUT/nochapters"/{chapters.txt,report.md,sync.json,mic.wav}
+run nochapters --no-transcribe --no-chapters
+check "exit 0 and DONE line" done_ok nochapters
+check "three STEP lines" steps_ok nochapters 3
+check "no chapters.txt or words.json" bash -c "[ ! -e '$OUT/nochapters/chapters.txt' ] && [ ! -e '$OUT/nochapters/words.json' ]"
+check "sync still measured" offset_near "$OUT/nochapters" "$EXPECTED_OFFSET_MAIN"
+check "report says chapters skipped" grep -q "^Skipped (the take was recorded with the transcript and chapters box unticked)" "$OUT/nochapters/report.md"
+
 # crash: fragmented videos cut off mid-fragment, events.jsonl with no stop line, a cut-off
 # last line and a 4 s section to merge
 run truncated --no-transcribe

@@ -14,6 +14,8 @@ Built by AVA INC for our own channel. You are welcome to build your own copy and
 - **Face in the video, if you want it.** A face bubble can go into the screen recording, in a circle, square, oval or wide shape. The camera is also saved as its own file, so the shape can still change in editing.
 - **More than one camera.** Any extra camera records its own file next to the main one.
 - **Live view.** Watch the shoot from another laptop or phone in a browser, with no login: every camera, the screen, the mic level and the checks.
+- **Recordings page.** Every take with a picture, search, filters, rename, save a copy and delete.
+- **Camera-only takes and a transcript tick box,** for quick videos that need neither the screen nor a transcript.
 - **Checks before you start.** Camera, mic, screen, disk space, battery and macOS camera effects, each with a plain fix when something is wrong.
 - **Camera watchdog.** If the camera file stops growing during a take, the take stops at once and says so, instead of filming on without a camera.
 - **Finishing.** After every take, `ava-finish` lines up the files by their sound and writes `words.json`, `chapters.txt`, `retakes.json` and `report.md`, all on the Mac.

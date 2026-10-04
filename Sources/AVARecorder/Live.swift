@@ -260,12 +260,19 @@ final class Tunnel {
         let pipe = Pipe()
         p.standardOutput = pipe
         p.standardError = pipe
+        // The address shows up about 10 seconds before it works. Hand it out only once Cloudflare
+        // says the connection is registered, so a copied link never opens to an error.
+        let found = Once()
+        var address: String?
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
-            guard !data.isEmpty, let text = String(data: data, encoding: .utf8),
-                  let range = text.range(of: #"https://[a-z0-9-]+\.trycloudflare\.com"#, options: .regularExpression) else { return }
-            let address = String(text[range])
-            DispatchQueue.main.async { self?.onAddress?(address) }
+            guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+            if address == nil, let range = text.range(of: #"https://[a-z0-9-]+\.trycloudflare\.com"#, options: .regularExpression) {
+                address = String(text[range])
+            }
+            if let address, text.contains("Registered tunnel connection"), found.first() {
+                DispatchQueue.main.async { self?.onAddress?(address) }
+            }
         }
         p.terminationHandler = { [weak self] ended in
             pipe.fileHandleForReading.readabilityHandler = nil

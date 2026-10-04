@@ -10,13 +10,25 @@ import SwiftUI
 @MainActor
 final class RecordingsModel: ObservableObject {
     enum Filter: String, CaseIterable, Identifiable {
-        case all, week, unfinished
+        case all, week, unfinished, screen, camera
         var id: String { rawValue }
         var title: String {
             switch self {
             case .all: "All"
             case .week: "This week"
             case .unfinished: "Not finished"
+            case .screen: "With screen"
+            case .camera: "Camera only"
+            }
+        }
+        /// For a narrow window, where five full names and counts do not fit.
+        var shortTitle: String {
+            switch self {
+            case .all: "All"
+            case .week: "Week"
+            case .unfinished: "Not done"
+            case .screen: "Screen"
+            case .camera: "Camera"
             }
         }
     }
@@ -143,6 +155,8 @@ final class RecordingsModel: ObservableObject {
         case .all: true
         case .week: take.date > now.addingTimeInterval(-7 * 24 * 3600)
         case .unfinished: !take.finished
+        case .screen: take.hasScreen
+        case .camera: take.hasCamera && !take.hasScreen
         }
     }
 
@@ -744,15 +758,17 @@ private struct FilterBar: View {
                 let on = choice == filter
                 Button { filter = choice } label: {
                     HStack(spacing: 6) {
-                        Text(choice.title)
+                        Text(stretch ? choice.shortTitle : choice.title)
                             .foregroundStyle(on ? Palette.ink : Palette.dim)
-                        Text("\(counts[choice] ?? 0)")
-                            .monospacedDigit()
-                            .foregroundStyle(on ? Palette.signal : Palette.engraved)
+                        if !stretch {
+                            Text("\(counts[choice] ?? 0)")
+                                .monospacedDigit()
+                                .foregroundStyle(on ? Palette.signal : Palette.engraved)
+                        }
                     }
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(1)
-                    .padding(.horizontal, 11)
+                    .padding(.horizontal, stretch ? 6 : 11)
                     .frame(maxWidth: stretch ? .infinity : nil)
                     .frame(height: 26)
                     .background {

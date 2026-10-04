@@ -70,6 +70,17 @@ final class Studio: ObservableObject {
     @Published var bubbleShape = BubbleShape(rawValue: UserDefaults.standard.string(forKey: "bubbleShape") ?? "") ?? .circle {
         didSet { if !Snapshots.active { UserDefaults.standard.set(bubbleShape.rawValue, forKey: "bubbleShape") } }
     }
+    /// Off for camera-only videos: no screen.mov, no face bubble.
+    @Published var recordScreen = UserDefaults.standard.object(forKey: "recordScreen") as? Bool ?? true {
+        didSet { if !Snapshots.active { UserDefaults.standard.set(recordScreen, forKey: "recordScreen") } }
+    }
+    /// The tick box: write the transcript and chapters after a take, or skip them for a quick one.
+    @Published var writeTranscript = UserDefaults.standard.object(forKey: "writeTranscript") as? Bool ?? true {
+        didSet { if !Snapshots.active { UserDefaults.standard.set(writeTranscript, forKey: "writeTranscript") } }
+    }
+    /// What the take in progress was started with, so changing a row mid-take changes nothing.
+    @Published private(set) var takeHasScreen = true
+    private var takeWantsTranscript = true
     /// macOS Studio Light: brightens her face and softens the background, inside the camera itself.
     @Published private(set) var touchUpOn = false
     @Published private(set) var liveFailure: String?
@@ -318,11 +329,13 @@ final class Studio: ObservableObject {
         var state: LampState
         var value: String
         var problem: String?
+        /// Set for a row that is a tick box.
+        var tick: Bool? = nil
 
         var label: String {
             if id.hasPrefix("camera-") { return "Camera \(id.dropFirst(7))" }
             return ["camera": "Camera", "effects": "Effects", "touchup": "Touch up", "mic": "Mic", "screen": "Record",
-                    "face": "In video", "prompter": "Prompter", "mac": "Mac", "live": "Live"][id] ?? id
+                    "face": "In video", "after": "After", "prompter": "Prompter", "mac": "Mac", "live": "Live"][id] ?? id
         }
     }
 
@@ -359,13 +372,19 @@ final class Studio: ObservableObject {
             out.append(Check(id: "mic", state: .fail, value: "None found", problem: "Plug the mic receiver into the Mac."))
         }
 
-        if !screenAllowed {
+        if !recordScreen {
+            out.append(Check(id: "screen", state: .ok, value: "Camera only, no screen"))
+        } else if !screenAllowed {
             out.append(Check(id: "screen", state: .fail, value: "Not allowed", problem: "Click the screen row to allow screen recording."))
         } else {
             out.append(Check(id: "screen", state: display == nil ? .warn : .ok, value: display?.name ?? "No screen"))
         }
-        out.append(Check(id: "face", state: faceInVideo ? .ok : .off,
-                         value: faceInVideo ? "Face, \(bubbleShape.title.lowercased())" : "Screen only"))
+        if recordScreen {
+            out.append(Check(id: "face", state: faceInVideo ? .ok : .off,
+                             value: faceInVideo ? "Face, \(bubbleShape.title.lowercased())" : "Screen only"))
+        }
+        out.append(Check(id: "after", state: writeTranscript ? .ok : .off,
+                         value: writeTranscript ? "Transcript and chapters" : "Just save the files", tick: writeTranscript))
 
         out.append(Check(id: "prompter", state: following ? .ok : .off, value: voiceValue))
 
@@ -413,7 +432,8 @@ final class Studio: ObservableObject {
         case .idle, .done, .failed: break
         default: return false
         }
-        return screenAllowed && micAllowed && micID != nil && display != nil
+        guard micAllowed, micID != nil else { return false }
+        return !recordScreen || (screenAllowed && display != nil)
     }
 
     // MARK: Queue
@@ -456,9 +476,12 @@ final class Studio: ObservableObject {
 
     // MARK: Recording
 
-    func start(withScreen: Bool = true) {
+    func start(withScreen requested: Bool? = nil) {
+        let withScreen = requested ?? recordScreen
         let cameraOnlyOK = !withScreen && micAllowed && micID != nil && !isBusy
         guard canStart || cameraOnlyOK else { return }
+        takeHasScreen = withScreen
+        takeWantsTranscript = writeTranscript
         phase = .starting
         elapsed = 0
         cardElapsed = 0
@@ -555,7 +578,7 @@ final class Studio: ObservableObject {
         log = EventLog(url: folder.appendingPathComponent("events.jsonl"), t0: time)
         let wall = ISO8601DateFormatter().string(from: Date())
         log?.write(["type": "start", "wall": wall, "title": script.title.isEmpty ? (currentItem?.title ?? "Untitled") : script.title,
-                    "targetMinutes": script.targetMinutes, "camera": "camera.mov", "screen": "screen.mov",
+                    "targetMinutes": script.targetMinutes, "camera": "camera.mov", "screen": takeHasScreen ? "screen.mov" : "",
                     "cameraName": cameraName ?? "", "micName": micName ?? "", "screenName": display?.name ?? "",
                     "extraCameras": activeExtras.prefix(extras.count).enumerated().map { ["file": "camera-\($0.offset + 2).mov", "name": $0.element.localizedName] }],
                    at: time)
@@ -585,10 +608,12 @@ final class Studio: ObservableObject {
         countdownTask = Task { @MainActor in
             for n in [3, 2, 1] {
                 countdown = n
+                Beeps.count()
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 if Task.isCancelled || phase != .recording { countdown = nil; return }
             }
             countdown = nil
+            Beeps.go()
             showCard(0)
         }
     }
@@ -761,7 +786,7 @@ final class Studio: ObservableObject {
 
         let process = Process()
         process.executableURL = tool
-        process.arguments = [folder.path]
+        process.arguments = [folder.path] + (takeWantsTranscript ? [] : ["--no-transcribe", "--no-chapters"])
         let out = Pipe()
         process.standardOutput = out
         process.standardError = FileHandle(forWritingAtPath: "/dev/null")
@@ -1155,7 +1180,7 @@ extension Studio {
                 streams.append(["id": "camera-\(i + 2)", "kind": "Camera \(i + 2)", "label": device.localizedName])
             }
         }
-        if phase == .recording || phase == .starting {
+        if (phase == .recording || phase == .starting) && takeHasScreen {
             streams.append(["id": "screen", "kind": "Screen", "label": display?.name ?? "Screen"])
         }
         let rows: [[String: Any]] = checks.filter { $0.id != "prompter" && $0.id != "live" }.map { check in
