@@ -21,7 +21,7 @@
    - Click the picture to switch between her face and the whole camera view.
    - The minus button shrinks the box to a small pill, and the face button brings it back.
    - The square button stops the recording.
-   - **Me | Screen** says what the video shows. Click **Me** for just her, **Screen** for the screen (with her face in it, if the face is in the video). Both keep recording the whole time, so switch as often as you like: the finished `video.mp4` follows every click with a half-second fade, and nothing has to be cut by hand.
+   - **Me | Screen** says what the video shows. Click **Me** and her camera grows out of the face circle to fill the whole screen; click **Screen** and it shrinks back into the circle. The motion shows the click worked. The screen recording includes it, so the finished `video.mp4` is exactly what was on the screen, and nothing has to be cut by hand.
    - In a camera-first take, the first click on **Screen** asks first ("Share your screen?"), with a tick box for the Mac's sound. From then on the screen is recorded until the take stops, and Me and Screen switch at once.
    - The face button puts the face in the video, in the shape picked in the **In video** row. Only one face shows at a time: while the face is in the video, this box shrinks to just the time, the level and the buttons. The box never appears in the recording, and neither does any pop-up banner.
    - If the camera stops sending pictures, the take stops within about 6 seconds and says so, so nobody films on without a camera.
@@ -55,7 +55,7 @@ The **Live** row shows the shoot on any browser, with no login: every camera, th
 |---|---|
 | camera.mov | the presenter on camera, with the mic |
 | camera-2.mov | A second camera, if one was added, with the same mic |
-| video.mp4 | The finished video: Me and Screen as clicked, with fades. Made when the take has a screen |
+| video.mp4 | The finished video: what was on the screen, including her camera filling it for Me. Made when the take has a screen |
 | screen.mov | The recorded screen, with the same mic (and the Mac's sound as a second track, if ticked). Starts when the screen was shared in a camera-first take |
 | mic.wav | The clean voice track |
 | words.json | The transcript, with the time of every word |

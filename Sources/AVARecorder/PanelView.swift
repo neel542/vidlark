@@ -615,8 +615,7 @@ struct PreviewLayerView: NSViewRepresentable {
     func updateNSView(_ view: PreviewNSView, context: Context) {}
 }
 
-final class PreviewNSView: NSView {
-    let preview = AVSampleBufferDisplayLayer()
+final class PreviewNSView: FeedView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -628,11 +627,6 @@ final class PreviewNSView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        preview.sampleBufferRenderer.flush()
-    }
 
     override func layout() {
         super.layout()

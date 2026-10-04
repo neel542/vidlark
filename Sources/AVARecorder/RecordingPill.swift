@@ -161,8 +161,7 @@ struct FaceZoomView: NSViewRepresentable {
     }
 }
 
-final class ZoomPreviewNSView: NSView {
-    let preview = AVSampleBufferDisplayLayer()
+final class ZoomPreviewNSView: FeedView {
     private var crop = CGRect(x: 0, y: 0, width: 1, height: 1)
 
     override init(frame: NSRect) {
@@ -176,11 +175,6 @@ final class ZoomPreviewNSView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        preview.sampleBufferRenderer.flush()
-    }
 
     func show(_ newCrop: CGRect) {
         guard newCrop != crop else { return }
@@ -563,6 +557,8 @@ final class RecordingPillController {
     private var bubblePlaced = false
     private let boxPreview = ZoomPreviewNSView()
     private let bubblePreview = ZoomPreviewNSView()
+    /// Her camera across the whole screen for Me, and the motion to and from the bubble.
+    private let stage = Stage()
 
     init(studio: Studio) {
         bubble = PrompterPanel(contentRect: NSRect(x: 0, y: 0, width: 228, height: 228),
@@ -573,20 +569,22 @@ final class RecordingPillController {
                               styleMask: [.borderless, .nonactivatingPanel],
                               backing: .buffered, defer: false)
         panel.isFloatingPanel = true
-        panel.level = .statusBar
+        // Above the stage, which is at status bar level so it covers the Dock and the menu bar.
+        panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
         panel.hidesOnDeactivate = false
         panel.isMovableByWindowBackground = true
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
-        studio.feed.show(on: boxPreview.preview)
-        studio.feed.show(on: bubblePreview.preview)
+        boxPreview.feed = studio.feed
+        bubblePreview.feed = studio.feed
+        stage.feed = studio.feed
         panel.contentView = NSHostingView(rootView: RecordingPillView(studio: studio, state: state, tracker: tracker, preview: boxPreview))
 
         for window in [bubble] {
             window.isFloatingPanel = true
-            window.level = .statusBar
+            window.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
             window.hidesOnDeactivate = false
             window.isMovableByWindowBackground = true
             window.backgroundColor = .clear
@@ -616,6 +614,17 @@ final class RecordingPillController {
             .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in DispatchQueue.main.async { self?.syncBubble() } })
+        // Me or Screen, clicked: the camera grows to fill the screen or shrinks into the bubble.
+        watches.append(studio.$showing
+            .dropFirst()
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    guard let self, self.studio.phase == .recording else { return }
+                    self.applyShowing(animated: true)
+                }
+            })
         // Sharing the screen mid-take brings the bubble in, if the face goes in the video.
         watches.append(studio.$takeHasScreen
             .dropFirst()
@@ -640,22 +649,61 @@ final class RecordingPillController {
         tracker.active = (state.expanded || wanted) && panel.isVisible
         DispatchQueue.main.async { [weak self] in self?.resize() }
         if wanted {
-            if !bubblePlaced, let visible = (studio.displayID.flatMap(DisplayChoice.screen(for:)) ?? NSScreen.main)?.visibleFrame {
-                // Bottom right of the recorded screen, where a face cam usually sits.
-                bubble.setFrameOrigin(NSPoint(x: visible.maxX - bubble.frame.width - 24, y: visible.minY + 24))
-                bubblePlaced = true
-            }
+            placeBubble()
+            // While her camera fills the screen, the stage holds her face and the bubble waits unseen.
+            bubble.alphaValue = stage.fillsScreen ? 0 : 1
+            bubblePreview.dimmed = stage.fillsScreen
             bubble.orderFrontRegardless()
-            // The window has to be on screen before the recorder can find it.
-            let id = CGWindowID(bubble.windowNumber)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-                guard let self, self.studio.faceInVideo, self.panel.isVisible else { return }
-                self.studio.showInRecording([id])
-            }
-        } else {
-            if bubble.isVisible { bubble.orderOut(nil) }
-            studio.showInRecording([])
+        } else if bubble.isVisible {
+            bubble.orderOut(nil)
         }
+        guard panel.isVisible else { studio.showInRecording([], bubble: false); return }
+        // The windows have to be on screen before the recorder can find them.
+        let ids = [CGWindowID(stage.window.windowNumber)] + (wanted ? [CGWindowID(bubble.windowNumber)] : [])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            guard let self, self.panel.isVisible else { return }
+            self.studio.showInRecording(ids, bubble: wanted && self.studio.faceInVideo)
+        }
+    }
+
+    /// Where the face bubble is, in screen coordinates, and how it looks. For a take with no bubble,
+    /// where it would be.
+    private func bubbleLook() -> Stage.Look {
+        placeBubble()
+        let shape = studio.bubbleShape
+        let size = shape.size
+        let radius: CGFloat = switch shape {
+        case .circle, .oval: min(size.width, size.height) / 2
+        case .square: 34
+        case .wide: 22
+        }
+        return Stage.Look(frame: CGRect(x: bubble.frame.minX + 14, y: bubble.frame.minY + 14, width: size.width, height: size.height),
+                          cornerRadius: radius, border: 3, crop: tracker.framing(aspect: size.width / size.height),
+                          visible: studio.faceInVideo && studio.takeHasScreen)
+    }
+
+    /// Me: her camera grows out of the bubble to fill the screen. Screen: it shrinks back in.
+    private func applyShowing(animated: Bool) {
+        let me = studio.showing == .camera && panel.isVisible
+        guard me != stage.fillsScreen else { return }
+        let look = bubbleLook()
+        if me {
+            bubble.alphaValue = 0
+            bubblePreview.dimmed = true
+            stage.grow(from: look, cameraAspect: studio.feed.aspect, animated: animated)
+        } else {
+            stage.shrink(to: look, cameraAspect: studio.feed.aspect, animated: animated) { [weak self] in
+                self?.bubble.alphaValue = 1
+                self?.bubblePreview.dimmed = false
+            }
+        }
+    }
+
+    /// Bottom right of the recorded screen, where a face cam usually sits, until it is dragged.
+    private func placeBubble() {
+        guard !bubblePlaced, let visible = (studio.displayID.flatMap(DisplayChoice.screen(for:)) ?? NSScreen.main)?.visibleFrame else { return }
+        bubble.setFrameOrigin(NSPoint(x: visible.maxX - bubble.frame.width - 24, y: visible.minY + 24))
+        bubblePlaced = true
     }
 
     private func follow(_ phase: Studio.Phase) {
@@ -663,19 +711,26 @@ final class RecordingPillController {
         case .starting, .recording, .stopping:
             tracker.active = state.expanded || (studio.faceInVideo && studio.takeHasScreen)
             guard !panel.isVisible else {
-                if phase == .recording { syncBubble() }
+                if phase == .recording {
+                    syncBubble()
+                    applyShowing(animated: true)
+                }
                 return
             }
             if let main = NSApp.windows.first(where: { !($0 is NSPanel) && $0.isVisible }) {
                 hiddenWindow = main
                 main.orderOut(nil)
             }
+            if let screen = studio.displayID.flatMap(DisplayChoice.screen(for:)) ?? NSScreen.main { stage.cover(screen) }
             place()
             panel.orderFrontRegardless()
             syncBubble()
         default:
             tracker.active = false
             state.askingToShare = false
+            stage.reset()
+            bubble.alphaValue = 1
+            bubblePreview.dimmed = false
             guard panel.isVisible else { return }
             panel.orderOut(nil)
             syncBubble()

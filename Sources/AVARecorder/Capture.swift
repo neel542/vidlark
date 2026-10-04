@@ -256,7 +256,14 @@ final class CameraFeed: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     private let queue = DispatchQueue(label: "ava.preview")
     private let lock = NSLock()
     private let layers = NSHashTable<AVSampleBufferDisplayLayer>.weakObjects()
+    /// The layers that can be seen right now. Only these get frames: a hidden layer that kept
+    /// taking them would hold on to the camera's buffers, and a camera short of buffers stalls.
+    private var seen = Set<ObjectIdentifier>()
     private var handed = 0
+    private var frameSize = CGSize(width: 16, height: 9)
+
+    /// Width over height of the camera picture, from the latest frame.
+    var aspect: CGFloat { lock.withLock { frameSize.width / max(frameSize.height, 1) } }
 
     /// How many frames went to a preview, and each preview's state, for the self test.
     var report: (frames: Int, states: [String]) {
@@ -287,8 +294,18 @@ final class CameraFeed: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         lock.withLock { layers.add(layer) }
     }
 
+    /// Whether this layer can be seen. Hidden, it lets go of every frame it holds.
+    func set(_ layer: AVSampleBufferDisplayLayer, seen visible: Bool) {
+        lock.withLock { if visible { seen.insert(ObjectIdentifier(layer)) } else { seen.remove(ObjectIdentifier(layer)) } }
+        if !visible { layer.sampleBufferRenderer.flush(removingDisplayedImage: false, completionHandler: nil) }
+    }
+
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        for layer in lock.withLock({ layers.allObjects }) {
+        if let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) {
+            let size = CGSize(width: CVPixelBufferGetWidth(pixels), height: CVPixelBufferGetHeight(pixels))
+            lock.withLock { frameSize = size }
+        }
+        for layer in lock.withLock({ layers.allObjects.filter { seen.contains(ObjectIdentifier($0)) } }) {
             let renderer = layer.sampleBufferRenderer
             if renderer.status == .failed { renderer.flush() }
             // A layer in a hidden window stops taking frames; it is skipped until it shows again.

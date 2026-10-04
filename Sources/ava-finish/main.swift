@@ -229,19 +229,10 @@ do {
     var composeProblem: String?
     if videoWanted {
         step("Making the video")
-        var clicks = events?.shows ?? []
-        if clicks.isEmpty {
-            // Takes from before the Me and Screen switch: the screen from the start, or from the share.
-            if events?.cameraFirst == true {
-                clicks = [ShowChange(t: 0, screen: false)] + (events?.screenShared.map { [ShowChange(t: $0, screen: true)] } ?? [])
-            } else {
-                clicks = [ShowChange(t: 0, screen: true)]
-            }
-        }
-        let offset = sync.offset, wanted = clicks
+        let offset = sync.offset, late = events?.cameraFirst == true
         let cameraURL = file("camera.mov"), screenURL = file("screen.mov"), out = file("video.mp4")
         do {
-            composed = try waitFor { try await composeVideo(camera: cameraURL, screen: screenURL, screenOffset: offset, clicks: wanted, out: out) }
+            composed = try waitFor { try await composeVideo(camera: cameraURL, screen: screenURL, screenOffset: offset, sharedLate: late, out: out) }
         } catch let error as FinishError {
             composeProblem = error.message
         } catch {

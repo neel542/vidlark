@@ -94,10 +94,21 @@ check "screen offset unchanged by the extra camera" offset_near "$OUT/extracam" 
 check "report names camera-2.mov" grep -q "^- camera-2.mov: offset" "$OUT/extracam/report.md"
 check "sync.json has no cameras list without extra cameras" py 'import json,sys; sys.exit("cameras" in json.load(open(sys.argv[1]+"/sync.json")))' "$OUT/notranscribe"
 
+looks_like_in() { # folder, video time, source file, source time, wanted: same or different
+    local dir="$OUT/$1"; shift
+    local score
+    score=$(/opt/homebrew/bin/ffmpeg -v info -ss "$1" -i "$dir/video.mp4" -ss "$3" -i "$dir/$2" \
+        -filter_complex "[0:v]scale=640:360,format=yuv420p[a];[1:v]scale=640:360,format=yuv420p[b];[a][b]ssim" -frames:v 1 -f null - 2>&1 \
+        | sed -n 's/.*All:\([0-9.]*\).*/\1/p' | tail -1)
+    echo "        video at $1 s against $2 at $3 s: SSIM $score"
+    if [ "$4" = same ]; then python3 -c "import sys; sys.exit(0 if float('$score') > 0.9 else 1)"
+    else python3 -c "import sys; sys.exit(0 if float('$score') < 0.6 else 1)"; fi
+}
+
 # camera first, screen shared 20 s in: screen.mov holds the same sound from 20 s on
 rm -rf "$OUT/shared" && mkdir -p "$OUT/shared"
 cp "$OUT/notranscribe/camera.mov" "$OUT/shared/"
-/opt/homebrew/bin/ffmpeg -v error -ss 20 -i "$OUT/notranscribe/camera.mov" -map 0 -c:v copy -c:a aac -b:a 128k "$OUT/shared/screen.mov"
+/opt/homebrew/bin/ffmpeg -v error -ss 20 -i "$OUT/notranscribe/screen.mov" -map 0 -c:v libx264 -preset ultrafast -c:a aac -b:a 128k "$OUT/shared/screen.mov"
 python3 - "$OUT/notranscribe/events.jsonl" "$OUT/shared/events.jsonl" <<'PY'
 import json, sys
 out = []
@@ -110,9 +121,11 @@ open(sys.argv[2], "w").write("\n".join(out) + "\n")
 PY
 run shared --no-transcribe
 check "exit 0 and DONE line" done_ok shared
-check "screen offset within 20 ms of +20" py 'import json,sys; d=json.load(open(sys.argv[1]+"/sync.json"))
-print("        measured %+.4f s, confidence %.3f, method %s" % (d["screenOffsetSec"], d["confidence"], d["method"]))
-sys.exit(0 if d["method"]=="audio" and abs(d["screenOffsetSec"]-20) <= 0.020 else 1)' "$OUT/shared"
+check "screen offset within 20 ms of 20 s plus the fixture's own offset" py 'import json,sys; d=json.load(open(sys.argv[1]+"/sync.json")); want=20+float(sys.argv[2])
+print("        measured %+.4f s, expected %+.4f s, confidence %.3f, method %s" % (d["screenOffsetSec"], want, d["confidence"], d["method"]))
+sys.exit(0 if d["method"]=="audio" and abs(d["screenOffsetSec"]-want) <= 0.020 else 1)' "$OUT/shared" "$EXPECTED_OFFSET_MAIN"
+check "before the share the video is the camera" looks_like_in shared 10 camera.mov 10 same
+check "after the share the video is the screen" looks_like_in shared 30 camera.mov 30 different
 check "report says when the screen was shared" grep -q "shared 00:19 into the take" "$OUT/shared/report.md"
 
 # Me and Screen: the video starts on the camera, shows the screen at 10 s and the camera again at 25 s
@@ -125,22 +138,14 @@ cp "$OUT/notranscribe/camera.mov" "$OUT/notranscribe/screen.mov" "$OUT/switches/
   echo '{"t":25,"type":"show","what":"camera"}'; } > "$OUT/switches/events.jsonl"
 run switches --no-transcribe
 check "exit 0 and DONE line" done_ok switches
-looks_like() { # video time, source file, source time, wanted: same or different
-    local score
-    score=$(/opt/homebrew/bin/ffmpeg -v info -ss "$1" -i "$OUT/switches/video.mp4" -ss "$3" -i "$OUT/switches/$2" \
-        -filter_complex "[0:v]scale=640:360,format=yuv420p[a];[1:v]scale=640:360,format=yuv420p[b];[a][b]ssim" -frames:v 1 -f null - 2>&1 \
-        | sed -n 's/.*All:\([0-9.]*\).*/\1/p' | tail -1)
-    echo "        video at $1 s against $2 at $3 s: SSIM $score"
-    if [ "$4" = same ]; then python3 -c "import sys; sys.exit(0 if float('$score') > 0.9 else 1)"
-    else python3 -c "import sys; sys.exit(0 if float('$score') < 0.6 else 1)"; fi
-}
+looks_like() { looks_like_in switches "$@"; }
 check "video.mp4 runs as long as the camera" py 'import subprocess,sys
 d=float(subprocess.check_output(["/opt/homebrew/bin/ffprobe","-v","error","-show_entries","format=duration","-of","csv=p=0",sys.argv[1]]).decode())
 print("        video.mp4 is %.2f s" % d); sys.exit(0 if abs(d-45) < 0.2 else 1)' "$OUT/switches/video.mp4"
-check "at 5 s the video is the camera" looks_like 5 camera.mov 5 same
-check "at 17 s the video is the screen" looks_like 17 screen.mov 17 same
-check "at 17 s the video is not the camera" looks_like 17 camera.mov 17 different
-check "at 35 s the video is the camera again" looks_like 35 camera.mov 35 same
+# Me fills the real screen with the camera, so screen.mov holds it: the video is screen.mov throughout.
+check "at 5 s the video is screen.mov" looks_like 5 screen.mov 5 same
+check "at 17 s the video is screen.mov, not the camera" looks_like 17 camera.mov 17 different
+check "at 35 s the video is screen.mov" looks_like 35 screen.mov 35 same
 check "report lists the clicks" bash -c "grep -q '^- 00:10 Screen' '$OUT/switches/report.md' && grep -q '^- 00:25 Me' '$OUT/switches/report.md'"
 
 # camera first and never shared: no screen.mov, said plainly

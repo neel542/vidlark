@@ -1,9 +1,11 @@
 import AVFoundation
 import Foundation
 
-// video.mp4: the finished video, made from camera.mov and screen.mov. During the take she clicks
-// Me or Screen; here the video follows those clicks, fading between the two, so nothing has to be
-// cut by hand. Both files stay as they are for anyone who wants to edit.
+// video.mp4: the finished video. During the take, Me fills the screen with her camera and Screen
+// shrinks it back into the face bubble, and all of that is in screen.mov, so from the moment
+// screen.mov has pictures the video is simply screen.mov. Before that (a camera-first take, until
+// the screen is shared) it is camera.mov, cropped the same way her camera filled the screen.
+// The sound is the mic from camera.mov, plus the Mac's sound when it was ticked.
 
 /// One click of Me or Screen, in camera time.
 struct ShowChange {
@@ -15,38 +17,16 @@ struct ComposeResult {
     var seconds: Double
     var width: Int
     var height: Int
-    /// When the video changes, in camera time: true is a change to the screen.
-    var changes: [ShowChange]
+    /// When the video changes from camera.mov to screen.mov, if it starts on camera.mov.
+    var cameraUntil: Double?
 }
 
-/// How long a fade between Me and Screen lasts.
-let fadeSeconds = 0.5
+/// How long the change from camera.mov to screen.mov takes.
+let handoverSeconds = 0.25
 
-/// The changes the video makes. `wanted` is what was clicked (the first entry is the start); the
-/// screen can only show while screen.mov has pictures, and two fades never overlap.
-func plannedChanges(wanted: [ShowChange], screenFrom: Double, screenTo: Double, end: Double) -> (startsOnScreen: Bool, changes: [ShowChange]) {
-    let clicks = wanted.sorted { $0.t < $1.t }
-    func wants(_ t: Double) -> Bool { clicks.last { $0.t <= t + 0.0001 }?.screen ?? false }
-    func shows(_ t: Double) -> Bool { wants(t) && t >= screenFrom - 0.0001 && t < screenTo - fadeSeconds }
-    let moments = Set(clicks.map(\.t) + [screenFrom, screenTo - fadeSeconds]).filter { $0 > 0 && $0 < end }.sorted()
-    let first = shows(0)
-    var state = first
-    var changes: [ShowChange] = []
-    var free = 0.0
-    for moment in moments {
-        let next = shows(moment)
-        guard next != state else { continue }
-        // A fade starts only once the last one has finished.
-        let at = max(moment, free)
-        guard at + fadeSeconds <= end else { break }
-        changes.append(ShowChange(t: at, screen: next))
-        state = next
-        free = at + fadeSeconds
-    }
-    return (first, changes)
-}
-
-func composeVideo(camera: URL, screen: URL, screenOffset: Double, clicks: [ShowChange], out: URL) async throws -> ComposeResult {
+/// `sharedLate`: a camera-first take, so screen.mov starts with her camera across the screen and
+/// the change can wait a moment for it.
+func composeVideo(camera: URL, screen: URL, screenOffset: Double, sharedLate: Bool, out: URL) async throws -> ComposeResult {
     let cameraAsset = AVURLAsset(url: camera)
     let screenAsset = AVURLAsset(url: screen)
     guard let cameraVideo = try await cameraAsset.loadTracks(withMediaType: .video).first else {
@@ -76,7 +56,7 @@ func composeVideo(camera: URL, screen: URL, screenOffset: Double, clicks: [ShowC
     }
 
     guard let cameraTrack = try await add(cameraVideo, .video, offset: 0) else { throw FinishError("camera.mov has no picture") }
-    let screenTrack = try await add(screenVideo, .video, offset: screenOffset)
+    guard let screenTrack = try await add(screenVideo, .video, offset: screenOffset) else { throw FinishError("screen.mov does not overlap the camera") }
     if let cameraAudio { _ = try await add(cameraAudio, .audio, offset: 0) }
     if let macSound { _ = try await add(macSound, .audio, offset: screenOffset) }
 
@@ -89,38 +69,32 @@ func composeVideo(camera: URL, screen: URL, screenOffset: Double, clicks: [ShowC
     let screenRange = try await screenVideo.load(.timeRange)
     let screenFrom = max(0, screenRange.start.seconds + screenOffset)
     let screenTo = min(end.seconds, screenRange.end.seconds + screenOffset)
-    let plan = screenTrack == nil
-        ? (startsOnScreen: false, changes: [])
-        : plannedChanges(wanted: clicks, screenFrom: screenFrom, screenTo: screenTo, end: end.seconds)
+    // A screen that starts within a moment of the camera is the screen from the start.
+    let cut = screenFrom < 1 ? 0 : screenFrom + (sharedLate ? 0.3 : 0)
 
-    // The camera fills the canvas (cropped a little above centre, where faces are); the screen fits it.
     let cameraLayer = AVMutableVideoCompositionLayerInstruction(assetTrack: cameraTrack)
     cameraLayer.setTransform(try await fitting(cameraVideo, into: canvas, fill: true), at: .zero)
-    cameraLayer.setOpacity(plan.startsOnScreen ? 0 : 1, at: .zero)
-    var layers = [cameraLayer]
-    if let screenTrack {
-        let screenLayer = AVMutableVideoCompositionLayerInstruction(assetTrack: screenTrack)
-        screenLayer.setTransform(try await fitting(screenVideo, into: canvas, fill: false), at: .zero)
-        screenLayer.setOpacity(plan.startsOnScreen ? 1 : 0, at: .zero)
-        // The screen sits on top. Fading in, the camera stays whole underneath until the fade ends;
-        // fading out, the camera is back underneath first.
-        for change in plan.changes {
-            let start = CMTime(seconds: change.t, preferredTimescale: 600)
-            let fade = CMTimeRange(start: start, duration: CMTime(seconds: fadeSeconds, preferredTimescale: 600))
-            if change.screen {
-                screenLayer.setOpacityRamp(fromStartOpacity: 0, toEndOpacity: 1, timeRange: fade)
-                cameraLayer.setOpacity(0, at: fade.end)
-            } else {
-                cameraLayer.setOpacity(1, at: start)
-                screenLayer.setOpacityRamp(fromStartOpacity: 1, toEndOpacity: 0, timeRange: fade)
-            }
-        }
-        layers.insert(screenLayer, at: 0)
+    let screenLayer = AVMutableVideoCompositionLayerInstruction(assetTrack: screenTrack)
+    screenLayer.setTransform(try await fitting(screenVideo, into: canvas, fill: false), at: .zero)
+    if cut == 0 {
+        cameraLayer.setOpacity(0, at: .zero)
+        screenLayer.setOpacity(1, at: .zero)
+    } else {
+        // The screen fades in over camera.mov, which stays whole underneath until it has.
+        let fade = CMTimeRange(start: CMTime(seconds: cut, preferredTimescale: 600), duration: CMTime(seconds: handoverSeconds, preferredTimescale: 600))
+        cameraLayer.setOpacity(1, at: .zero)
+        screenLayer.setOpacity(0, at: .zero)
+        screenLayer.setOpacityRamp(fromStartOpacity: 0, toEndOpacity: 1, timeRange: fade)
+        cameraLayer.setOpacity(0, at: fade.end)
+    }
+    // If the screen stops a moment before the camera, the camera covers the last moment.
+    if screenTo < end.seconds - 0.05 {
+        cameraLayer.setOpacity(1, at: CMTime(seconds: screenTo, preferredTimescale: 600))
     }
 
     let instruction = AVMutableVideoCompositionInstruction()
     instruction.timeRange = CMTimeRange(start: .zero, duration: end)
-    instruction.layerInstructions = layers
+    instruction.layerInstructions = [screenLayer, cameraLayer]
     let video = AVMutableVideoComposition()
     video.renderSize = canvas
     video.frameDuration = CMTime(value: 1, timescale: 30)
@@ -134,7 +108,7 @@ func composeVideo(camera: URL, screen: URL, screenOffset: Double, clicks: [ShowC
     export.timeRange = CMTimeRange(start: .zero, duration: end)
     try await export.export(to: out, as: .mp4)
     return ComposeResult(seconds: end.seconds, width: Int(canvas.width), height: Int(canvas.height),
-                         changes: (plan.startsOnScreen ? [ShowChange(t: 0, screen: true)] : [ShowChange(t: 0, screen: false)]) + plan.changes)
+                         cameraUntil: cut > 0 ? cut : nil)
 }
 
 /// The picture's size the right way up.

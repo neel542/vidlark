@@ -34,7 +34,7 @@ A native Mac app for filming the presenter's YouTube videos. It replaces Loom. I
 | 18 | Transcript tick box | Added 4 Oct: unticked runs `ava-finish --no-transcribe --no-chapters`; sync and the report are still made |
 | 19 | Countdown beeps | Added 4 Oct: a beep on 3, 2 and 1, a higher one on go |
 | 20 | Recordings page | Added 4 Oct: every take with a thumbnail, search, filters, rename, save a copy and delete to Trash. Click a take to watch it in the app; Camera and Screen switch at the same moment of the take |
-| 21 | Me and Screen | Added 4 Oct: both files record the whole take; a two-way switch in the face box says what the video shows. `ava-finish` makes `video.mp4` following each click with a 0.5 s fade (AVFoundation, HEVC, the screen's shape up to 1920 wide; the camera fills it, cropped a little above centre) |
+| 21 | Me and Screen | Added 4 Oct: a two-way switch in the face box. Me grows her camera out of the bubble to fill the recorded screen (a click-through window, `Stage`, that is part of the screen recording); Screen shrinks it back in 0.5 s. `ava-finish` makes `video.mp4` from screen.mov, and from camera.mov before a camera-first share (AVFoundation, HEVC, the screen's shape up to 1920 wide). Previews only get frames while they can be seen |
 | 14 | Live view | Added 4 Oct: a no-login web page with every camera, the screen while recording, the mic level and the checks. Served by the Mac on port 8790 behind a secret link; Anywhere mode adds a Cloudflare quick tunnel. Pictures are only made while someone watches |
 
 Not building: the Shorts cutter, and iPhone remote control.
@@ -70,7 +70,7 @@ The app writes these files:
 - `words.json`: `[{"word","start","end"}]` on the camera timeline (the same shape `video-edit` uses).
 - `chapters.txt`: in YouTube format, or empty if fewer than 3 chapters of at least 10 seconds.
 - `retakes.json`: `[{"t","context"}]`.
-- `video.mp4`: the finished video, following the `show` lines with 0.5 s fades. Only when there is a screen.mov; `--no-video` skips it.
+- `video.mp4`: the finished video: screen.mov (which holds the Me and Screen motion), with camera.mov before a camera-first share. Only when there is a screen.mov; `--no-video` skips it.
 - `report.md`: a plain-language summary.
 
 ## Not yet checked

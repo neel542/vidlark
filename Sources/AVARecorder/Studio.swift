@@ -172,7 +172,7 @@ final class Studio: ObservableObject {
         }
         bootLive()
         camera.attach(feed.output)
-        feed.show(on: mainPreview.preview)
+        mainPreview.feed = feed
 
         let defaults = UserDefaults.standard
         refreshDevices(preferredCamera: defaults.string(forKey: "camera"), preferredMic: defaults.string(forKey: "mic"))
@@ -578,15 +578,16 @@ final class Studio: ObservableObject {
         return SCContentFilter(display: target, excludingApplications: excluded, exceptingWindows: shown)
     }
 
-    /// Lets these windows of the app into the screen recording, or none with an empty list.
-    func showInRecording(_ windowIDs: [CGWindowID]) {
+    /// Lets these windows of the app into the screen recording (the stage and the bubble), or none
+    /// with an empty list. `bubble` says whether the face bubble is one of them, for the log.
+    func showInRecording(_ windowIDs: [CGWindowID], bubble: Bool) {
         shownWindowIDs = windowIDs
         guard phase == .recording || phase == .starting else { return }
         Task {
             guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true),
                   let filter = try? makeFilter(content) else { return }
             try? await screen.update(filter)
-            log?.write(["type": "bubble", "visible": !windowIDs.isEmpty])
+            log?.write(["type": "bubble", "visible": bubble])
         }
     }
 
@@ -614,9 +615,11 @@ final class Studio: ObservableObject {
                                        to: folder.appendingPathComponent("screen.mov"))
                 guard phase == .recording else { return }
                 takeHasScreen = true
-                // Sharing is a click on Screen, so the video shows it from here.
-                showing = .screen
-                log?.write(["type": "show", "what": "screen"])
+                // Sharing is a click on Screen. screen.mov first holds a moment of her camera across
+                // the screen, so the finished video can change from camera.mov to it without a
+                // jump; then her camera shrinks into the bubble.
+                try? await Task.sleep(nanoseconds: 600_000_000)
+                if phase == .recording { show(.screen) }
             } catch {
                 log?.write(["type": "screen-error", "message": error.localizedDescription])
                 if phase == .recording { shareProblem = plain(error) }
