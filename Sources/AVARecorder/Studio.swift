@@ -70,7 +70,8 @@ final class Studio: ObservableObject {
     @Published var bubbleShape = BubbleShape(rawValue: UserDefaults.standard.string(forKey: "bubbleShape") ?? "") ?? .circle {
         didSet { if !Snapshots.active { UserDefaults.standard.set(bubbleShape.rawValue, forKey: "bubbleShape") } }
     }
-    /// Off for camera-only videos: no screen.mov, no face bubble.
+    /// Off for camera-first takes: the take starts with the camera only, and the screen joins
+    /// when it is shared from the face box. A take that is never shared has no screen.mov.
     @Published var recordScreen = UserDefaults.standard.object(forKey: "recordScreen") as? Bool ?? true {
         didSet { if !Snapshots.active { UserDefaults.standard.set(recordScreen, forKey: "recordScreen") } }
     }
@@ -78,8 +79,16 @@ final class Studio: ObservableObject {
     @Published var writeTranscript = UserDefaults.standard.object(forKey: "writeTranscript") as? Bool ?? true {
         didSet { if !Snapshots.active { UserDefaults.standard.set(writeTranscript, forKey: "writeTranscript") } }
     }
-    /// What the take in progress was started with, so changing a row mid-take changes nothing.
+    /// Also record what the Mac plays (a video, a click) as a second sound track in screen.mov.
+    @Published var screenAudio = UserDefaults.standard.bool(forKey: "screenAudio") {
+        didSet { if !Snapshots.active { UserDefaults.standard.set(screenAudio, forKey: "screenAudio") } }
+    }
+    /// The screen is being recorded in the take in progress: from the start, or since it was shared.
     @Published private(set) var takeHasScreen = true
+    /// Why sharing the screen mid-take did not work, shown in the face box.
+    @Published var shareProblem: String?
+    /// True while the screen recorder is starting for a mid-take share.
+    private var sharing = false
     private var takeWantsTranscript = true
     /// macOS Studio Light: brightens her face and softens the background, inside the camera itself.
     @Published private(set) var touchUpOn = false
@@ -94,7 +103,9 @@ final class Studio: ObservableObject {
     @Published private(set) var hearing = false
 
     let camera = CameraRecorder()
-    /// The panel's camera picture, joined to the session once at boot (see PreviewLayerView).
+    /// Copies of the camera picture for every preview on screen. See CameraFeed for why.
+    let feed = CameraFeed()
+    /// The panel's camera picture.
     let mainPreview = PreviewNSView()
     private let screen = ScreenRecorder()
     private var extras: [CameraRecorder] = []
@@ -111,6 +122,8 @@ final class Studio: ObservableObject {
     private var log: EventLog?
     private var folder: URL?
     private var t0: CFTimeInterval = 0
+    /// When the 3-2-1 count ended. The clock on screen counts from here, so it starts at 00:00.
+    private var goAt: CFTimeInterval?
     private var cardStart: CFTimeInterval = 0
     private var lastLoud: CFTimeInterval = 0
     private var lastSpaceCheck: CFTimeInterval = 0
@@ -138,6 +151,10 @@ final class Studio: ObservableObject {
             FramingTest.run(movie: URL(fileURLWithPath: CommandLine.arguments[i + 1]), out: URL(fileURLWithPath: CommandLine.arguments[i + 2]))
             return
         }
+        if let i = CommandLine.arguments.firstIndex(of: "--screen-camera-test"), i + 1 < CommandLine.arguments.count {
+            ScreenCameraTest.run(dir: URL(fileURLWithPath: CommandLine.arguments[i + 1]))
+            return
+        }
         if let i = CommandLine.arguments.firstIndex(of: "--camera-cpu-test"), i + 1 < CommandLine.arguments.count {
             CameraCPUTest.run(dir: URL(fileURLWithPath: CommandLine.arguments[i + 1]))
             return
@@ -150,7 +167,8 @@ final class Studio: ObservableObject {
             DispatchQueue.main.async { self?.takeLevel(avg, pk) }
         }
         bootLive()
-        mainPreview.preview.session = camera.session
+        camera.attach(feed.output)
+        feed.show(on: mainPreview.preview)
 
         let defaults = UserDefaults.standard
         refreshDevices(preferredCamera: defaults.string(forKey: "camera"), preferredMic: defaults.string(forKey: "mic"))
@@ -372,17 +390,16 @@ final class Studio: ObservableObject {
             out.append(Check(id: "mic", state: .fail, value: "None found", problem: "Plug the mic receiver into the Mac."))
         }
 
+        let sound = screenAudio ? " · Mac sound" : ""
         if !recordScreen {
-            out.append(Check(id: "screen", state: .ok, value: "Camera only, no screen"))
+            out.append(Check(id: "screen", state: .ok, value: "Camera first, share later" + sound))
         } else if !screenAllowed {
             out.append(Check(id: "screen", state: .fail, value: "Not allowed", problem: "Click the screen row to allow screen recording."))
         } else {
-            out.append(Check(id: "screen", state: display == nil ? .warn : .ok, value: display?.name ?? "No screen"))
+            out.append(Check(id: "screen", state: display == nil ? .warn : .ok, value: (display?.name ?? "No screen") + sound))
         }
-        if recordScreen {
-            out.append(Check(id: "face", state: faceInVideo ? .ok : .off,
-                             value: faceInVideo ? "Face, \(bubbleShape.title.lowercased())" : "Screen only"))
-        }
+        out.append(Check(id: "face", state: faceInVideo ? .ok : .off,
+                         value: faceInVideo ? "Face, \(bubbleShape.title.lowercased())" : "Screen only"))
         out.append(Check(id: "after", state: writeTranscript ? .ok : .off,
                          value: writeTranscript ? "Transcript and chapters" : "Just save the files", tick: writeTranscript))
 
@@ -481,6 +498,7 @@ final class Studio: ObservableObject {
         let cameraOnlyOK = !withScreen && micAllowed && micID != nil && !isBusy
         guard canStart || cameraOnlyOK else { return }
         takeHasScreen = withScreen
+        shareProblem = nil
         takeWantsTranscript = writeTranscript
         phase = .starting
         elapsed = 0
@@ -509,7 +527,7 @@ final class Studio: ObservableObject {
                     Task { @MainActor in self?.screenFailed(error) }
                 }
                 try await screen.start(filter: filter, pixelSize: choice.pixelSize,
-                                       micID: micAllowed ? micID : nil,
+                                       micID: micAllowed ? micID : nil, systemAudio: screenAudio,
                                        to: folder.appendingPathComponent("screen.mov"))
                 }
 
@@ -568,9 +586,41 @@ final class Studio: ObservableObject {
         }
     }
 
+    /// Starts recording the screen in the middle of a camera-first take, into screen.mov. The
+    /// finisher lines it up with the camera by sound, starting from the "screen-start" event.
+    func shareScreen() {
+        guard phase == .recording, !takeHasScreen, !sharing, let folder else { return }
+        shareProblem = nil
+        sharing = true
+        Task {
+            defer { sharing = false }
+            do {
+                guard screenAllowed else {
+                    throw RecorderError("Screen recording is not allowed yet. Allow AVA Recorder in System Settings, Privacy, then open the app again.")
+                }
+                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+                guard let choice = display ?? displays.first else { throw RecorderError("No screen to record.") }
+                let filter = try makeFilter(content)
+                screen.onError = { [weak self] error in
+                    Task { @MainActor in self?.screenFailed(error) }
+                }
+                log?.write(["type": "screen-start", "screen": "screen.mov", "screenName": choice.name, "macSound": screenAudio])
+                try await screen.start(filter: filter, pixelSize: choice.pixelSize,
+                                       micID: micAllowed ? micID : nil, systemAudio: screenAudio,
+                                       to: folder.appendingPathComponent("screen.mov"))
+                guard phase == .recording else { return }
+                takeHasScreen = true
+            } catch {
+                log?.write(["type": "screen-error", "message": error.localizedDescription])
+                if phase == .recording { shareProblem = plain(error) }
+            }
+        }
+    }
+
     private func rolling(from time: CFTimeInterval) {
         guard phase == .starting, let folder else { return }
         t0 = time
+        goAt = nil
         phase = .recording
         cameraWritten = (0, time)
         lastWatch = time
@@ -613,6 +663,8 @@ final class Studio: ObservableObject {
                 if Task.isCancelled || phase != .recording { countdown = nil; return }
             }
             countdown = nil
+            goAt = CACurrentMediaTime()
+            elapsed = 0
             Beeps.go()
             showCard(0)
         }
@@ -620,7 +672,7 @@ final class Studio: ObservableObject {
 
     private func tick() {
         let now = CACurrentMediaTime()
-        elapsed = now - t0
+        elapsed = goAt.map { now - $0 } ?? 0
         if now - lastWatch > 2 {
             lastWatch = now
             watchCamera(now)
@@ -691,6 +743,7 @@ final class Studio: ObservableObject {
             }
             camera.onFinished = nil
             await stopExtras()
+            while sharing { try? await Task.sleep(nanoseconds: 100_000_000) }
             await screen.stop()
             liveFrames.forget("screen")
             log?.close()
@@ -951,6 +1004,8 @@ extension Studio {
             var all = fields
             all["build"] = Bundle.main.bundleURL.path
             all["checks"] = checks.map { "\($0.id): \($0.value)\($0.problem.map { " (\($0))" } ?? "")" }
+            let previews = feed.report
+            all["previews"] = ["framesShown": previews.frames, "states": previews.states]
             if let data = try? JSONSerialization.data(withJSONObject: all, options: [.prettyPrinted, .sortedKeys]) {
                 try? data.write(to: out)
             }
@@ -965,8 +1020,9 @@ extension Studio {
                 currentID = nil
                 script = Script.parse(sample, fallbackTitle: "Self test")
             }
-            let withScreen = canStart
-            guard withScreen || (micAllowed && micID != nil) else {
+            // The Record row decides, unless the screen cannot be recorded at all.
+            let withScreen = canStart && recordScreen
+            guard canStart || (micAllowed && micID != nil) else {
                 report(["ok": false, "stage": "preflight", "cgPreflight": preflight, "screenProbe": probe ?? "ok"]); return
             }
             start(withScreen: withScreen)
@@ -976,18 +1032,26 @@ extension Studio {
                 try? await Task.sleep(nanoseconds: 200_000_000); waited += 0.2
             }
             guard phase == .recording else { report(["ok": false, "stage": "start", "reason": "timed out"]); return }
+            // AVA_SHARE_AT=<seconds>: a camera-first take shares the screen that far in.
+            if let at = ProcessInfo.processInfo.environment["AVA_SHARE_AT"].flatMap(Double.init) {
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: UInt64(at * 1_000_000_000))
+                    shareScreen()
+                }
+            }
             let step = seconds / 4
             for _ in 0..<3 {
                 try? await Task.sleep(nanoseconds: UInt64(step * 1_000_000_000))
                 next()
             }
             try? await Task.sleep(nanoseconds: UInt64(step * 1_000_000_000))
+            let clock = elapsed
             stop()
             waited = 0
             while waited < 300 {
                 switch phase {
                 case .done(let folder, let note):
-                    report(["ok": true, "folder": folder.path, "note": note ?? "", "screen": withScreen ? "recorded" : "skipped: \(probe ?? "")"]); return
+                    report(["ok": true, "folder": folder.path, "note": note ?? "", "clockAtStop": clock, "screen": FileManager.default.fileExists(atPath: folder.appendingPathComponent("screen.mov").path) ? "recorded" : "none: \(probe ?? "")"]); return
                 case .failed(let why):
                     report(["ok": false, "stage": "stop", "reason": why]); return
                 default:
@@ -1031,6 +1095,12 @@ extension Studio {
         self.cardIndex = cardIndex
         self.cardElapsed = cardElapsed
         self.countdown = countdown
+    }
+
+    /// A camera-first take that has not shared the screen yet.
+    func stageCameraFirst() {
+        recordScreen = false
+        takeHasScreen = false
     }
 
     func stageReactions(_ on: Bool) {

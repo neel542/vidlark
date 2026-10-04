@@ -162,7 +162,7 @@ struct FaceZoomView: NSViewRepresentable {
 }
 
 final class ZoomPreviewNSView: NSView {
-    let preview = AVCaptureVideoPreviewLayer()
+    let preview = AVSampleBufferDisplayLayer()
     private var crop = CGRect(x: 0, y: 0, width: 1, height: 1)
 
     override init(frame: NSRect) {
@@ -176,6 +176,11 @@ final class ZoomPreviewNSView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        preview.sampleBufferRenderer.flush()
+    }
 
     func show(_ newCrop: CGRect) {
         guard newCrop != crop else { return }
@@ -192,12 +197,10 @@ final class ZoomPreviewNSView: NSView {
         guard crop.width > 0, crop.height > 0, bounds.width > 0 else { return }
         let width = bounds.width / crop.width
         let height = bounds.height / crop.height
-        let mirrored = preview.connection?.isVideoMirrored ?? false
-        let x = mirrored ? 1 - crop.maxX : crop.minX
         CATransaction.begin()
         CATransaction.setAnimationDuration(animated ? 0.4 : 0)
         CATransaction.setDisableActions(!animated)
-        preview.frame = CGRect(x: -x * width, y: -crop.minY * height, width: width, height: height)
+        preview.frame = CGRect(x: -crop.minX * width, y: -crop.minY * height, width: width, height: height)
         CATransaction.commit()
     }
 }
@@ -209,6 +212,8 @@ final class PillState: ObservableObject {
         didSet { UserDefaults.standard.set(expanded, forKey: "faceBoxOpen") }
     }
     @Published var faceZoom = true
+    /// The "Share your screen?" card is open.
+    @Published var askingToShare = false
 }
 
 /// The shape her face takes in the video.
@@ -273,12 +278,17 @@ struct RecordingPillView: View {
     @ObservedObject var tracker: FaceTracker
     var preview: ZoomPreviewNSView
     @State private var breathe = false
+    /// The width of the box or pill, so the share card under it lines up with it.
+    @State private var topWidth: CGFloat = 252
 
     var body: some View {
-        Group {
+        VStack(alignment: .trailing, spacing: 8) {
             // One face on screen at a time: when the face goes into the video, the bubble is the
             // face and this box keeps only the time, the level and the buttons.
-            if state.expanded && !faceInVideo { box } else { pill }
+            Group { if state.expanded && !faceInVideo { box } else { pill } }
+                .background(GeometryReader { g in Color.clear.preference(key: TopWidth.self, value: g.size.width) })
+                .onPreferenceChange(TopWidth.self) { topWidth = $0 }
+            if state.askingToShare || studio.shareProblem != nil { shareCard }
         }
         .padding(10)
         .preferredColorScheme(.dark)
@@ -340,6 +350,13 @@ struct RecordingPillView: View {
                 .frame(minWidth: 52, alignment: .leading)
             LiveMeter(meter: studio.meter)
                 .frame(width: state.expanded && !faceInVideo ? 52 : 44)
+            // A camera-first take: the screen joins the video when she shares it.
+            if studio.isRolling && !studio.takeHasScreen {
+                RoundButton(symbol: "rectangle.inset.filled.and.person.filled", lit: state.askingToShare, help: "Share the screen") {
+                    studio.shareProblem = nil
+                    state.askingToShare.toggle()
+                }
+            }
             if (state.expanded || faceInVideo) && studio.takeHasScreen {
                 RoundButton(symbol: studio.faceInVideo ? "person.crop.circle.fill" : "person.crop.circle", lit: studio.faceInVideo,
                             help: studio.faceInVideo ? "Take the face out of the video"
@@ -360,6 +377,61 @@ struct RecordingPillView: View {
 
     /// The face bubble is showing for this take.
     private var faceInVideo: Bool { studio.faceInVideo && studio.takeHasScreen }
+
+    /// Why the screen cannot be shared, if it cannot.
+    private var shareBlocked: String? {
+        studio.shareProblem ?? (studio.screenAllowed ? nil
+            : "Screen recording is not allowed yet. Allow AVA Recorder in System Settings, Privacy, then open the app again.")
+    }
+
+    /// Asks before the screen goes into the video, with the Mac's sound as a choice.
+    private var shareCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(shareBlocked == nil ? "Share your screen?" : "The screen is not shared")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Palette.ink)
+            Text(shareBlocked ?? "Everything on \(studio.display?.name ?? "the screen") goes into the video from now on.")
+                .font(.system(size: 11.5))
+                .foregroundStyle(Palette.dim)
+                .fixedSize(horizontal: false, vertical: true)
+            if shareBlocked == nil {
+                // The same tick box as the panel's After row.
+                Button { studio.screenAudio.toggle() } label: {
+                    HStack(spacing: 7) {
+                        Image(systemName: studio.screenAudio ? "checkmark.square.fill" : "square")
+                            .font(.system(size: 13))
+                            .foregroundStyle(studio.screenAudio ? Palette.signal : Palette.engraved)
+                        Text("Include the Mac's sound").font(.system(size: 12)).foregroundStyle(Palette.ink)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Also record what the Mac plays, such as a video on screen")
+            }
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                if shareBlocked == nil {
+                    CardButton(title: "Cancel") { state.askingToShare = false }
+                    CardButton(title: "Share screen", primary: true) {
+                        state.askingToShare = false
+                        studio.shareScreen()
+                    }
+                } else {
+                    if !studio.screenAllowed {
+                        CardButton(title: "Open Settings") { studio.askForScreenAccess() }
+                    }
+                    CardButton(title: "OK", primary: true) {
+                        state.askingToShare = false
+                        studio.shareProblem = nil
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .frame(width: topWidth, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Palette.glass.opacity(0.95)))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.white.opacity(0.09)))
+    }
 
     private var caption: String {
         let base = !state.faceZoom ? "Whole picture" : tracker.found ? "Face" : "Looking for a face"
@@ -405,6 +477,33 @@ private struct RoundButton: View {
     }
 }
 
+private struct TopWidth: PreferenceKey {
+    static let defaultValue: CGFloat = 252
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+private struct CardButton: View {
+    var title: String
+    var primary = false
+    var action: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(primary ? Palette.glass : Palette.ink)
+                .padding(.horizontal, 12)
+                .frame(height: 28)
+                .background(Capsule().fill(primary ? (hover ? Palette.signalHot : Palette.signal) : (hover ? Color(hex: 0x262C29) : Palette.raised)))
+                .overlay(Capsule().strokeBorder(primary ? Color.clear : Palette.hairline))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+    }
+}
+
 // MARK: - Window
 
 @MainActor
@@ -436,8 +535,8 @@ final class RecordingPillController {
         panel.isOpaque = false
         panel.hasShadow = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
-        boxPreview.preview.session = studio.camera.session
-        bubblePreview.preview.session = studio.camera.session
+        studio.feed.show(on: boxPreview.preview)
+        studio.feed.show(on: bubblePreview.preview)
         panel.contentView = NSHostingView(rootView: RecordingPillView(studio: studio, state: state, tracker: tracker, preview: boxPreview))
 
         for window in [bubble] {
@@ -472,6 +571,18 @@ final class RecordingPillController {
             .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in DispatchQueue.main.async { self?.syncBubble() } })
+        // Sharing the screen mid-take brings the bubble in, if the face goes in the video.
+        watches.append(studio.$takeHasScreen
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                DispatchQueue.main.async { if self?.panel.isVisible == true { self?.syncBubble() } }
+            })
+        watches.append(state.$askingToShare.map { _ in () }
+            .merge(with: studio.$shareProblem.map { _ in () })
+            .dropFirst(2)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] in DispatchQueue.main.async { self?.resize() } })
         watches.append(studio.$bubbleShape
             .dropFirst()
             .receive(on: RunLoop.main)
@@ -519,6 +630,7 @@ final class RecordingPillController {
             syncBubble()
         default:
             tracker.active = false
+            state.askingToShare = false
             guard panel.isVisible else { return }
             panel.orderOut(nil)
             syncBubble()

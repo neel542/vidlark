@@ -132,7 +132,7 @@ struct PanelView: View {
                 InputRow(check: check, label: check.label, menu: menu(for: check.id), height: dense ? 33 : 38)
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        if check.id == "screen" && studio.recordScreen && !studio.screenAllowed { studio.askForScreenAccess() }
+                        if check.id == "screen" && !studio.screenAllowed { studio.askForScreenAccess() }
                         if check.id == "after" { studio.writeTranscript.toggle() }
                         if check.id == "effects" { studio.openVideoEffects() }
                     }
@@ -166,15 +166,17 @@ struct PanelView: View {
         case "mic":
             return studio.mics.map { d in MenuChoice(title: d.localizedName, selected: d.uniqueID == studio.micID) { studio.micID = d.uniqueID } }
         case "screen":
-            // Some videos are just the camera: no screen recording at all.
-            let cameraOnly = MenuChoice(title: "Camera only, no screen", selected: !studio.recordScreen) { studio.recordScreen = false }
-            guard studio.screenAllowed else { return studio.recordScreen ? nil : [cameraOnly] }
+            // Camera first: the take starts with only the camera, and the screen joins when it is
+            // shared from the face box. Never shared, and the video is just the camera.
+            let later = MenuChoice(title: "Camera first, share the screen when ready", selected: !studio.recordScreen) { studio.recordScreen = false }
+            let sound = MenuChoice(title: "Include the Mac's sound", selected: studio.screenAudio) { studio.screenAudio.toggle() }
+            guard studio.screenAllowed else { return studio.recordScreen ? nil : [later] }
             return studio.displays.map { d in
                 MenuChoice(title: d.name, selected: studio.recordScreen && d.id == studio.displayID) {
                     studio.displayID = d.id
                     studio.recordScreen = true
                 }
-            } + [cameraOnly]
+            } + [later, sound]
         case "prompter":
             return [MenuChoice(title: "Follows the voice", selected: studio.followVoice) { studio.followVoice = true },
                     MenuChoice(title: "Key only", selected: !studio.followVoice) { studio.followVoice = false }]
@@ -604,8 +606,7 @@ struct Viewfinder: View {
     }
 }
 
-/// Shows a preview made once at launch. A preview joining or leaving the camera session during a
-/// take ends camera.mov on the spot (measured 4 Oct), so SwiftUI must never make or drop one.
+/// Shows the panel's camera picture, made once at launch and fed by `CameraFeed`.
 struct PreviewLayerView: NSViewRepresentable {
     var view: PreviewNSView
 
@@ -615,7 +616,7 @@ struct PreviewLayerView: NSViewRepresentable {
 }
 
 final class PreviewNSView: NSView {
-    let preview = AVCaptureVideoPreviewLayer()
+    let preview = AVSampleBufferDisplayLayer()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -627,6 +628,11 @@ final class PreviewNSView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        preview.sampleBufferRenderer.flush()
+    }
 
     override func layout() {
         super.layout()

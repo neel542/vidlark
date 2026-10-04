@@ -357,6 +357,8 @@ struct RecordingsView: View {
     @State private var renaming: TakeInfo?
     @State private var newName = ""
     @State private var deleting: TakeInfo?
+    /// The take playing in the viewer, which takes the place of the cards.
+    @State private var watching: TakeInfo?
 
     /// The page for the real library. `onClose` adds a back button; leave it out in a window of its own.
     init(onClose: (() -> Void)? = nil) {
@@ -372,13 +374,17 @@ struct RecordingsView: View {
     var body: some View {
         GeometryReader { g in
             let compact = g.size.width < 760
-            VStack(alignment: .leading, spacing: 0) {
-                header(compact: compact)
-                    .padding(.horizontal, compact ? 22 : 44)
-                    // The window's title bar band holds the traffic lights; snapshots have none.
-                    .padding(.top, compact ? (Snapshots.active ? 36 : 8) : 34)
-                    .padding(.bottom, compact ? 18 : 26)
-                content(compact: compact)
+            if let watching {
+                TakeViewer(take: watching) { self.watching = nil }
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    header(compact: compact)
+                        .padding(.horizontal, compact ? 22 : 44)
+                        // The window's title bar band holds the traffic lights; snapshots have none.
+                        .padding(.top, compact ? (Snapshots.active ? 36 : 8) : 34)
+                        .padding(.bottom, compact ? 18 : 26)
+                    content(compact: compact)
+                }
             }
         }
         .frame(minWidth: 400, minHeight: 480)
@@ -478,6 +484,7 @@ struct RecordingsView: View {
 
     private func card(_ take: TakeInfo, hover: Bool) -> some View {
         TakeCard(take: take, activity: model.activity(take), forceHover: hover,
+                 watch: { watching = take },
                  open: { model.showInFinder(take) },
                  rename: { newName = take.title; renaming = take },
                  saveCopy: { model.saveCopy(take) },
@@ -491,6 +498,7 @@ struct TakeCard: View {
     var take: TakeInfo
     var activity: RecordingsModel.Activity
     var forceHover = false
+    var watch: () -> Void
     var open: () -> Void
     var rename: () -> Void
     var saveCopy: () -> Void
@@ -534,6 +542,19 @@ struct TakeCard: View {
                             .transition(.opacity)
                     }
                 }
+                .overlay {
+                    if lit && canWatch {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 17))
+                            .foregroundStyle(Palette.ink)
+                            .offset(x: 2)
+                            .frame(width: 46, height: 46)
+                            .background(Circle().fill(Color.black.opacity(0.55)))
+                            .overlay(Circle().strokeBorder(Color.white.opacity(0.14)))
+                            .allowsHitTesting(false)
+                            .transition(.opacity)
+                    }
+                }
 
             Text(take.title)
                 .font(.system(size: 13, weight: .semibold))
@@ -567,13 +588,18 @@ struct TakeCard: View {
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .onHover { hover = $0 }
         .animation(.easeOut(duration: 0.2), value: hover)
-        .onTapGesture(count: 2, perform: open)
+        .onTapGesture { if canWatch { watch() } }
         .contextMenu { actions }
-        .help("Double-click to show it in Finder")
+        .help(canWatch ? "Click to watch it" : "Recording now")
+        .accessibilityAction(named: "Watch") { if canWatch { watch() } }
         .accessibilityAction(named: "Show in Finder", open)
     }
 
+    /// A take can be watched once its files are closed.
+    private var canWatch: Bool { activity != .recording && (take.hasCamera || take.hasScreen) }
+
     @ViewBuilder private var actions: some View {
+        if canWatch { Button("Watch", action: watch) }
         Button("Show in Finder", action: open)
         if activity == .none {
             Button("Rename…", action: rename)
@@ -685,8 +711,9 @@ private struct MoreButton<Items: View>: View {
 
 // MARK: - Header pieces
 
-private struct BackButton: View {
+struct BackButton: View {
     var action: () -> Void
+    var help = "Back to the recorder"
     @State private var hover = false
 
     var body: some View {
@@ -702,7 +729,7 @@ private struct BackButton: View {
         .buttonStyle(.plain)
         .onHover { hover = $0 }
         .keyboardShortcut("[", modifiers: .command)
-        .help("Back to the recorder")
+        .help(help)
         .accessibilityLabel("Back")
     }
 }

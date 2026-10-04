@@ -6,6 +6,10 @@ struct RecordingEvents {
     var cards: [(t: Double, section: String)] = []
     var apps: [(t: Double, name: String)] = []
     var stopTime: Double?
+    /// The take started with the camera only (its start line names no screen file).
+    var cameraFirst = false
+    /// When the screen was shared in a camera-first take, in camera time.
+    var screenShared: Double?
     var skippedLines = 0
 }
 
@@ -34,6 +38,9 @@ func readEvents(_ url: URL) -> RecordingEvents? {
         case "start":
             events.title = text("title")
             events.wall = text("wall")
+            events.cameraFirst = (object["screen"] as? String) == ""
+        case "screen-start":
+            if events.screenShared == nil { events.screenShared = t }
         case "card":
             if let section = text("section") { events.cards.append((t, section)) }
         case "app":

@@ -5,8 +5,10 @@ import Foundation
 
 // aresample with first_pts=0 pads any late audio start with silence, so sample 0 of each
 // wav is time 0 of its movie, and async=1 fills gaps the same way.
-func extractAudio(ffmpeg: String, input: String, outputs: [(path: String, rate: Int)], maxSeconds: Double? = nil) throws {
+func extractAudio(ffmpeg: String, input: String, outputs: [(path: String, rate: Int)],
+                  startSeconds: Double? = nil, maxSeconds: Double? = nil) throws {
     var args = ["-nostdin", "-v", "error", "-y"]
+    if let startSeconds { args += ["-ss", String(format: "%.3f", startSeconds)] }
     if let maxSeconds { args += ["-t", String(format: "%.1f", maxSeconds)] }
     args += ["-i", input]
     for output in outputs {
@@ -169,9 +171,8 @@ func bestLag(camera: [Double], screen: [Double], maxLag: Int, minOverlap: Int) -
     return (refined - Double(maxLag), scores[bestIndex])
 }
 
-func measureSync(cameraWav: URL, screenWav: URL) throws -> SyncResult {
+func measureSync(cameraWav: URL, screenWav: URL, maxLagSeconds: Double = 3) throws -> SyncResult {
     let window = 120.0
-    let maxLagSeconds = 3.0
     let camera = try readWav(cameraWav, maxSeconds: window)
     let screen = try readWav(screenWav, maxSeconds: window + maxLagSeconds)
     let frameLength = max(1, camera.info.sampleRate / 1000)  // 1 ms frames

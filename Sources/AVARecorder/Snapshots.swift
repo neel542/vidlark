@@ -48,6 +48,17 @@ enum Snapshots {
             write(RecordingPillView(studio: s, state: state, tracker: FaceTracker(), preview: ZoomPreviewNSView()), size: size,
                   to: dir.appendingPathComponent(open ? "pill-open.png" : "pill-closed.png"))
         }
+        do {
+            // A camera-first take with the "Share your screen?" card open.
+            let s = Studio()
+            s.stage(phase: .recording, camera: "x", mic: "x", level: -18, elapsed: 74, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: nil)
+            s.stageCameraFirst()
+            let state = PillState()
+            state.expanded = true
+            state.askingToShare = true
+            write(RecordingPillView(studio: s, state: state, tracker: FaceTracker(), preview: ZoomPreviewNSView()), size: CGSize(width: 290, height: 520),
+                  to: dir.appendingPathComponent("pill-share.png"))
+        }
         UserDefaults.standard.removeObject(forKey: "faceBoxOpen")
 
         for shape in BubbleShape.allCases {
@@ -79,6 +90,12 @@ enum Snapshots {
         recordings("not-finished", roomy, .sample(filter: .unfinished))
         recordings("no-match", narrow, .sample(search: "zebra"))
         recordings("empty", roomy, .sample(empty: true))
+        if let take = RecordingsModel.sample().takes.first(where: { $0.hasCamera && $0.hasScreen }) {
+            for (name, size) in [("wide", roomy), ("narrow", narrow)] {
+                write(TakeViewer(take: take, close: {}).preferredColorScheme(.dark), size: size,
+                      to: dir.appendingPathComponent("recordings-watch-\(name).png"))
+            }
+        }
     }
 
     @MainActor

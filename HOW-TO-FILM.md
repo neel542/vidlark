@@ -11,16 +11,17 @@
 2. Open AVA Recorder. It fills the monitor. Check the lamps are green:
    - Camera (its menu also has **Touch up the face**, which opens macOS Video Effects: switch on Studio Light once and it stays on)
    - Mic (say a few words so the meter moves)
-   - Record (the screen that gets recorded, or **Camera only, no screen** for a talking-head video)
+   - Record (the screen that gets recorded from the start, or **Camera first, share the screen when ready**. Its menu also has **Include the Mac's sound**, for a video or a click played on the Mac)
    - In video (the screen only, or the face in a circle, square, oval or wide shape)
    - After (tick it for a transcript and chapters; untick it for a quick video that only needs the files)
    - Mac (free space and power)
    - An amber **Effects** row means macOS Reactions are on. Click it and switch Reactions off: they cost battery, and with gestures on a thumbs-up puts balloons in the video.
-3. Press the green key. The big window steps aside, so the presenter has the whole monitor for slides, screenshots and Seller Central. Three short beeps count down 3, 2, 1, and a higher beep means go.
+3. Press the green key. The big window steps aside, so the presenter has the whole monitor for slides, screenshots and Seller Central. Three short beeps count down 3, 2, 1, and a higher beep means go. The clock starts at 00:00 on go.
 4. In the top right corner, a small box shows her face, zoomed in automatically:
    - Click the picture to switch between her face and the whole camera view.
    - The minus button shrinks the box to a small pill, and the face button brings it back.
    - The square button stops the recording.
+   - In a camera-first take, the screen button shares the screen. It asks first ("Share your screen?"), with a tick box for the Mac's sound. From then on the screen is recorded until the take stops; the finisher lines it up with the camera.
    - The face button puts the face in the video, in the shape picked in the **In video** row. Only one face shows at a time: while the face is in the video, this box shrinks to just the time, the level and the buttons. The box never appears in the recording, and neither does any pop-up banner.
    - If the camera stops sending pictures, the take stops within about 6 seconds and says so, so nobody films on without a camera.
 5. If she stumbles, she says **"retake"** and repeats the line. The edit finds it from the transcript.
@@ -30,7 +31,7 @@ The prompter is built but switched off for now.
 
 ## All recordings
 
-The **Recordings** button at the top right of the panel (or Command-Shift-R) shows every take with a picture, its length and size. Search by name, filter by All, This week, Not finished, With screen or Camera only, and rename, save a copy or delete (deleted takes go to the Trash).
+The **Recordings** button at the top right of the panel (or Command-Shift-R) shows every take with a picture, its length and size. Click a take to watch it in the app: switch between Camera and Screen and it stays at the same moment of the take, or open it in QuickTime Player. Search by name, filter by All, This week, Not finished, With screen or Camera only, and rename, save a copy or delete (deleted takes go to the Trash).
 
 ## More than one camera
 
@@ -53,7 +54,7 @@ The **Live** row shows the shoot on any browser, with no login: every camera, th
 |---|---|
 | camera.mov | the presenter on camera, with the mic |
 | camera-2.mov | A second camera, if one was added, with the same mic |
-| screen.mov | The recorded screen, with the same mic |
+| screen.mov | The recorded screen, with the same mic (and the Mac's sound as a second track, if ticked). Starts when the screen was shared in a camera-first take |
 | mic.wav | The clean voice track |
 | words.json | The transcript, with the time of every word |
 | chapters.txt | Ready to paste into the YouTube description |

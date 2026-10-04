@@ -1,5 +1,6 @@
 import AVFoundation
 import AppKit
+import ScreenCaptureKit
 import Vision
 
 /// `--camera-test <dir>`: records short camera files while changing the camera session the ways
@@ -12,6 +13,8 @@ enum CameraTest {
         var name: String
         var fileExists: Bool
         var seconds: Double
+        /// The picture alone. A file can run on with sound after its picture has stopped.
+        var videoSeconds: Double = 0
         var error: String?
         var writtenSamples: [Double]
     }
@@ -40,8 +43,11 @@ enum CameraTest {
                 ("new: feed switched through setFrames",
                  { r, o, _ in r.setFrames(o, on: false) },
                  { r, o, _ in r.setFrames(o, on: true) }),
+                ("countdown beeps", { _, _, _ in Beeps.count() }, { _, _, _ in Beeps.go() }),
             ]
-            for (name, first, second) in cases {
+            // AVA_CASES=plain,beep runs only the cases whose names contain one of those words.
+            let only = ProcessInfo.processInfo.environment["AVA_CASES"]?.split(separator: ",")
+            for (name, first, second) in cases where only.map({ $0.contains { name.contains($0) } }) ?? true {
                 NSApp.windows.forEach { $0.orderOut(nil) }
                 let recorder = CameraRecorder()
                 let output = AVCaptureVideoDataOutput()
@@ -53,7 +59,7 @@ enum CameraTest {
                 try? FileManager.default.removeItem(at: url)
                 let outcome = await take(recorder, output, url: url, first: first, second: second)
                 results.append(Outcome(name: name, fileExists: outcome.exists, seconds: outcome.seconds,
-                                       error: outcome.error, writtenSamples: outcome.samples))
+                                       videoSeconds: outcome.video, error: outcome.error, writtenSamples: outcome.samples))
                 recorder.release()
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
@@ -94,7 +100,7 @@ enum CameraTest {
     private static func take(_ recorder: CameraRecorder, _ output: AVCaptureVideoDataOutput, url: URL,
                              first: (CameraRecorder, AVCaptureVideoDataOutput, inout AVCaptureVideoPreviewLayer?) -> Void,
                              second: (CameraRecorder, AVCaptureVideoDataOutput, inout AVCaptureVideoPreviewLayer?) -> Void)
-        async -> (exists: Bool, seconds: Double, error: String?, samples: [Double]) {
+        async -> (exists: Bool, seconds: Double, video: Double, error: String?, samples: [Double]) {
         var finishError: String?
         var finished = false
         recorder.onFinished = { error in
@@ -118,15 +124,20 @@ enum CameraTest {
             recorder.stopRecording()
         }
         let info = await probe(url)
-        return (info.exists, info.seconds, early, samples)
+        return (info.exists, info.seconds, info.video, early, samples)
     }
 
-    private static func probe(_ url: URL) async -> (exists: Bool, seconds: Double, audio: Bool) {
-        guard FileManager.default.fileExists(atPath: url.path) else { return (false, 0, false) }
+    private static func probe(_ url: URL) async -> (exists: Bool, seconds: Double, video: Double, audio: Bool) {
+        guard FileManager.default.fileExists(atPath: url.path) else { return (false, 0, 0, false) }
         let asset = AVURLAsset(url: url)
         let seconds = (try? await asset.load(.duration))?.seconds ?? 0
         let audio = !((try? await asset.loadTracks(withMediaType: .audio)) ?? []).isEmpty
-        return (true, seconds, audio)
+        var video = 0.0
+        if let track = try? await asset.loadTracks(withMediaType: .video).first,
+           let range = try? await track.load(.timeRange) {
+            video = range.duration.seconds
+        }
+        return (true, seconds, video, audio)
     }
 
     private static func write(_ object: [String: String], to dir: URL) {
@@ -188,6 +199,33 @@ enum CameraCPUTest {
             await measure("5 plus a frame output, on")
             layers.removeAll()
             await measure("6 frame output on, no previews")
+
+            // As the app sits idle: the panel's picture on screen, the face box and bubble hidden.
+            func window(_ layer: CALayer) -> NSPanel {
+                let view = NSView(frame: NSRect(x: 0, y: 0, width: 640, height: 360))
+                view.wantsLayer = true
+                layer.frame = view.bounds
+                view.layer?.addSublayer(layer)
+                let panel = NSPanel(contentRect: NSRect(x: 100, y: 100, width: 640, height: 360),
+                                    styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                panel.contentView = view
+                return panel
+            }
+            recorder.setFrames(output, on: false)
+            let old = (0..<3).map { _ in AVCaptureVideoPreviewLayer(session: recorder.session) }
+            let oldWindows = old.map(window)
+            oldWindows[0].orderFrontRegardless()
+            await measure("7 old: three preview layers, one on screen")
+            oldWindows.forEach { $0.orderOut(nil) }
+            old.forEach { $0.session = nil }
+            let feed = CameraFeed()
+            recorder.attach(feed.output)
+            let new = (0..<3).map { _ in AVSampleBufferDisplayLayer() }
+            new.forEach(feed.show)
+            let newWindows = new.map(window)
+            newWindows[0].orderFrontRegardless()
+            await measure("8 new: feed into three layers, one on screen")
+            newWindows.forEach { $0.orderOut(nil) }
             flags["cpu"] = results
             try? JSONSerialization.data(withJSONObject: flags, options: [.prettyPrinted, .sortedKeys])
                 .write(to: dir.appendingPathComponent("camera-cpu.json"))
@@ -272,5 +310,167 @@ enum FramingTest {
             try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys]).write(to: out)
             exit(0)
         }
+    }
+}
+
+/// `--screen-camera-test <dir>`: records camera.mov while ScreenCaptureKit records the screen,
+/// in a few variations, and writes how much camera picture survived to <dir>/screen-camera.json.
+/// Built to find out why the camera picture stopped 0.13 s into every take with a screen on 4 Oct.
+enum ScreenCameraTest {
+    private final class Sink: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {}
+
+    struct Outcome: Encodable {
+        var name: String
+        var note: String?
+        var cameraPicture: Double
+        var cameraTotal: Double
+        var screenPicture: Double
+    }
+
+    @MainActor
+    static func run(dir: URL) {
+        NSApp.windows.forEach { $0.orderOut(nil) }
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        Task { @MainActor in
+            func fail(_ why: String) -> Never {
+                try? Data(why.utf8).write(to: dir.appendingPathComponent("screen-camera.json"))
+                exit(1)
+            }
+            guard let cam = AVCaptureDevice.default(for: .video), let mic = AVCaptureDevice.default(for: .audio) else { fail("no camera or mic") }
+            let content: SCShareableContent
+            do { content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true) } catch { fail("screen: \(error)") }
+            guard let display = content.displays.first else { fail("no display") }
+            let plain = SCContentFilter(display: display, excludingApplications: [], exceptingWindows: [])
+            let me = content.applications.filter { $0.bundleIdentifier == Bundle.main.bundleIdentifier }
+            let withoutMe = SCContentFilter(display: display, excludingApplications: me, exceptingWindows: [])
+            let full = CGSize(width: display.width * 2, height: display.height * 2)
+            struct Case {
+                var name: String
+                var screenFirst = true
+                var mic = true
+                var size: CGSize
+                var filter: SCContentFilter
+                var update = false
+                var window = false
+                /// Two frame outputs attached with frames off, switched on by prepareForTake, as in the app.
+                var outputs = false
+                /// False: wait as long as the screen takes to start, but start no screen.
+                var screen = true
+                /// The preview window is hidden 0.7 s into the take, as the panel is when a take starts.
+                var hide = false
+                /// The preview gets copies of frames (CameraFeed) instead of joining the session.
+                var feed = false
+            }
+            let half = CGSize(width: display.width, height: display.height)
+            let cases: [Case] = [
+                Case(name: "screen first, with mic", size: full, filter: plain),
+                Case(name: "screen first, no mic", mic: false, size: full, filter: plain),
+                Case(name: "camera first, screen 2 s later, with mic", screenFirst: false, size: full, filter: plain),
+                Case(name: "screen first, with mic, half size", size: half, filter: plain),
+                Case(name: "filter update after camera starts", size: full, filter: plain, update: true),
+                Case(name: "filter update, app left out", size: full, filter: withoutMe, update: true),
+                Case(name: "filter update, app left out, preview window", size: full, filter: withoutMe, update: true, window: true),
+                Case(name: "no update, app left out, preview window", size: full, filter: withoutMe, window: true),
+                Case(name: "outputs switched on, then screen, then camera", size: full, filter: withoutMe, outputs: true),
+                Case(name: "outputs switched on, 1 s wait, then camera, no screen", size: full, filter: withoutMe, outputs: true, screen: false),
+                Case(name: "old preview window hidden mid-take", size: full, filter: withoutMe, window: true, hide: true),
+                Case(name: "fed preview window hidden mid-take", size: full, filter: withoutMe, window: true, hide: true, feed: true),
+            ]
+            let only = ProcessInfo.processInfo.environment["AVA_CASES"]?.split(separator: ",")
+            var results: [Outcome] = []
+            let sink = Sink()
+            for c in cases where only.map({ $0.contains { c.name.contains($0) } }) ?? true {
+                let recorder = CameraRecorder()
+                let screen = ScreenRecorder()
+                var taps: [AVCaptureVideoDataOutput] = []
+                if c.outputs {
+                    for _ in 0..<2 {
+                        let tap = AVCaptureVideoDataOutput()
+                        tap.alwaysDiscardsLateVideoFrames = true
+                        tap.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange]
+                        tap.setSampleBufferDelegate(sink, queue: DispatchQueue(label: "test.tap"))
+                        recorder.attach(tap, framesOn: false)
+                        taps.append(tap)
+                    }
+                }
+                recorder.use(camera: cam, mic: mic)
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                let slug = c.name.replacingOccurrences(of: ",", with: "").replacingOccurrences(of: " ", with: "-")
+                let camURL = dir.appendingPathComponent(slug + "-camera.mov")
+                let scrURL = dir.appendingPathComponent(slug + "-screen.mov")
+                [camURL, scrURL].forEach { try? FileManager.default.removeItem(at: $0) }
+                // A window showing the camera, like the face box: the old preview layer joined to the
+                // session, or the new one fed with copies of frames.
+                var window: NSPanel?
+                var note: String?
+                let feed = CameraFeed()
+                if c.feed { recorder.attach(feed.output) }
+                if c.window {
+                    let view = NSView(frame: NSRect(x: 0, y: 0, width: 240, height: 240))
+                    view.wantsLayer = true
+                    if c.feed {
+                        let layer = AVSampleBufferDisplayLayer()
+                        layer.frame = view.bounds
+                        view.layer?.addSublayer(layer)
+                        feed.show(on: layer)
+                    } else {
+                        let layer = AVCaptureVideoPreviewLayer(session: recorder.session)
+                        layer.frame = view.bounds
+                        view.layer?.addSublayer(layer)
+                        note = "old preview mirrored: \(layer.connection?.isVideoMirrored ?? false), camera position \(cam.position.rawValue)"
+                    }
+                    let panel = NSPanel(contentRect: NSRect(x: 200, y: 200, width: 240, height: 240),
+                                        styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+                    panel.contentView = view
+                    panel.orderFrontRegardless()
+                    window = panel
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                }
+                recorder.prepareForTake()
+                if !c.screen {
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    recorder.startRecording(to: camURL)
+                } else if c.screenFirst {
+                    try? await screen.start(filter: c.filter, pixelSize: c.size, micID: c.mic ? mic.uniqueID : nil, to: scrURL)
+                    recorder.startRecording(to: camURL)
+                } else {
+                    recorder.startRecording(to: camURL)
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    try? await screen.start(filter: c.filter, pixelSize: c.size, micID: c.mic ? mic.uniqueID : nil, to: scrURL)
+                }
+                if c.update {
+                    try? await Task.sleep(nanoseconds: 700_000_000)
+                    try? await screen.update(c.filter)
+                }
+                if c.hide {
+                    try? await Task.sleep(nanoseconds: 700_000_000)
+                    window?.orderOut(nil)
+                }
+                try? await Task.sleep(nanoseconds: 6_000_000_000)
+                await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+                    let once = Once()
+                    recorder.onFinished = { _ in if once.first() { done.resume() } }
+                    recorder.stopRecording()
+                }
+                await screen.stop()
+                window?.orderOut(nil)
+                recorder.release()
+                _ = taps
+                results.append(Outcome(name: c.name, note: note, cameraPicture: await picture(camURL),
+                                       cameraTotal: (try? await AVURLAsset(url: camURL).load(.duration))?.seconds ?? 0,
+                                       screenPicture: await picture(scrURL)))
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+            }
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted]
+            try? encoder.encode(results).write(to: dir.appendingPathComponent("screen-camera.json"))
+            exit(0)
+        }
+    }
+
+    private static func picture(_ url: URL) async -> Double {
+        guard let track = try? await AVURLAsset(url: url).loadTracks(withMediaType: .video).first,
+              let range = try? await track.load(.timeRange) else { return 0 }
+        return range.duration.seconds
     }
 }

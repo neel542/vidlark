@@ -94,6 +94,35 @@ check "screen offset unchanged by the extra camera" offset_near "$OUT/extracam" 
 check "report names camera-2.mov" grep -q "^- camera-2.mov: offset" "$OUT/extracam/report.md"
 check "sync.json has no cameras list without extra cameras" py 'import json,sys; sys.exit("cameras" in json.load(open(sys.argv[1]+"/sync.json")))' "$OUT/notranscribe"
 
+# camera first, screen shared 20 s in: screen.mov holds the same sound from 20 s on
+rm -rf "$OUT/shared" && mkdir -p "$OUT/shared"
+cp "$OUT/notranscribe/camera.mov" "$OUT/shared/"
+/opt/homebrew/bin/ffmpeg -v error -ss 20 -i "$OUT/notranscribe/camera.mov" -map 0 -c:v copy -c:a aac -b:a 128k "$OUT/shared/screen.mov"
+python3 - "$OUT/notranscribe/events.jsonl" "$OUT/shared/events.jsonl" <<'PY'
+import json, sys
+out = []
+for line in open(sys.argv[1]):
+    e = json.loads(line)
+    if e["type"] == "start": e["screen"] = ""
+    out.append(json.dumps(e))
+out.insert(1, json.dumps({"type": "screen-start", "t": 19.6, "screen": "screen.mov"}))
+open(sys.argv[2], "w").write("\n".join(out) + "\n")
+PY
+run shared --no-transcribe
+check "exit 0 and DONE line" done_ok shared
+check "screen offset within 20 ms of +20" py 'import json,sys; d=json.load(open(sys.argv[1]+"/sync.json"))
+print("        measured %+.4f s, confidence %.3f, method %s" % (d["screenOffsetSec"], d["confidence"], d["method"]))
+sys.exit(0 if d["method"]=="audio" and abs(d["screenOffsetSec"]-20) <= 0.020 else 1)' "$OUT/shared"
+check "report says when the screen was shared" grep -q "shared 00:19 into the take" "$OUT/shared/report.md"
+
+# camera first and never shared: no screen.mov, said plainly
+rm -rf "$OUT/nevershared" && mkdir -p "$OUT/nevershared"
+cp "$OUT/notranscribe/camera.mov" "$OUT/nevershared/"
+grep -v screen-start "$OUT/shared/events.jsonl" > "$OUT/nevershared/events.jsonl"
+run nevershared --no-transcribe
+check "exit 0 and DONE line" done_ok nevershared
+check "report says the screen was not shared" grep -q "none, the screen was not shared in this take" "$OUT/nevershared/report.md"
+
 # the tick box unticked: no transcript and no chapters
 rm -rf "$OUT/nochapters" && cp -R "$OUT/notranscribe" "$OUT/nochapters" && rm -f "$OUT/nochapters"/{chapters.txt,report.md,sync.json,mic.wav}
 run nochapters --no-transcribe --no-chapters

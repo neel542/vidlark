@@ -65,6 +65,8 @@ final class CameraRecorder: NSObject {
     private var frameOutputs: [(output: AVCaptureOutput, wanted: Bool)] = []
     /// True from the start of a take until its file closes. Camera queue only.
     private var taking = false
+    /// When the session will have settled after the last connection was switched on. Camera queue only.
+    private var settled: CFTimeInterval = 0
 
     var onLevel: ((Float, Float) -> Void)?
     var onStarted: ((CFTimeInterval) -> Void)?
@@ -122,20 +124,17 @@ final class CameraRecorder: NSObject {
 
     func startRecording(to url: URL) {
         queue.async { [self] in
-            let changed = frameOutputsOnForTake()
-            // Give a just-changed session a moment to settle before the file opens.
-            if changed {
-                queue.asyncAfter(deadline: .now() + 0.5) { [self] in movie.startRecording(to: url, recordingDelegate: self) }
-            } else {
-                movie.startRecording(to: url, recordingDelegate: self)
-            }
+            frameOutputsOnForTake()
+            // Give a just-changed session half a second to settle before the file opens.
+            let wait = max(0, settled - CACurrentMediaTime())
+            queue.asyncAfter(deadline: .now() + wait) { [self] in movie.startRecording(to: url, recordingDelegate: self) }
         }
     }
 
     /// Switches every extra output on ahead of a take, so nothing about the session changes once
     /// the file is open. Turning one on or off mid-take is what lost a whole camera file on 4 Oct.
     func prepareForTake() {
-        queue.async { [self] in _ = frameOutputsOnForTake() }
+        queue.async { [self] in frameOutputsOnForTake() }
     }
 
     /// Asks for frames to an extra output, or stops them. During a take the change waits until
@@ -153,17 +152,15 @@ final class CameraRecorder: NSObject {
         queue.async { [self] in reply(movie.isRecording ? movie.recordedDuration.seconds : nil) }
     }
 
-    /// Camera queue only. Returns true if any connection had to be switched on.
-    private func frameOutputsOnForTake() -> Bool {
+    /// Camera queue only. Switching a connection on means the file waits until `settled`.
+    private func frameOutputsOnForTake() {
         taking = true
-        var changed = false
         for item in frameOutputs {
             if let connection = item.output.connection(with: .video), !connection.isEnabled {
                 connection.isEnabled = true
-                changed = true
+                settled = CACurrentMediaTime() + 0.5
             }
         }
-        return changed
     }
 
     /// Camera queue only. The take is over, so outputs go back to what they asked for.
@@ -247,16 +244,75 @@ extension CameraRecorder: AVCaptureAudioDataOutputSampleBufferDelegate {
     }
 }
 
+// MARK: - Previews
+
+/// The camera picture for every preview on screen (panel, face box, bubble), from one frame output.
+/// Previews used to be AVCaptureVideoPreviewLayers, which belong to the camera session: a window
+/// hiding or showing one at the start of a take changed the session and camera.mov stopped within
+/// a second. On 4 Oct every test take lost its picture that way, and none did with no preview layers.
+/// These layers only get copies of frames, so nothing on screen can touch the session.
+final class CameraFeed: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
+    let output = AVCaptureVideoDataOutput()
+    private let queue = DispatchQueue(label: "ava.preview")
+    private let lock = NSLock()
+    private let layers = NSHashTable<AVSampleBufferDisplayLayer>.weakObjects()
+    private var handed = 0
+
+    /// How many frames went to a preview, and each preview's state, for the self test.
+    var report: (frames: Int, states: [String]) {
+        lock.withLock {
+            (handed, layers.allObjects.map { ["unknown", "rendering", "failed"][min(max($0.sampleBufferRenderer.status.rawValue, 0), 2)] })
+        }
+    }
+
+    override init() {
+        super.init()
+        output.alwaysDiscardsLateVideoFrames = true
+        output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange]
+        output.setSampleBufferDelegate(self, queue: queue)
+    }
+
+    func show(on layer: AVSampleBufferDisplayLayer) {
+        // Camera frames are stamped with the host clock, so a layer run by that clock shows each
+        // one as it arrives. (Marking frames "display immediately" instead changes data the camera
+        // shares between threads, and crashed the app on 4 Oct.)
+        let host = CMClockGetHostTimeClock()
+        var timebase: CMTimebase?
+        if CMTimebaseCreateWithSourceClock(allocator: kCFAllocatorDefault, sourceClock: host, timebaseOut: &timebase) == noErr,
+           let timebase {
+            CMTimebaseSetTime(timebase, time: CMClockGetTime(host))
+            CMTimebaseSetRate(timebase, rate: 1)
+            layer.controlTimebase = timebase
+        }
+        lock.withLock { layers.add(layer) }
+    }
+
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        for layer in lock.withLock({ layers.allObjects }) {
+            let renderer = layer.sampleBufferRenderer
+            if renderer.status == .failed { renderer.flush() }
+            // A layer in a hidden window stops taking frames; it is skipped until it shows again.
+            if renderer.isReadyForMoreMediaData {
+                renderer.enqueue(sampleBuffer)
+                lock.withLock { handed += 1 }
+            }
+        }
+    }
+}
+
 // MARK: - Screen
 
 /// The content screen plus the same mic, into screen.mov. The shared mic is what lets the
 /// finisher line the two files up exactly. The app's own windows and Notification Center are
-/// cut out of the picture.
+/// cut out of the picture. With `systemAudio`, what the Mac plays goes in as a second sound track
+/// (the mic stays the first, which the finisher reads).
 final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
     private var stream: SCStream?
     private var writer: AVAssetWriter?
     private var videoIn: AVAssetWriterInput?
     private var audioIn: AVAssetWriterInput?
+    private var systemIn: AVAssetWriterInput?
+    private var wantsSystemAudio = false
     private let queue = DispatchQueue(label: "ava.screen")
     private var started = false
     private var wantsAudio = false
@@ -270,7 +326,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
     /// Every complete screen frame, for the live view. Called on the stream queue.
     var onFrame: ((CVPixelBuffer) -> Void)?
 
-    func start(filter: SCContentFilter, pixelSize: CGSize, micID: String?, to url: URL) async throws {
+    func start(filter: SCContentFilter, pixelSize: CGSize, micID: String?, systemAudio: Bool = false, to url: URL) async throws {
         self.url = url
         started = false
         audioFormat = nil
@@ -284,7 +340,14 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
         config.colorSpaceName = CGColorSpace.sRGB
         config.showsCursor = true
         config.queueDepth = 8
-        config.capturesAudio = false
+        config.capturesAudio = systemAudio
+        if systemAudio {
+            // The app's own sounds (the countdown beeps) stay out.
+            config.excludesCurrentProcessAudio = true
+            config.sampleRate = 48_000
+            config.channelCount = 2
+        }
+        wantsSystemAudio = systemAudio
         wantsAudio = micID != nil
         if let micID {
             config.captureMicrophone = true
@@ -294,6 +357,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
         let s = SCStream(filter: filter, configuration: config, delegate: self)
         try s.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
         if wantsAudio { try s.addStreamOutput(self, type: .microphone, sampleHandlerQueue: queue) }
+        if systemAudio { try s.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue) }
         stream = s
         streamStart = CACurrentMediaTime()
         try await s.startCapture()
@@ -323,8 +387,9 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
                 lastFrame = nil
                 videoIn?.markAsFinished()
                 audioIn?.markAsFinished()
+                systemIn?.markAsFinished()
                 w.finishWriting { [self] in
-                    writer = nil; videoIn = nil; audioIn = nil
+                    writer = nil; videoIn = nil; audioIn = nil; systemIn = nil
                     done.resume()
                 }
             }
@@ -349,6 +414,8 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
         case .microphone:
             if audioFormat == nil { audioFormat = sampleBuffer.formatDescription }
             if started, let a = audioIn, a.isReadyForMoreMediaData { a.append(sampleBuffer) }
+        case .audio:
+            if started, let s = systemIn, s.isReadyForMoreMediaData { s.append(sampleBuffer) }
         default:
             break
         }
@@ -403,6 +470,22 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
                 let a = AVAssetWriterInput(mediaType: .audio, outputSettings: settings, sourceFormatHint: format)
                 a.expectsMediaDataInRealTime = true
                 if w.canAdd(a) { w.add(a); audioIn = a }
+            }
+
+            // The Mac's sound, after the mic so the mic stays the first sound track.
+            systemIn = nil
+            if wantsSystemAudio {
+                var layout = AudioChannelLayout()
+                layout.mChannelLayoutTag = kAudioChannelLayoutTag_Stereo
+                let s = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+                    AVFormatIDKey: kAudioFormatMPEG4AAC,
+                    AVSampleRateKey: 48_000,
+                    AVNumberOfChannelsKey: 2,
+                    AVEncoderBitRateKey: 192_000,
+                    AVChannelLayoutKey: Data(bytes: &layout, count: MemoryLayout<AudioChannelLayout>.size),
+                ])
+                s.expectsMediaDataInRealTime = true
+                if w.canAdd(s) { w.add(s); systemIn = s }
             }
 
             guard w.startWriting() else { return false }

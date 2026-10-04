@@ -75,6 +75,8 @@ func buildReport(_ r: ReportInput) -> String {
     out.append("- Camera (camera.mov): \(length(r.cameraDuration))")
     if let note = r.screenNote {
         out.append("- Screen (screen.mov): \(note)")
+    } else if let shared = r.events?.screenShared {
+        out.append("- Screen (screen.mov): \(length(r.screenDuration)), shared \(clock(shared)) into the take")
     } else {
         out.append("- Screen (screen.mov): \(length(r.screenDuration))")
     }
@@ -101,7 +103,8 @@ func buildReport(_ r: ReportInput) -> String {
         let verdict = c >= 0.8 ? "high" : c >= 0.5 ? "medium, worth a quick check by eye" : "low, check the sync by eye before editing"
         out.append("- Confidence: \(String(format: "%.2f", c)) (\(verdict))")
     } else {
-        out.append("Not measured, because \(r.sync.note ?? "there is no screen sound to match"). sync.json says offset 0.")
+        let offset = r.sync.offset == 0 ? "0" : "\(jsonNumber(r.sync.offset)), the moment the screen was shared"
+        out.append("Not measured, because \(r.sync.note ?? "there is no screen sound to match"). sync.json says offset \(offset).")
     }
     for extra in r.extraCameras {
         out.append("")

@@ -71,6 +71,8 @@ do {
     try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
     workDir = work
 
+    let events = readEvents(file("events.jsonl"))
+
     // 1. Audio
     step("Taking the sound out of the videos")
     let camera: MediaInfo
@@ -94,6 +96,10 @@ do {
     var screen16k: URL?
     if !FileManager.default.fileExists(atPath: screenPath) {
         screenNote = "not found"
+        if events?.cameraFirst == true {
+            screenNote = "none, the screen was not shared in this take"
+            screenProblem = "the screen was not shared in this take"
+        }
     } else {
         do {
             let screen = try probeMedia(ffprobe, screenPath)
@@ -115,7 +121,20 @@ do {
     // 2. Sync
     step("Lining up the camera and the screen")
     var sync = SyncResult(offset: 0, method: "none", confidence: 0, note: screenProblem)
-    if let screen16k {
+    if let screen16k, let shared = events?.screenShared, shared > 3 {
+        // Shared in the middle of the take: match the screen against the camera's sound from just
+        // before the share, then count back to the start of camera.mov.
+        let from = max(0, shared - 2.5)
+        let part = work.appendingPathComponent("camera16k-shared.wav")
+        do {
+            try extractAudio(ffmpeg: ffmpeg, input: cameraPath, outputs: [(part.path, 16000)], startSeconds: from, maxSeconds: 130)
+            let found = try measureSync(cameraWav: part, screenWav: screen16k, maxLagSeconds: 5)
+            sync = SyncResult(offset: found.method == "audio" ? found.offset + from : shared, method: found.method,
+                              confidence: found.confidence, note: found.note)
+        } catch {
+            sync = SyncResult(offset: shared, method: "none", confidence: 0, note: "the screen sound could not be read")
+        }
+    } else if let screen16k {
         sync = (try? measureSync(cameraWav: camera16k, screenWav: screen16k))
             ?? SyncResult(offset: 0, method: "none", confidence: 0, note: "the screen sound could not be read")
     }
@@ -189,7 +208,6 @@ do {
     }
 
     // 5. Chapters
-    let events = readEvents(file("events.jsonl"))
     var chapters: [Chapter] = []
     var chapterSource = "prompter sections"
     var candidates = 0
