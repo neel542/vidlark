@@ -122,7 +122,7 @@ struct PanelView: View {
         let checks = studio.checks.filter { $0.id != "prompter" }
         return VStack(spacing: 0) {
             ForEach(checks) { check in
-                InputRow(check: check, label: label(for: check.id), menu: menu(for: check.id))
+                InputRow(check: check, label: check.label, menu: menu(for: check.id))
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if check.id == "screen" && !studio.screenAllowed { studio.askForScreenAccess() }
@@ -142,14 +142,15 @@ struct PanelView: View {
         .allowsHitTesting(!studio.isBusy)
     }
 
-    private func label(for id: String) -> String {
-        ["camera": "Camera", "effects": "Effects", "mic": "Mic", "screen": "Record", "prompter": "Prompter", "space": "Space", "power": "Power"][id] ?? id
-    }
-
     private func menu(for id: String) -> [MenuChoice]? {
         switch id {
         case "camera":
-            return studio.cameras.map { d in MenuChoice(title: d.localizedName, selected: d.uniqueID == studio.cameraID) { studio.cameraID = d.uniqueID } }
+            let main = studio.cameras.map { d in MenuChoice(title: d.localizedName, selected: d.uniqueID == studio.cameraID) { studio.cameraID = d.uniqueID } }
+            // Any other camera can record its own file alongside the main one.
+            let extra = studio.cameras.filter { $0.uniqueID != studio.cameraID }.map { d in
+                MenuChoice(title: "Also record \(d.localizedName)", selected: studio.extraCameraIDs.contains(d.uniqueID)) { studio.toggleExtra(d.uniqueID) }
+            }
+            return main + extra
         case "mic":
             return studio.mics.map { d in MenuChoice(title: d.localizedName, selected: d.uniqueID == studio.micID) { studio.micID = d.uniqueID } }
         case "screen":
@@ -158,6 +159,19 @@ struct PanelView: View {
         case "prompter":
             return [MenuChoice(title: "Follows her voice", selected: studio.followVoice) { studio.followVoice = true },
                     MenuChoice(title: "Key only", selected: !studio.followVoice) { studio.followVoice = false }]
+        case "live":
+            var choices = [
+                MenuChoice(title: "Off", selected: studio.liveMode == .off) { studio.liveMode = .off },
+                MenuChoice(title: "Home Wi-Fi", selected: studio.liveMode == .wifi) { studio.liveMode = .wifi },
+                MenuChoice(title: "Anywhere", selected: studio.liveMode == .anywhere) { studio.liveMode = .anywhere },
+            ]
+            if studio.liveLink != nil {
+                choices.append(MenuChoice(title: "Copy link", selected: false) { studio.copyLiveLink() })
+            }
+            if studio.liveMode != .off {
+                choices.append(MenuChoice(title: "New link (old links stop working)", selected: false) { studio.newLiveLink() })
+            }
+            return choices
         default:
             return nil
         }

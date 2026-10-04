@@ -50,6 +50,18 @@ final class Studio: ObservableObject {
     @Published private(set) var freeGB: Double?
     /// macOS hand-gesture Reactions. When on, a thumbs-up puts balloons in the camera file, and the detection costs CPU all the time.
     @Published private(set) var reactionsOn = false
+    /// Extra cameras, recorded as camera-2.mov, camera-3.mov and so on, in the order they were added.
+    @Published var extraCameraIDs: [String] = UserDefaults.standard.stringArray(forKey: "extraCameras") ?? [] {
+        didSet {
+            if !Snapshots.active { UserDefaults.standard.set(extraCameraIDs, forKey: "extraCameras") }
+            applyInputs()
+        }
+    }
+    @Published var liveMode = LiveMode(rawValue: UserDefaults.standard.string(forKey: "liveMode") ?? "") ?? .off {
+        didSet { applyLive() }
+    }
+    @Published private(set) var tunnelAddress: String?
+    @Published private(set) var liveFailure: String?
 
     // Voice follow
     @Published var followVoice = UserDefaults.standard.object(forKey: "followVoice") as? Bool ?? false {
@@ -61,6 +73,13 @@ final class Studio: ObservableObject {
 
     let camera = CameraRecorder()
     private let screen = ScreenRecorder()
+    private var extras: [CameraRecorder] = []
+    private var extraOrder: [String] = []
+    let liveFrames = LiveFrames()
+    private lazy var liveServer = LiveServer(frames: liveFrames, token: liveToken)
+    private let tunnel = Tunnel()
+    private var liveTaps: [String: LiveTap] = [:]
+    private var liveToken = UserDefaults.standard.string(forKey: "liveToken") ?? ""
     private var log: EventLog?
     private var folder: URL?
     private var t0: CFTimeInterval = 0
@@ -90,6 +109,7 @@ final class Studio: ObservableObject {
         camera.onLevel = { [weak self] avg, pk in
             DispatchQueue.main.async { self?.takeLevel(avg, pk) }
         }
+        bootLive()
 
         let defaults = UserDefaults.standard
         refreshDevices(preferredCamera: defaults.string(forKey: "camera"), preferredMic: defaults.string(forKey: "mic"))
@@ -111,6 +131,7 @@ final class Studio: ObservableObject {
         checker = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.runChecks() }
         }
+        applyLive()
     }
 
     private func requestPermissions() {
@@ -192,6 +213,25 @@ final class Studio: ObservableObject {
         let cam = cameraAllowed ? cameras.first { $0.uniqueID == cameraID } : nil
         let mic = micAllowed ? mics.first { $0.uniqueID == micID } : nil
         camera.use(camera: cam, mic: mic)
+
+        // Each extra camera writes its own file with the same mic, so the finisher can line it up by sound.
+        let wanted = cameraAllowed ? activeExtras : []
+        if wanted.map(\.uniqueID) != extraOrder {
+            for i in extras.indices {
+                extras[i].release()
+                liveTaps["camera-\(i + 2)"] = nil
+                liveFrames.forget("camera-\(i + 2)")
+            }
+            extras = wanted.indices.map { i in
+                let recorder = CameraRecorder()
+                let tap = LiveTap(name: "camera-\(i + 2)", frames: liveFrames)
+                liveTaps[tap.name] = tap
+                recorder.attach(tap.output)
+                return recorder
+            }
+            extraOrder = wanted.map(\.uniqueID)
+        }
+        for (recorder, device) in zip(extras, wanted) { recorder.use(camera: device, mic: mic) }
     }
 
     private func remember() {
@@ -246,6 +286,12 @@ final class Studio: ObservableObject {
         var state: LampState
         var value: String
         var problem: String?
+
+        var label: String {
+            if id.hasPrefix("camera-") { return "Camera \(id.dropFirst(7))" }
+            return ["camera": "Camera", "effects": "Effects", "mic": "Mic", "screen": "Record", "prompter": "Prompter",
+                    "space": "Space", "power": "Power", "live": "Live"][id] ?? id
+        }
     }
 
     var checks: [Check] {
@@ -256,6 +302,12 @@ final class Studio: ObservableObject {
             out.append(Check(id: "camera", state: .ok, value: name))
         } else {
             out.append(Check(id: "camera", state: .warn, value: "None found", problem: "Connect the iPhone. It will appear here."))
+        }
+
+        if cameraAllowed {
+            for (i, device) in activeExtras.enumerated() {
+                out.append(Check(id: "camera-\(i + 2)", state: .ok, value: device.localizedName))
+            }
         }
 
         if reactionsOn {
@@ -290,7 +342,34 @@ final class Studio: ObservableObject {
         out.append(Check(id: "power", state: power.pluggedIn ? .ok : .warn,
                          value: (power.pluggedIn ? "Plugged in" : "On battery") + pct,
                          problem: power.pluggedIn ? nil : "Plug in the charger before a long take."))
+        out.append(liveCheck)
         return out
+    }
+
+    private var liveCheck: Check {
+        if let liveFailure { return Check(id: "live", state: .fail, value: "Not working", problem: liveFailure) }
+        switch liveMode {
+        case .off:
+            return Check(id: "live", state: .off, value: "Off")
+        case .wifi:
+            return Check(id: "live", state: .ok, value: "Home Wi-Fi")
+        case .anywhere:
+            if Tunnel.binary == nil {
+                return Check(id: "live", state: .warn, value: "Not set up",
+                             problem: "Watching from outside home needs cloudflared installed. Home Wi-Fi works now.")
+            }
+            return Check(id: "live", state: tunnelAddress == nil ? .warn : .ok, value: tunnelAddress == nil ? "Connecting" : "Anywhere")
+        }
+    }
+
+    /// Extra cameras that are plugged in, in the order they were added. Never the main camera.
+    var activeExtras: [AVCaptureDevice] {
+        extraCameraIDs.compactMap { id in id == cameraID ? nil : cameras.first { $0.uniqueID == id } }
+    }
+
+    func toggleExtra(_ id: String) {
+        guard !isBusy else { return }
+        if let i = extraCameraIDs.firstIndex(of: id) { extraCameraIDs.remove(at: i) } else { extraCameraIDs.append(id) }
     }
 
     var canStart: Bool {
@@ -380,6 +459,16 @@ final class Studio: ObservableObject {
                     Task { @MainActor in self?.cameraEndedEarly(error) }
                 }
                 camera.startRecording(to: folder.appendingPathComponent("camera.mov"))
+                for (i, recorder) in extras.enumerated() {
+                    let file = "camera-\(i + 2).mov"
+                    recorder.onStarted = nil
+                    recorder.onFinished = { [weak self] error in
+                        Task { @MainActor in
+                            self?.log?.write(["type": "camera-error", "file": file, "message": error?.localizedDescription ?? "stopped early"])
+                        }
+                    }
+                    recorder.startRecording(to: folder.appendingPathComponent(file))
+                }
                 try? await Task.sleep(nanoseconds: 15_000_000_000)
                 if phase == .starting { cameraEndedEarly(nil) }
             } catch {
@@ -423,7 +512,9 @@ final class Studio: ObservableObject {
         let wall = ISO8601DateFormatter().string(from: Date())
         log?.write(["type": "start", "wall": wall, "title": script.title.isEmpty ? (currentItem?.title ?? "Untitled") : script.title,
                     "targetMinutes": script.targetMinutes, "camera": "camera.mov", "screen": "screen.mov",
-                    "cameraName": cameraName ?? "", "micName": micName ?? "", "screenName": display?.name ?? ""], at: time)
+                    "cameraName": cameraName ?? "", "micName": micName ?? "", "screenName": display?.name ?? "",
+                    "extraCameras": activeExtras.prefix(extras.count).enumerated().map { ["file": "camera-\($0.offset + 2).mov", "name": $0.element.localizedName] }],
+                   at: time)
 
         if let i = queue.firstIndex(where: { $0.id == currentID }) {
             queue[i].recordings += 1
@@ -524,7 +615,9 @@ final class Studio: ObservableObject {
                 camera.onFinished = { error in done.resume(returning: error) }
                 camera.stopRecording()
             }
+            await stopExtras()
             await screen.stop()
+            liveFrames.forget("screen")
             log?.close()
             log = nil
             applyInputs()
@@ -551,9 +644,22 @@ final class Studio: ObservableObject {
         guard phase == .starting else { return }
         phase = .stopping
         Task {
+            await stopExtras()
             await screen.stop()
+            liveFrames.forget("screen")
             applyInputs()
             phase = .failed("The camera and mic did not start\(error.map { ": \($0.localizedDescription)" } ?? ""). Check the camera and mic rows, then try again.")
+        }
+    }
+
+    private func stopExtras() async {
+        for recorder in extras {
+            let once = Once()
+            await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+                recorder.onFinished = { _ in if once.first() { done.resume() } }
+                recorder.stopRecording()
+            }
+            recorder.onFinished = nil
         }
     }
 
@@ -806,6 +912,7 @@ extension Studio {
         voice = .ready
         freeGB = 212
         power = PowerState(pluggedIn: true, percent: 86)
+        liveMode = .wifi
         if let script {
             let item = VideoItem(title: "Sample", script: script)
             queue = [item, VideoItem(title: "Second", script: "# Inbound placement fees, explained\n- one"),
@@ -861,4 +968,140 @@ final class LineReader: @unchecked Sendable {
 struct RecorderError: Error {
     let message: String
     init(_ message: String) { self.message = message }
+}
+
+// MARK: - Live view
+
+extension Studio {
+    fileprivate func bootLive() {
+        if liveToken.isEmpty {
+            liveToken = LiveServer.newToken()
+            UserDefaults.standard.set(liveToken, forKey: "liveToken")
+        }
+        liveServer.token = liveToken
+        liveServer.status = { [weak self] in
+            MainActor.assumeIsolated { self?.liveStatus() ?? Data("{}".utf8) }
+        }
+        liveServer.onFailure = { [weak self] reason in
+            Task { @MainActor in
+                self?.liveFailure = "The live view could not start (\(reason)). Quit any other copy of AVA Recorder, then pick Home Wi-Fi again."
+            }
+        }
+        liveFrames.onWake = { [weak self] name in
+            Task { @MainActor in self?.liveTaps[name]?.wake() }
+        }
+        let tap = LiveTap(name: "camera", frames: liveFrames)
+        liveTaps[tap.name] = tap
+        camera.attach(tap.output)
+        screen.onFrame = { [frames = liveFrames] pixels in
+            frames.offer("screen", pixels, maxWidth: 1600, interval: 0.5)
+        }
+        tunnel.onAddress = { [weak self] address in
+            Task { @MainActor in self?.tunnelAddress = address }
+        }
+        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tunnel.stop() }
+        }
+    }
+
+    fileprivate func applyLive() {
+        guard booted, !Snapshots.active else { return }
+        UserDefaults.standard.set(liveMode.rawValue, forKey: "liveMode")
+        liveFailure = nil
+        guard liveMode != .off else {
+            tunnel.stop()
+            tunnelAddress = nil
+            liveServer.stop()
+            return
+        }
+        do {
+            try liveServer.start()
+        } catch {
+            liveFailure = "The live view could not start: \(error.localizedDescription)"
+            return
+        }
+        if liveMode == .anywhere {
+            tunnel.start()
+        } else {
+            tunnel.stop()
+            tunnelAddress = nil
+        }
+    }
+
+    /// The link for the page in the current mode. The Wi-Fi link stays the same; the anywhere link
+    /// changes every time the tunnel starts.
+    var liveLink: String? {
+        switch liveMode {
+        case .off: nil
+        case .wifi: LiveServer.localAddress.map { "\($0)/\(liveToken)/" }
+        case .anywhere: tunnelAddress.map { "\($0)/\(liveToken)/" }
+        }
+    }
+
+    func copyLiveLink() {
+        guard let liveLink else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(liveLink, forType: .string)
+    }
+
+    /// A new secret. Every link handed out before stops working.
+    func newLiveLink() {
+        liveToken = LiveServer.newToken()
+        UserDefaults.standard.set(liveToken, forKey: "liveToken")
+        liveServer.token = liveToken
+        objectWillChange.send()
+    }
+
+    /// What the page shows: state, time, mic level, the pictures on offer and the checks.
+    func liveStatus() -> Data {
+        var name = "ready"
+        var message: String?
+        switch phase {
+        case .idle: name = "ready"
+        case .starting: name = "starting"
+        case .recording: name = "recording"
+        case .stopping: name = "stopping"
+        case .finishing(let step, _): name = "finishing"; message = step
+        case .done(_, let note): name = "done"; message = note
+        case .failed(let text): name = "failed"; message = text
+        }
+        var streams: [[String: String]] = []
+        if cameraAllowed, let cameraName {
+            streams.append(["id": "camera", "kind": "Camera", "label": cameraName])
+            for (i, device) in activeExtras.enumerated() {
+                streams.append(["id": "camera-\(i + 2)", "kind": "Camera \(i + 2)", "label": device.localizedName])
+            }
+        }
+        if phase == .recording || phase == .starting {
+            streams.append(["id": "screen", "kind": "Screen", "label": display?.name ?? "Screen"])
+        }
+        let rows: [[String: Any]] = checks.filter { $0.id != "prompter" && $0.id != "live" }.map { check in
+            var row: [String: Any] = ["label": check.label, "value": check.value, "state": "\(check.state)"]
+            if let problem = check.problem { row["problem"] = problem }
+            return row
+        }
+        let object: [String: Any] = [
+            "phase": name,
+            "message": message ?? NSNull(),
+            "title": script.title.isEmpty ? (currentItem?.title ?? "") : script.title,
+            "elapsed": isRolling ? elapsed : 0,
+            "level": Double(meter.level),
+            "streams": streams,
+            "checks": rows,
+        ]
+        return (try? JSONSerialization.data(withJSONObject: object)) ?? Data("{}".utf8)
+    }
+}
+
+/// True the first time only, from any thread. Guards a continuation against a second resume.
+final class Once: @unchecked Sendable {
+    private let lock = NSLock()
+    private var used = false
+
+    func first() -> Bool {
+        lock.withLock {
+            defer { used = true }
+            return !used
+        }
+    }
 }

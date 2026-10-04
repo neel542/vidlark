@@ -119,6 +119,18 @@ final class CameraRecorder: NSObject {
         queue.async { [self] in movie.startRecording(to: url, recordingDelegate: self) }
     }
 
+    /// Lets go of the camera and mic, for an extra camera that is no longer wanted.
+    func release() {
+        queue.async { [self] in
+            if session.isRunning { session.stopRunning() }
+            session.beginConfiguration()
+            session.inputs.forEach(session.removeInput)
+            session.commitConfiguration()
+            videoInput = nil
+            audioInput = nil
+        }
+    }
+
     func stopRecording() {
         queue.async { [self] in
             if movie.isRecording { movie.stopRecording() } else { onFinished?(nil) }
@@ -196,6 +208,8 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
     private var lastFrame: CMSampleBuffer?
 
     var onError: ((Error) -> Void)?
+    /// Every complete screen frame, for the live view. Called on the stream queue.
+    var onFrame: ((CVPixelBuffer) -> Void)?
 
     func start(filter: SCContentFilter, pixelSize: CGSize, micID: String?, to url: URL) async throws {
         self.url = url
@@ -272,6 +286,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
                 guard openWriter(at: sampleBuffer.presentationTimeStamp) else { return }
             }
             if let v = videoIn, v.isReadyForMoreMediaData, v.append(sampleBuffer) { lastFrame = sampleBuffer }
+            if let onFrame, let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) { onFrame(pixels) }
         case .microphone:
             if audioFormat == nil { audioFormat = sampleBuffer.formatDescription }
             if started, let a = audioIn, a.isReadyForMoreMediaData { a.append(sampleBuffer) }

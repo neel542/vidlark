@@ -93,6 +93,13 @@ struct SyncResult {
     let note: String?
 }
 
+/// An extra camera file (camera-2.mov and on). Its offset means camera_t = this file's t + offset.
+struct ExtraCameraSync {
+    var file: String
+    var duration: Double?
+    var sync: SyncResult
+}
+
 // RMS loudness of consecutive frames, returned as Double for the correlation sums.
 func loudnessEnvelope(_ samples: [Float], frameLength: Int) -> [Double] {
     let frames = samples.count / frameLength

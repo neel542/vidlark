@@ -81,6 +81,19 @@ check "offset within 10 ms of $EXPECTED_OFFSET_MAIN" offset_near "$OUT/notranscr
 check "chapters.txt is Hook, Setup, Payoff" chapters_are "$OUT/notranscribe" "00:00 Hook|00:15 Setup|00:30 Payoff|"
 check "report says transcript skipped" grep -q "^Skipped" "$OUT/notranscribe/report.md"
 
+# extra camera: camera-2.mov starts 0.75 s after camera.mov and carries the same sound
+rm -rf "$OUT/extracam" && mkdir -p "$OUT/extracam"
+cp "$OUT/notranscribe/camera.mov" "$OUT/notranscribe/screen.mov" "$OUT/notranscribe/events.jsonl" "$OUT/extracam/"
+/opt/homebrew/bin/ffmpeg -v error -ss 0.75 -i "$OUT/notranscribe/camera.mov" -map 0 -c:v copy -c:a aac -b:a 128k "$OUT/extracam/camera-2.mov"
+run extracam --no-transcribe
+check "exit 0 and DONE line" done_ok extracam
+check "camera-2.mov offset within 20 ms of +0.75" py 'import json,sys; d=json.load(open(sys.argv[1]+"/sync.json")); c=d["cameras"][0]
+print("        measured %+.4f s, confidence %.3f, method %s" % (c["offsetSec"], c["confidence"], c["method"]))
+sys.exit(0 if c["file"]=="camera-2.mov" and c["method"]=="audio" and abs(c["offsetSec"]-0.75) <= 0.020 else 1)' "$OUT/extracam"
+check "screen offset unchanged by the extra camera" offset_near "$OUT/extracam" "$EXPECTED_OFFSET_MAIN"
+check "report names camera-2.mov" grep -q "^- camera-2.mov: offset" "$OUT/extracam/report.md"
+check "sync.json has no cameras list without extra cameras" py 'import json,sys; sys.exit("cameras" in json.load(open(sys.argv[1]+"/sync.json")))' "$OUT/notranscribe"
+
 # crash: fragmented videos cut off mid-fragment, events.jsonl with no stop line, a cut-off
 # last line and a 4 s section to merge
 run truncated --no-transcribe

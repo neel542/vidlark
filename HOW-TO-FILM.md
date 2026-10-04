@@ -7,7 +7,7 @@
 
 ## Each filming day
 
-1. Put the iPhone on the tripod with the rear camera facing the presenter. Plug the mic receiver into the Mac.
+1. Put the iPhone on the tripod with the rear camera facing the presenter, screen locked, in landscape. Plug it into the Mac with a USB-C cable (it charges during the take and is steadier than wireless). It shows up as a camera on its own, through Continuity Camera, which only works when the Mac user and the iPhone are signed in to the same Apple ID. Plug the mic receiver into the Mac.
 2. Open AVA Recorder. It fills the monitor. Check that all five lamps are green:
    - Camera
    - Mic (say a few words so the meter moves)
@@ -25,6 +25,19 @@
 
 The prompter is built but switched off for now.
 
+## More than one camera
+
+Plug in the second camera, open the **Camera** row's menu and pick **Also record** with its name. It gets its own row and its own file (`camera-2.mov`, then `camera-3.mov`), with the same mic in it so the finisher can line it up. The main camera stays the one in `camera.mov`, and the face box always uses it.
+
+## Watching from another laptop or phone
+
+The **Live** row shows the shoot on any browser, with no login: every camera, the screen while recording, the mic level and the checks. A camera picture that stops updating is marked "No new picture".
+
+- **Home Wi-Fi**: works on the same Wi-Fi. The link stays the same, so bookmark it once.
+- **Anywhere**: works from any internet connection through a free Cloudflare tunnel. The link changes every time it starts, so copy it again each time. Needs `cloudflared` installed.
+- **Copy link** puts the link on the clipboard. On a Mac signed in to the same Apple ID, just paste it on the other laptop.
+- The secret in the link is the only key. Anyone with the link sees her screen, including Seller Central, so never post it anywhere. **New link** stops every old link working.
+
 ## Where the files go
 
 `/Users/Shared/AVA Recordings/<date> <title>/recording-N/`
@@ -32,6 +45,7 @@ The prompter is built but switched off for now.
 | File | What it is |
 |---|---|
 | camera.mov | the presenter on camera, with the mic |
+| camera-2.mov | A second camera, if one was added, with the same mic |
 | screen.mov | The recorded screen, with the same mic |
 | mic.wav | The clean voice track |
 | words.json | The transcript, with the time of every word |

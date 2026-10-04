@@ -117,8 +117,41 @@ do {
         sync = (try? measureSync(cameraWav: camera16k, screenWav: screen16k))
             ?? SyncResult(offset: 0, method: "none", confidence: 0, note: "the screen sound could not be read")
     }
-    try writeText("{\"screenOffsetSec\":\(jsonNumber(sync.offset, places: 4)),\"method\":\(jsonString(sync.method)),\"confidence\":\(jsonNumber(sync.confidence))}\n",
-                  to: file("sync.json"))
+
+    // Extra cameras carry the same mic, so each lines up with camera.mov by sound.
+    var extraCameras: [ExtraCameraSync] = []
+    for n in 2...9 {
+        let name = "camera-\(n).mov"
+        let path = file(name).path
+        guard FileManager.default.fileExists(atPath: path) else { continue }
+        var entry = ExtraCameraSync(file: name, duration: nil,
+                                    sync: SyncResult(offset: 0, method: "none", confidence: 0, note: "\(name) could not be read"))
+        if let info = try? probeMedia(ffprobe, path) {
+            entry.duration = info.duration
+            if !info.hasAudio {
+                entry.sync = SyncResult(offset: 0, method: "none", confidence: 0, note: "\(name) has no sound track")
+            } else {
+                let wav = work.appendingPathComponent("camera\(n)-16k.wav")
+                do {
+                    try extractAudio(ffmpeg: ffmpeg, input: path, outputs: [(wav.path, 16000)], maxSeconds: 130)
+                    entry.sync = (try? measureSync(cameraWav: camera16k, screenWav: wav))
+                        ?? SyncResult(offset: 0, method: "none", confidence: 0, note: "the sound in \(name) could not be read")
+                } catch {
+                    entry.sync = SyncResult(offset: 0, method: "none", confidence: 0, note: "the sound in \(name) could not be read")
+                }
+            }
+        }
+        extraCameras.append(entry)
+    }
+
+    var syncJSON = "{\"screenOffsetSec\":\(jsonNumber(sync.offset, places: 4)),\"method\":\(jsonString(sync.method)),\"confidence\":\(jsonNumber(sync.confidence))"
+    if !extraCameras.isEmpty {
+        let items = extraCameras.map {
+            "{\"file\":\(jsonString($0.file)),\"offsetSec\":\(jsonNumber($0.sync.offset, places: 4)),\"method\":\(jsonString($0.sync.method)),\"confidence\":\(jsonNumber($0.sync.confidence))}"
+        }
+        syncJSON += ",\"cameras\":[\(items.joined(separator: ","))]"
+    }
+    try writeText(syncJSON + "}\n", to: file("sync.json"))
 
     // 3 and 4. Transcript and retakes
     var transcript = TranscriptOutcome.skipped
@@ -176,7 +209,7 @@ do {
     let report = buildReport(ReportInput(
         folder: folder, title: title, wall: events?.wall,
         cameraDuration: cameraDuration, screenDuration: screenDuration, screenNote: screenNote,
-        sync: sync, transcript: transcript, retakes: retakes,
+        sync: sync, extraCameras: extraCameras, transcript: transcript, retakes: retakes,
         chapters: chapters, chapterSource: chapterSource, candidateChapters: candidates,
         events: events))
     try writeText(report, to: file("report.md"))

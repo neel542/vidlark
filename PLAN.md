@@ -27,6 +27,8 @@ A native Mac app for filming the presenter's YouTube videos. It replaces Loom. I
 | 10 | Load the script | Drop in a `.md` or `.txt` file, or paste the text |
 | 11 | Simple for the presenter | She only ever sees the prompter |
 | 12 | Batch day | A queue of videos for the day; the next one loads after each finishes |
+| 13 | Extra cameras | Added 4 Oct: any other camera can record its own file (`camera-2.mov` on) next to the main one, with the same mic for sync |
+| 14 | Live view | Added 4 Oct: a no-login web page with every camera, the screen while recording, the mic level and the checks. Served by the Mac on port 8790 behind a secret link; Anywhere mode adds a Cloudflare quick tunnel. Pictures are only made while someone watches |
 
 Not building: the Shorts cutter, and iPhone remote control.
 
@@ -41,9 +43,11 @@ Not building: the Shorts cutter, and iPhone remote control.
 The app writes these files:
 
 - `camera.mov`: the iPhone video plus the mic.
+- `camera-2.mov`, `camera-3.mov` and on: extra cameras, each with the same mic, in the order they were added. Only when extra cameras are picked.
 - `screen.mov`: the recorded screen plus the same mic (the shared audio is what allows exact sync).
 - `events.jsonl`: one JSON object per line, written live. `t` is seconds since `camera.mov` started.
-  - `{"t":0,"type":"start","wall":"<ISO8601>","title":"...","targetMinutes":15,"camera":"camera.mov","screen":"screen.mov"}`
+  - `{"t":0,"type":"start","wall":"<ISO8601>","title":"...","targetMinutes":15,"camera":"camera.mov","screen":"screen.mov","extraCameras":[{"file":"camera-2.mov","name":"..."}]}`
+  - `{"t":61.0,"type":"camera-error","file":"camera-2.mov","message":"..."}` when an extra camera stops early. The take carries on.
   - `{"t":3.2,"type":"card","index":1,"section":"Hook","text":"..."}`. Every move after the first card adds `"by":"key"` or `"by":"voice"`, and so does `{"type":"end"}`.
   - `{"t":95.0,"type":"listen-error","message":"..."}` when speech recognition stops working. The take carries on with the key.
   - `{"t":40.1,"type":"app","name":"Microsoft PowerPoint"}`
@@ -52,7 +56,7 @@ The app writes these files:
 
 `ava-finish <folder>` adds these files:
 
-- `sync.json`: `{"screenOffsetSec":x,"method":"audio","confidence":c}`. `camera_t = screen_t + screenOffsetSec`.
+- `sync.json`: `{"screenOffsetSec":x,"method":"audio","confidence":c}`. `camera_t = screen_t + screenOffsetSec`. With extra cameras it also has `"cameras":[{"file":"camera-2.mov","offsetSec":y,"method":"audio","confidence":c}]`, where `camera_t = camera-2_t + offsetSec`.
 - `mic.wav`: the clean mic track, taken from `camera.mov` (48 kHz).
 - `words.json`: `[{"word","start","end"}]` on the camera timeline (the same shape `video-edit` uses).
 - `chapters.txt`: in YouTube format, or empty if fewer than 3 chapters of at least 10 seconds.

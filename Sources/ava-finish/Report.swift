@@ -14,6 +14,7 @@ struct ReportInput {
     var screenDuration: Double?
     var screenNote: String?
     var sync: SyncResult
+    var extraCameras: [ExtraCameraSync]
     var transcript: TranscriptOutcome
     var retakes: [Retake]?
     var chapters: [Chapter]
@@ -76,6 +77,9 @@ func buildReport(_ r: ReportInput) -> String {
     } else {
         out.append("- Screen (screen.mov): \(length(r.screenDuration))")
     }
+    for extra in r.extraCameras {
+        out.append("- Extra camera (\(extra.file)): \(length(extra.duration))")
+    }
 
     out.append("")
     out.append("## Sync")
@@ -97,6 +101,17 @@ func buildReport(_ r: ReportInput) -> String {
         out.append("- Confidence: \(String(format: "%.2f", c)) (\(verdict))")
     } else {
         out.append("Not measured, because \(r.sync.note ?? "there is no screen sound to match"). sync.json says offset 0.")
+    }
+    for extra in r.extraCameras {
+        out.append("")
+        if extra.sync.method == "audio" {
+            let c = extra.sync.confidence
+            let verdict = c >= 0.8 ? "high" : c >= 0.5 ? "medium, worth a quick check by eye" : "low, check the sync by eye before editing"
+            out.append("- \(extra.file): offset \(jsonNumber(extra.sync.offset)) seconds (camera time = \(extra.file) time + offset), "
+                       + "confidence \(String(format: "%.2f", c)) (\(verdict)), saved in sync.json")
+        } else {
+            out.append("- \(extra.file): not measured, because \(extra.sync.note ?? "it has no sound to match"). sync.json says offset 0.")
+        }
     }
 
     out.append("")
