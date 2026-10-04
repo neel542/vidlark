@@ -799,7 +799,8 @@ final class Studio: ObservableObject {
     }
 
     func openFolder() {
-        if case .done(let folder, _) = phase {
+        // The take may have been renamed on the Recordings page since it finished.
+        if case .done(let folder, _) = phase, FileManager.default.fileExists(atPath: folder.path) {
             NSWorkspace.shared.activateFileViewerSelecting([folder])
         } else {
             NSWorkspace.shared.open(Library.root)

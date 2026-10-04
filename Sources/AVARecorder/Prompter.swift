@@ -34,7 +34,7 @@ struct PrompterView: View {
                 .id("count-\(n)")
                 .transition(.opacity)
         } else if studio.ended {
-            line(dot: .off, text: "End of script. Look at the lens, then Neel stops.", size: base * 0.75, opacity: 0.7)
+            line(dot: .off, text: "End of script. Look at the lens, then stop.", size: base * 0.75, opacity: 0.7)
         } else if let card = studio.currentCard ?? (studio.isRolling ? nil : studio.script.cards.first) {
             let waiting = !studio.isRolling
             VStack(alignment: .leading, spacing: 0) {
@@ -120,7 +120,7 @@ struct PrompterView: View {
 
     private var railLeft: String {
         let total = studio.script.cards.count
-        if !studio.isRolling { return total == 0 ? "Waiting for Neel" : "Waiting for Neel · \(total) lines" }
+        if !studio.isRolling { return total == 0 ? "Waiting to start" : "Waiting to start · \(total) lines" }
         if studio.countdown != nil { return "Starting" }
         if studio.ended { return "Done" }
         guard let card = studio.currentCard else { return timecode(studio.elapsed) }

@@ -80,6 +80,13 @@ struct PanelView: View {
     // MARK: Header
 
     private func header(big: Bool) -> some View {
+        HStack(alignment: .center, spacing: big ? 18 : 10) {
+            queueButton(big: big)
+            RecordingsButton(big: big)
+        }
+    }
+
+    private func queueButton(big: Bool) -> some View {
         Button { showQueue.toggle() } label: {
             HStack(alignment: .center, spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -431,6 +438,33 @@ struct LinkButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
+    }
+}
+
+/// Opens the page with every recording. Always in the header, so it is one click from anywhere.
+struct RecordingsButton: View {
+    var big: Bool
+    @State private var hover = false
+
+    var body: some View {
+        Button { RecordingsWindow.show() } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: big ? 12 : 11, weight: .semibold))
+                Text("Recordings")
+                    .font(.system(size: big ? 13 : 12, weight: .semibold))
+            }
+            .foregroundStyle(hover ? Palette.ink : Palette.dim)
+            .padding(.horizontal, big ? 14 : 10)
+            .frame(height: big ? 32 : 28)
+            .background(Capsule().fill(hover ? Palette.raised : Palette.face))
+            .overlay(Capsule().strokeBorder(Palette.hairline))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .keyboardShortcut("r", modifiers: [.command, .shift])
+        .help("Every recording, with search, rename, copy and delete (Command-Shift-R)")
     }
 }
 
