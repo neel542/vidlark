@@ -182,8 +182,8 @@ private struct VideoSettings: View {
     var body: some View {
         SettingsGroup {
             SettingRow("Start each take with",
-                       "Screen records the screen from the first second. Just me starts with only the camera; press Screen in the recording box when you are ready to share it.") {
-                Segments(choices: [("Screen", true), ("Just me", false)], selected: studio.recordScreen) { studio.recordScreen = $0 }
+                       "Me starts with only your camera; press Screen in the recording box when you are ready to share the screen. Screen records the screen from the first second.") {
+                Segments(choices: [("Me", false), ("Screen", true)], selected: studio.recordScreen) { studio.recordScreen = $0 }
             }
             SettingRow("Your face on the screen",
                        "While the video shows the screen, your face sits in a corner in this shape. Drag it anywhere during the take. The camera file is always saved too.") {
@@ -212,7 +212,7 @@ private struct QualitySettings: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             if let format = studio.cameraFormat, let name = studio.cameraName {
-                Readout(lamp: .ok, text: "\(name) is recording \(format.text). About \(String(format: "%.1f", format.gigabytesPer15Minutes)) GB for 15 minutes.")
+                Readout(lamp: .ok, text: "\(name) records \(format.text). About \(String(format: "%.1f", format.gigabytesPer15Minutes)) GB for 15 minutes.")
             } else {
                 Readout(lamp: .off, text: "No camera is connected yet.")
             }
@@ -263,7 +263,7 @@ private struct EffectsSettings: View {
                 EffectRow(name: "Reactions", on: studio.reactionsOn || studio.gesturesOn, bestOff: true,
                           what: "A hand gesture, like a thumbs-up or a heart, fills the picture with balloons, hearts or confetti, right in the recording. While it is on, the Mac also keeps watching your hands, which uses battery. Best off for filming.")
                 EffectRow(name: "Studio Light", on: studio.touchUpOn, bestOff: false,
-                          what: "Lights your face and gently darkens the background, like a soft lamp in front of you. This is the touch up. Many people like it on.")
+                          what: "Lights your face and gently darkens the background, like a soft lamp in front of you. Many people like it on.")
                 EffectRow(name: "Portrait", on: studio.portraitOn, bestOff: false,
                           what: "Blurs the background behind you.")
                 EffectRow(name: "Center Stage", on: studio.centerStageOn, bestOff: true,
@@ -288,7 +288,10 @@ private struct PrompterSettings: View {
                     Segments(choices: [("With my voice", true), ("Key only", false)], selected: studio.followVoice) { studio.followVoice = $0 }
                 }
                 SettingRow("Keyboard", "The key under Esc moves to the next line. Hold Shift with it to go back.") {
-                    KeyCap(text: "`")
+                    HStack(spacing: 8) {
+                        KeyCap(text: "`")
+                        Text("under Esc").font(.system(size: 12)).foregroundStyle(Palette.dim)
+                    }
                 }
             }
             RemoteSettings()
@@ -302,7 +305,7 @@ private struct LiveSettings: View {
     var body: some View {
         SettingsGroup {
             SettingRow("Live view",
-                       "Home Wi-Fi works on a laptop or phone on the same Wi-Fi. Anywhere also works from outside, through a free Cloudflare link that changes each time it starts.") {
+                       "Home Wi-Fi works on a laptop or phone on the same Wi-Fi. Anywhere also works away from home, through a free secure link that changes each time it starts.") {
                 Segments(choices: [("Off", LiveMode.off), ("Home Wi-Fi", .wifi), ("Anywhere", .anywhere)], selected: studio.liveMode) { studio.liveMode = $0 }
             }
             if studio.liveMode != .off {
@@ -453,7 +456,8 @@ struct Switch: View {
             ZStack(alignment: on ? .trailing : .leading) {
                 Capsule().fill(on ? Palette.signal : Palette.raised)
                     .overlay(Capsule().strokeBorder(on ? Color.clear : Palette.hairline))
-                Circle().fill(on ? Palette.glass : Palette.dim)
+                Circle().fill(on ? Palette.ink : Palette.dim)
+                    .shadow(color: .black.opacity(0.3), radius: 1, y: 0.5)
                     .frame(width: 16, height: 16)
                     .padding(3)
             }
@@ -641,7 +645,8 @@ struct KeyCap: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 13, weight: .semibold))
+            // A lone mark like ` needs to be bigger to be seen at all.
+            .font(.system(size: text.count == 1 ? 18 : 13, weight: text.count == 1 ? .bold : .semibold))
             .foregroundStyle(Palette.ink)
             .frame(minWidth: 28, minHeight: 26)
             .padding(.horizontal, 6)
@@ -686,7 +691,7 @@ private struct RemoteSettings: View {
                                     KeyCap(text: button.name)
                                     SmallButton(title: "Remove") { remote.forget(action) }
                                 }
-                                SmallButton(title: remote.buttons[action] == nil ? "Set" : "Change", primary: remote.buttons[action] == nil) {
+                                SmallButton(title: remote.buttons[action] == nil ? "Set" : "Change") {
                                     remote.setActive(false)
                                     remote.learn(action)
                                 }

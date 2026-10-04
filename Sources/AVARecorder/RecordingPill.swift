@@ -451,7 +451,7 @@ struct RecordingPillView: View {
 
     private var caption: String {
         let base = !state.faceZoom ? "Whole picture" : tracker.found ? "Face" : "Looking for a face"
-        return studio.faceInVideo ? base + " · in video" : base
+        return base
     }
 
     private var label: String {
@@ -478,7 +478,8 @@ private struct RoundButton: View {
                 Circle().fill(hover ? Color(hex: 0x262C29) : Palette.raised)
                 Circle().strokeBorder(Palette.hairline)
                 if stop {
-                    RoundedRectangle(cornerRadius: 3, style: .continuous).fill(Palette.ink).frame(width: 11, height: 11)
+                    // The same red square as the panel's record button while recording.
+                    RoundedRectangle(cornerRadius: 3, style: .continuous).fill(Palette.red).frame(width: 12, height: 12)
                 } else {
                     Image(systemName: symbol).font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(lit ? Palette.signal : Palette.dim)

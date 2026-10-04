@@ -458,10 +458,10 @@ final class Studio: ObservableObject {
 
         if gesturesOn {
             out.append(Check(id: "effects", state: .warn, value: "Reactions on",
-                             problem: "Turn off Reactions, or a thumbs-up puts balloons in the video. Click the Effects row."))
+                             problem: "Turn off Reactions, or a thumbs-up puts balloons in the video. See Settings, Camera effects."))
         } else if reactionsOn {
             out.append(Check(id: "effects", state: .warn, value: "Reactions on",
-                             problem: "Turn off Reactions to save battery. Click the Effects row."))
+                             problem: "Turn off Reactions to save battery. See Settings, Camera effects."))
         }
 
         if !micAllowed {
@@ -541,8 +541,11 @@ final class Studio: ObservableObject {
             return Attention(level: .fail, text: "No microphone found. Plug in the mic receiver or connect a Bluetooth mic.")
         }
         if recordScreen && !screenAllowed {
-            return Attention(level: .fail, text: "Screen recording is not allowed yet, so only the camera can be recorded.",
+            return Attention(level: .fail, text: "Screen recording is not allowed yet. Allow it, or remove the Screen source to record only the camera.",
                              fix: .screenAccess, fixTitle: "Allow")
+        }
+        if cameraName == nil {
+            return Attention(level: .warn, text: "No camera connected. Plug one in, or bring the iPhone close to the Mac.")
         }
         if let freeGB, freeGB < 20 {
             return Attention(level: freeGB < 5 ? .fail : .warn,
@@ -552,7 +555,7 @@ final class Studio: ObservableObject {
         if reactionsOn || gesturesOn {
             return Attention(level: .warn,
                              text: "macOS Reactions are on. A thumbs-up can fill your video with balloons, and they use battery.",
-                             fix: .videoEffects, fixTitle: "Turn off", learnMore: .effects)
+                             fix: .videoEffects, fixTitle: "Open Video Effects", learnMore: .effects)
         }
         if !power.pluggedIn {
             return Attention(level: .warn, text: "On battery\(power.percent.map { " (\($0)%)" } ?? ""). Plug in the charger before a long take.",

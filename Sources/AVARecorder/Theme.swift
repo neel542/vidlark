@@ -1,9 +1,10 @@
 import SwiftUI
 
 /*
- THESIS: The operator panel is the face of a field audio recorder, not a settings dashboard.
- Three things are always visible: whether each input is live, the level meter, and one lit record key.
- It refuses the sidebar plus cards plus toggles layout of a generic capture app.
+ THESIS: The operator panel is the face of a field audio recorder, not a settings dashboard. It holds
+ only what a take needs: the picture, the sources with their lamps and the meter, and one red record
+ button. Every other choice lives in the Settings window, one plain sentence each, so the face itself
+ never becomes the sidebar plus cards plus toggles layout of a generic capture app.
 
  OWN-WORLD: An anodised graphite body (#0E1110 to #151917) with engraved uppercase labels in a warm
  grey-green. Status lamps have a hot centre. The level meter is segmented, signal green through
@@ -14,10 +15,10 @@ import SwiftUI
  and presses the lit key. He watches time and level, then sees the files get finished and filed.
  the presenter sees only the prompter: one line, large, with the next line waiting faintly beneath it.
 
- FIRST VIEWPORT: A 400x720 window. The video title is at the top. A 16:9 viewfinder well comes
- next, then the input rows (camera, mic and its meter, screen, prompter, space, power), each with a lamp.
- The transport sits at the bottom: large light timecode on the left, an 84pt record key on the
- right, and one line of plain guidance beneath them.
+ FIRST VIEWPORT: Full screen. The video title top left; Live, Recordings and Settings top right. The
+ 16:9 picture fills the left with the prompter strip under it. The right column: Sources (camera,
+ microphone with its meter, screen, extra cameras) with + Add, at most one attention card, then large
+ light timecode and the 84pt red record button at the bottom. Narrow, the same stacked.
 
  FORM: field recorder face, position 5 of 7, seed 29f141b5.
  Raises: one next decision at monumental scale (from airport wayfinding); the next line waits one

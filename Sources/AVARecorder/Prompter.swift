@@ -128,7 +128,7 @@ struct PrompterView: View {
     }
 
     private var railRight: String {
-        guard studio.isRolling else { return "Next key: under Esc" }
+        guard studio.isRolling else { return "Next line: the key under Esc" }
         guard studio.countdown == nil, !studio.ended, let budget = studio.cardBudget else { return short(studio.elapsed) }
         return "\(short(studio.cardElapsed)) of \(short(budget))"
     }

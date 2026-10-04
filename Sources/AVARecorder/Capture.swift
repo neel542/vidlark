@@ -82,7 +82,17 @@ struct CameraFormat: Equatable {
     var height: Int
     var fps: Int
 
-    var text: String { "\(width) × \(height), \(fps) fps" }
+    /// "1080p", "4K", "720p", or the size for anything else.
+    var name: String {
+        switch height {
+        case 2160: "4K"
+        case 1080, 1440: "\(height)p"
+        case 720: "720p"
+        default: "\(width) × \(height)"
+        }
+    }
+
+    var text: String { "\(name) at \(fps) frames a second" }
 
     /// About how big 15 minutes of camera.mov gets, measured on 4 Oct at 0.08 bits a pixel in HEVC.
     var gigabytesPer15Minutes: Double { Double(width * height * fps) * 0.08 * 900 / 8 / 1_000_000_000 }

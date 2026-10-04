@@ -46,11 +46,13 @@ struct SourcesPanel: View {
     private var cameraRow: some View {
         let lamp: LampState = !studio.cameraAllowed ? .fail : studio.cameraName == nil ? .warn : .ok
         var detail = studio.cameraAllowed ? (studio.cameraName ?? "None connected") : "Not allowed yet"
-        if let format = studio.cameraFormat, studio.cameraName != nil { detail += " · \(format.width) × \(format.height)" }
-        if studio.touchUpOn && studio.cameraName != nil { detail += " · touched up" }
+        if let format = studio.cameraFormat, studio.cameraName != nil { detail += " · \(format.name)" }
+        if studio.touchUpOn && studio.cameraName != nil { detail += " · Studio Light" }
         let choices = studio.cameras.map { d in MenuChoice(title: d.localizedName, selected: d.uniqueID == studio.cameraID) { studio.cameraID = d.uniqueID } }
-        let more = [MenuChoice(title: "Camera quality…", selected: false) { SettingsWindow.show(.quality) },
-                    MenuChoice(title: "Touch up and effects…", selected: false) { SettingsWindow.show(.effects) }]
+        // Quality straight from the camera's menu, without opening Settings.
+        let more = CameraQuality.allCases.map { q in
+            MenuChoice(title: "Quality: \(q.title)", selected: studio.cameraQuality == q) { studio.cameraQuality = q }
+        } + [MenuChoice(title: "Studio Light and other effects…", selected: false) { SettingsWindow.show(.effects) }]
         return SourceRow(symbol: "video.fill", title: "Camera", detail: detail, lamp: lamp, dense: dense, menu: choices, more: more)
     }
 

@@ -57,11 +57,16 @@ struct PanelView: View {
             header(big: true)
             HStack(alignment: .top, spacing: 36) {
                 VStack(alignment: .leading, spacing: 18) {
+                    // The picture keeps its shape; the prompter strip under it takes what is left,
+                    // so its bottom lines up with the record button whatever the screen's shape.
                     viewfinder
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                        .layoutPriority(1)
                     if studio.currentItem != nil {
                         PrompterView(studio: studio)
-                            .frame(height: 170)
+                            .frame(minHeight: 170, maxHeight: .infinity)
+                    } else {
+                        Spacer(minLength: 0)
                     }
                 }
                 VStack(spacing: 0) {
@@ -92,7 +97,7 @@ struct PanelView: View {
             if big {
                 RecordingsButton(big: big)
             } else {
-                HeaderButton(symbol: "square.grid.2x2", title: "Recordings", big: false,
+                HeaderButton(symbol: "film.stack", title: "Recordings", big: false,
                              help: "Every recording (Command-Shift-R)", lamp: nil) { RecordingsWindow.show() }
             }
             HeaderButton(symbol: "gearshape", title: "Settings", big: big,
@@ -131,7 +136,7 @@ struct PanelView: View {
     }
 
     private var subtitle: String {
-        guard let item = studio.currentItem else { return "Record without a prompter, or add a script" }
+        guard let item = studio.currentItem else { return "Drop a script here to add one" }
         let position = (studio.queue.firstIndex(of: item) ?? 0) + 1
         var parts = ["Video \(position) of \(studio.queue.count)", "\(studio.script.targetMinutes) min"]
         if item.recordings > 0 { parts.append(item.recordings == 1 ? "1 take" : "\(item.recordings) takes") }
@@ -341,7 +346,7 @@ struct RecordingsButton: View {
     var body: some View {
         Button { RecordingsWindow.show() } label: {
             HStack(spacing: 6) {
-                Image(systemName: "square.grid.2x2")
+                Image(systemName: "film.stack")
                     .font(.system(size: big ? 12 : 11, weight: .semibold))
                 Text("Recordings")
                     .font(.system(size: big ? 13 : 12, weight: .semibold))
