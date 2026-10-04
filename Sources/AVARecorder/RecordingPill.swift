@@ -79,7 +79,19 @@ final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSam
         let now = CACurrentMediaTime()
         guard now - last > 0.2, let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         last = now
+        guard let next = frame(pixels) else { return }
+        let hasFace = misses <= 10
+        let ratio = CGFloat(CVPixelBufferGetWidth(pixels)) / CGFloat(CVPixelBufferGetHeight(pixels))
+        DispatchQueue.main.async {
+            self.crop = next
+            if self.found != hasFace { self.found = hasFace }
+            if self.aspect != ratio { self.aspect = ratio }
+        }
+    }
 
+    /// One look at the picture, about 5 times a second. Returns the new framing, or nil to leave it.
+    /// Separate from the camera callback so `--test-framing` can run it over a recorded file.
+    func frame(_ pixels: CVPixelBuffer) -> CGRect? {
         let width = CGFloat(CVPixelBufferGetWidth(pixels))
         let height = CGFloat(CVPixelBufferGetHeight(pixels))
         let handler = VNImageRequestHandler(cvPixelBuffer: pixels, orientation: .up)
@@ -120,24 +132,18 @@ final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSam
                 goal = target
             }
         }
-        guard let goal else { return }
+        guard let goal else { return nil }
         let next: CGRect
         if let old = smoothed {
             let k: CGFloat = 0.3
             next = CGRect(x: old.minX + (goal.minX - old.minX) * k, y: old.minY + (goal.minY - old.minY) * k,
                           width: old.width + (goal.width - old.width) * k, height: old.height + (goal.height - old.height) * k)
-            if abs(next.minX - old.minX) < 0.0005, abs(next.minY - old.minY) < 0.0005, abs(next.width - old.width) < 0.0005 { return }
+            if abs(next.minX - old.minX) < 0.0005, abs(next.minY - old.minY) < 0.0005, abs(next.width - old.width) < 0.0005 { return nil }
         } else {
             next = goal
         }
         smoothed = next
-        let hasFace = face != nil || misses <= 10
-        let ratio = width / height
-        DispatchQueue.main.async {
-            self.crop = next
-            if self.found != hasFace { self.found = hasFace }
-            if self.aspect != ratio { self.aspect = ratio }
-        }
+        return next
     }
 }
 

@@ -1,5 +1,6 @@
 import AVFoundation
 import AppKit
+import Vision
 
 /// `--camera-test <dir>`: records short camera files while changing the camera session the ways
 /// the app can mid-take, and writes what survived to <dir>/camera-test.json. Built to find out
@@ -190,6 +191,85 @@ enum CameraCPUTest {
             flags["cpu"] = results
             try? JSONSerialization.data(withJSONObject: flags, options: [.prettyPrinted, .sortedKeys])
                 .write(to: dir.appendingPathComponent("camera-cpu.json"))
+            exit(0)
+        }
+    }
+}
+
+/// `--test-framing <movie> <out.json>`: runs the face framing over a recorded camera file at
+/// 5 looks a second, next to the framing used before 4 Oct, and reports how much each moved and
+/// how often the face stayed inside the frame.
+enum FramingTest {
+    @MainActor
+    static func run(movie: URL, out: URL) {
+        NSApp.windows.forEach { $0.orderOut(nil) }
+        Task.detached {
+            let asset = AVURLAsset(url: movie)
+            guard let track = try? await asset.loadTracks(withMediaType: .video).first,
+                  let reader = try? AVAssetReader(asset: asset) else { exit(1) }
+            let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange])
+            reader.add(output)
+            reader.startReading()
+            let tracker = FaceTracker()
+            var old: CGRect?
+            var oldMisses = 0
+            var current: CGRect?
+            var stats = (newMoves: 0, oldMoves: 0, newTravel: 0.0, oldTravel: 0.0, looks: 0, faces: 0, newHolds: 0, oldHolds: 0)
+            var lastTime = -1.0
+            while let sample = output.copyNextSampleBuffer() {
+                let t = sample.presentationTimeStamp.seconds
+                guard t - lastTime >= 0.2, let pixels = CMSampleBufferGetImageBuffer(sample) else { continue }
+                lastTime = t
+                stats.looks += 1
+                let w = CGFloat(CVPixelBufferGetWidth(pixels)), h = CGFloat(CVPixelBufferGetHeight(pixels))
+                let request = VNDetectFaceRectanglesRequest()
+                try? VNImageRequestHandler(cvPixelBuffer: pixels, orientation: .up).perform([request])
+                let face = (request.results ?? []).max { $0.boundingBox.width * $0.boundingBox.height < $1.boundingBox.width * $1.boundingBox.height }?.boundingBox
+
+                // New framing.
+                if let next = tracker.frame(pixels) {
+                    if let c = current { let d = hypot(next.midX - c.midX, next.midY - c.midY); if d > 0.002 { stats.newMoves += 1 }; stats.newTravel += d }
+                    current = next
+                }
+                // The framing before 4 Oct: follow every look, no dead zone.
+                var target: CGRect?
+                if let box = face {
+                    oldMisses = 0
+                    let side = min(h, w, max(box.height * h * 2.8, h * 0.25))
+                    let cx = min(max(box.midX * w, side / 2), w - side / 2)
+                    let cy = min(max(box.midY * h - box.height * h * 0.15, side / 2), h - side / 2)
+                    target = CGRect(x: (cx - side / 2) / w, y: (cy - side / 2) / h, width: side / w, height: side / h)
+                } else {
+                    oldMisses += 1
+                    if oldMisses > 10 || old == nil {
+                        let side = min(w, h)
+                        target = CGRect(x: (w - side) / 2 / w, y: 0, width: side / w, height: side / h)
+                    }
+                }
+                if let target {
+                    let next = old.map { o in
+                        CGRect(x: o.minX + (target.minX - o.minX) * 0.35, y: o.minY + (target.minY - o.minY) * 0.35,
+                               width: o.width + (target.width - o.width) * 0.35, height: o.height + (target.height - o.height) * 0.35)
+                    } ?? target
+                    if let o = old { let d = hypot(next.midX - o.midX, next.midY - o.midY); if d > 0.002 { stats.oldMoves += 1 }; stats.oldTravel += d }
+                    old = next
+                }
+                if let face {
+                    stats.faces += 1
+                    if let c = current, c.contains(face) { stats.newHolds += 1 }
+                    if let o = old, o.contains(face) { stats.oldHolds += 1 }
+                }
+            }
+            let minutes = max(lastTime, 1) / 60
+            let result: [String: Any] = [
+                "minutes": minutes, "looks": stats.looks, "looksWithFace": stats.faces,
+                "new": ["visibleMovesPerMinute": Double(stats.newMoves) / minutes, "travelPerMinute": stats.newTravel / minutes,
+                        "faceInsideFrame": Double(stats.newHolds) / Double(max(stats.faces, 1))],
+                "old": ["visibleMovesPerMinute": Double(stats.oldMoves) / minutes, "travelPerMinute": stats.oldTravel / minutes,
+                        "faceInsideFrame": Double(stats.oldHolds) / Double(max(stats.faces, 1))],
+            ]
+            try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys]).write(to: out)
             exit(0)
         }
     }

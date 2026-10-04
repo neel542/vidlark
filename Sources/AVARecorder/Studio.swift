@@ -123,6 +123,10 @@ final class Studio: ObservableObject {
             CameraTest.run(dir: URL(fileURLWithPath: CommandLine.arguments[i + 1]))
             return
         }
+        if let i = CommandLine.arguments.firstIndex(of: "--test-framing"), i + 2 < CommandLine.arguments.count {
+            FramingTest.run(movie: URL(fileURLWithPath: CommandLine.arguments[i + 1]), out: URL(fileURLWithPath: CommandLine.arguments[i + 2]))
+            return
+        }
         if let i = CommandLine.arguments.firstIndex(of: "--camera-cpu-test"), i + 1 < CommandLine.arguments.count {
             CameraCPUTest.run(dir: URL(fileURLWithPath: CommandLine.arguments[i + 1]))
             return
