@@ -76,7 +76,8 @@ enum Library {
         return folder
     }
 
-    private static func uniqueFolder(_ url: URL) -> URL {
+    /// Adds " (2)", " (3)" and so on until nothing on disk has the name.
+    static func uniqueFolder(_ url: URL) -> URL {
         var candidate = url
         var n = 2
         while FileManager.default.fileExists(atPath: candidate.path) {
