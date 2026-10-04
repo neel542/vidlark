@@ -59,6 +59,18 @@ enum Snapshots {
         }
         prompter("bullet") { $0.stage(phase: .recording, camera: "x", mic: "x", level: -30, elapsed: 200, cardIndex: 3, cardElapsed: 52, countdown: nil, screenAllowed: true, script: script) }
         prompter("over") { $0.stage(phase: .recording, camera: "x", mic: "x", level: -30, elapsed: 400, cardIndex: 5, cardElapsed: 260, countdown: nil, screenAllowed: true, script: script) }
+
+        // The Recordings page, fed staged sample takes with drawn thumbnails. Nothing on disk is read.
+        func recordings(_ name: String, _ size: CGSize, _ model: @autoclosure @escaping () -> RecordingsModel, hover: Bool = false) {
+            write(RecordingsView(model: model(), onClose: {}, showHover: hover).preferredColorScheme(.dark), size: size,
+                  to: dir.appendingPathComponent("recordings-\(name).png"))
+        }
+        let roomy = CGSize(width: 1512, height: 945), narrow = CGSize(width: 400, height: 860)
+        recordings("wide", roomy, .sample(), hover: true)
+        recordings("narrow", narrow, .sample(notice: .init(text: "Saved a copy in Desktop", reveal: URL(fileURLWithPath: "/tmp"))))
+        recordings("not-finished", roomy, .sample(filter: .unfinished))
+        recordings("no-match", narrow, .sample(search: "zebra"))
+        recordings("empty", roomy, .sample(empty: true))
     }
 
     @MainActor
