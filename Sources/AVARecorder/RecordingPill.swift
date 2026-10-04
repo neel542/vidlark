@@ -321,6 +321,7 @@ struct RecordingPillView: View {
                     .padding(8)
                     .allowsHitTesting(false)
             }
+            viewSwitch
             controls
                 .padding(.horizontal, 6)
         }
@@ -331,12 +332,36 @@ struct RecordingPillView: View {
 
     /// Minimised: just the essentials.
     private var pill: some View {
-        controls
-            .padding(.leading, 10)
-            .padding(.trailing, 2)
-            .frame(height: 46)
-            .background(Capsule().fill(Palette.glass.opacity(0.95)))
-            .overlay(Capsule().strokeBorder(Color.white.opacity(0.09)))
+        VStack(spacing: 6) {
+            viewSwitch
+            controls
+                .padding(.leading, 4)
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Palette.glass.opacity(0.95)))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.white.opacity(0.09)))
+    }
+
+    /// Me or Screen: what the finished video shows from now on. One click switches; the finished
+    /// video fades between them, and both are recorded the whole time.
+    private var viewSwitch: some View {
+        HStack(spacing: 2) {
+            ViewChoice(title: "Me", symbol: "person.fill", on: studio.showing == .camera) { studio.show(.camera) }
+            ViewChoice(title: "Screen", symbol: "display", on: studio.showing == .screen) {
+                if studio.takeHasScreen {
+                    studio.show(.screen)
+                } else {
+                    studio.shareProblem = nil
+                    state.askingToShare = true
+                }
+            }
+        }
+        .padding(2)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.face))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Palette.hairline))
+        .disabled(!studio.isRolling)
+        .opacity(studio.isRolling ? 1 : 0.5)
+        .help("What the video shows. Click to switch; the finished video fades from one to the other.")
     }
 
     private var controls: some View {
@@ -350,14 +375,8 @@ struct RecordingPillView: View {
                 .frame(minWidth: 52, alignment: .leading)
             LiveMeter(meter: studio.meter)
                 .frame(width: state.expanded && !faceInVideo ? 52 : 44)
-            // A camera-first take: the screen joins the video when she shares it.
-            if studio.isRolling && !studio.takeHasScreen {
-                RoundButton(symbol: "rectangle.inset.filled.and.person.filled", lit: state.askingToShare, help: "Share the screen") {
-                    studio.shareProblem = nil
-                    state.askingToShare.toggle()
-                }
-            }
-            if (state.expanded || faceInVideo) && studio.takeHasScreen {
+            // Her face in the screen part of the video, or not.
+            if studio.showing == .screen && studio.takeHasScreen {
                 RoundButton(symbol: studio.faceInVideo ? "person.crop.circle.fill" : "person.crop.circle", lit: studio.faceInVideo,
                             help: studio.faceInVideo ? "Take the face out of the video"
                                 : "Put the face in the video (\(studio.bubbleShape.title.lowercased()))") {
@@ -390,7 +409,7 @@ struct RecordingPillView: View {
             Text(shareBlocked == nil ? "Share your screen?" : "The screen is not shared")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Palette.ink)
-            Text(shareBlocked ?? "Everything on \(studio.display?.name ?? "the screen") goes into the video from now on.")
+            Text(shareBlocked ?? "From now on \(studio.display?.name ?? "the screen") is recorded too, and the video shows it. Click Me any time to go back to just you.")
                 .font(.system(size: 11.5))
                 .foregroundStyle(Palette.dim)
                 .fixedSize(horizontal: false, vertical: true)
@@ -474,6 +493,32 @@ private struct RoundButton: View {
         .buttonStyle(.plain)
         .onHover { hover = $0 }
         .help(help)
+    }
+}
+
+private struct ViewChoice: View {
+    var title: String
+    var symbol: String
+    var on: Bool
+    var action: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: symbol).font(.system(size: 11, weight: .semibold))
+                Text(title).font(.system(size: 12.5, weight: .semibold))
+            }
+            .foregroundStyle(on ? Palette.glass : hover ? Palette.ink : Palette.dim)
+            .frame(maxWidth: .infinity)
+            .frame(height: 30)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(on ? Palette.signal : hover ? Palette.raised : Color.clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .animation(.easeOut(duration: 0.18), value: on)
     }
 }
 

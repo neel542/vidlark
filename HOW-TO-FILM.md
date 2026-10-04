@@ -21,17 +21,18 @@
    - Click the picture to switch between her face and the whole camera view.
    - The minus button shrinks the box to a small pill, and the face button brings it back.
    - The square button stops the recording.
-   - In a camera-first take, the screen button shares the screen. It asks first ("Share your screen?"), with a tick box for the Mac's sound. From then on the screen is recorded until the take stops; the finisher lines it up with the camera.
+   - **Me | Screen** says what the video shows. Click **Me** for just her, **Screen** for the screen (with her face in it, if the face is in the video). Both keep recording the whole time, so switch as often as you like: the finished `video.mp4` follows every click with a half-second fade, and nothing has to be cut by hand.
+   - In a camera-first take, the first click on **Screen** asks first ("Share your screen?"), with a tick box for the Mac's sound. From then on the screen is recorded until the take stops, and Me and Screen switch at once.
    - The face button puts the face in the video, in the shape picked in the **In video** row. Only one face shows at a time: while the face is in the video, this box shrinks to just the time, the level and the buttons. The box never appears in the recording, and neither does any pop-up banner.
    - If the camera stops sending pictures, the take stops within about 6 seconds and says so, so nobody films on without a camera.
 5. If she stumbles, she says **"retake"** and repeats the line. The edit finds it from the transcript.
-6. After you stop, the big window comes back while it lines up the files and writes the transcript, chapters and retakes.
+6. After you stop, the big window comes back while it lines up the files, makes `video.mp4` and writes the transcript, chapters and retakes. `video.mp4` is the one to upload; the camera and screen files stay for anyone who wants to edit.
 
 The prompter is built but switched off for now.
 
 ## All recordings
 
-The **Recordings** button at the top right of the panel (or Command-Shift-R) shows every take with a picture, its length and size. Click a take to watch it in the app: switch between Camera and Screen and it stays at the same moment of the take, or open it in QuickTime Player. Search by name, filter by All, This week, Not finished, With screen or Camera only, and rename, save a copy or delete (deleted takes go to the Trash).
+The **Recordings** button at the top right of the panel (or Command-Shift-R) shows every take with a picture, its length and size. Click a take to watch it in the app: **Video** is the finished video, and switching to Camera or Screen stays at the same moment of the take, or open it in QuickTime Player. Search by name, filter by All, This week, Not finished, With screen or Camera only, and rename, save a copy or delete (deleted takes go to the Trash).
 
 ## More than one camera
 
@@ -54,6 +55,7 @@ The **Live** row shows the shoot on any browser, with no login: every camera, th
 |---|---|
 | camera.mov | the presenter on camera, with the mic |
 | camera-2.mov | A second camera, if one was added, with the same mic |
+| video.mp4 | The finished video: Me and Screen as clicked, with fades. Made when the take has a screen |
 | screen.mov | The recorded screen, with the same mic (and the Mac's sound as a second track, if ticked). Starts when the screen was shared in a camera-first take |
 | mic.wav | The clean voice track |
 | words.json | The transcript, with the time of every word |

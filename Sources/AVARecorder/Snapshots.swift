@@ -39,14 +39,15 @@ enum Snapshots {
         wide("ready") { $0.stage(phase: .idle, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
         wide("recording") { $0.stage(phase: .recording, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -14, elapsed: 462, cardIndex: 5, cardElapsed: 41, countdown: nil, screenAllowed: true, script: script) }
 
-        for open in [true, false] {
+        for (name, open, showing) in [("pill-open", true, Studio.Show.screen), ("pill-closed", false, .screen), ("pill-me", false, .camera)] {
             let s = Studio()
             s.stage(phase: .recording, camera: "x", mic: "x", level: -18, elapsed: 312, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: nil)
+            s.stageShowing(showing)
             let state = PillState()
             state.expanded = open
-            let size = open ? CGSize(width: 290, height: 340) : CGSize(width: 290, height: 70)
+            let size = open ? CGSize(width: 290, height: 390) : CGSize(width: 290, height: 120)
             write(RecordingPillView(studio: s, state: state, tracker: FaceTracker(), preview: ZoomPreviewNSView()), size: size,
-                  to: dir.appendingPathComponent(open ? "pill-open.png" : "pill-closed.png"))
+                  to: dir.appendingPathComponent("\(name).png"))
         }
         do {
             // A camera-first take with the "Share your screen?" card open.
@@ -56,7 +57,7 @@ enum Snapshots {
             let state = PillState()
             state.expanded = true
             state.askingToShare = true
-            write(RecordingPillView(studio: s, state: state, tracker: FaceTracker(), preview: ZoomPreviewNSView()), size: CGSize(width: 290, height: 520),
+            write(RecordingPillView(studio: s, state: state, tracker: FaceTracker(), preview: ZoomPreviewNSView()), size: CGSize(width: 290, height: 570),
                   to: dir.appendingPathComponent("pill-share.png"))
         }
         UserDefaults.standard.removeObject(forKey: "faceBoxOpen")

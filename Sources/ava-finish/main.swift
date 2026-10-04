@@ -1,6 +1,6 @@
 import Foundation
 
-// ava-finish <recording folder> [--no-transcribe] [--no-chapters] [--model <path to ggml model>]
+// ava-finish <recording folder> [--no-transcribe] [--no-chapters] [--no-video] [--model <path to ggml model>]
 // stdout carries only progress for the app: "STEP n/total ...", then "DONE <report.md>" or "FAIL <reason>".
 
 setvbuf(stdout, nil, _IOLBF, 0)
@@ -17,10 +17,11 @@ func fail(_ reason: String) -> Never {
     finish(1)
 }
 
-let usage = "usage: ava-finish <recording folder> [--no-transcribe] [--no-chapters] [--model <path>]"
+let usage = "usage: ava-finish <recording folder> [--no-transcribe] [--no-chapters] [--no-video] [--model <path>]"
 var folderArg: String?
 var transcribeWanted = true
 var chaptersWanted = true
+var videoAllowed = true
 var modelOverride: String?
 var argIndex = 1
 let argv = CommandLine.arguments
@@ -29,6 +30,7 @@ while argIndex < argv.count {
     switch arg {
     case "--no-transcribe": transcribeWanted = false
     case "--no-chapters": chaptersWanted = false
+    case "--no-video": videoAllowed = false
     case "--model":
         argIndex += 1
         guard argIndex < argv.count else { fail(usage) }
@@ -45,7 +47,9 @@ while argIndex < argv.count {
 guard let folderArg else { fail(usage) }
 
 let folder = URL(fileURLWithPath: folderArg).standardizedFileURL
-let totalSteps = (transcribeWanted ? 6 : 4) - (chaptersWanted ? 0 : 1)
+// video.mp4 is made whenever there is a screen to switch to.
+let videoWanted = videoAllowed && FileManager.default.fileExists(atPath: folder.appendingPathComponent("screen.mov").path)
+let totalSteps = (transcribeWanted ? 6 : 4) - (chaptersWanted ? 0 : 1) + (videoWanted ? 1 : 0)
 var stepNumber = 0
 func step(_ words: String) {
     stepNumber += 1
@@ -220,7 +224,32 @@ do {
     }
     if chaptersWanted { try writeText(chaptersText(chapters), to: file("chapters.txt")) }
 
-    // 6. Report
+    // 6. The finished video, following each click of Me or Screen
+    var composed: ComposeResult?
+    var composeProblem: String?
+    if videoWanted {
+        step("Making the video")
+        var clicks = events?.shows ?? []
+        if clicks.isEmpty {
+            // Takes from before the Me and Screen switch: the screen from the start, or from the share.
+            if events?.cameraFirst == true {
+                clicks = [ShowChange(t: 0, screen: false)] + (events?.screenShared.map { [ShowChange(t: $0, screen: true)] } ?? [])
+            } else {
+                clicks = [ShowChange(t: 0, screen: true)]
+            }
+        }
+        let offset = sync.offset, wanted = clicks
+        let cameraURL = file("camera.mov"), screenURL = file("screen.mov"), out = file("video.mp4")
+        do {
+            composed = try waitFor { try await composeVideo(camera: cameraURL, screen: screenURL, screenOffset: offset, clicks: wanted, out: out) }
+        } catch let error as FinishError {
+            composeProblem = error.message
+        } catch {
+            composeProblem = error.localizedDescription
+        }
+    }
+
+    // 7. Report
     step("Writing the report")
     var title = events?.title ?? folder.lastPathComponent
     if events?.title == nil, folder.lastPathComponent.hasPrefix("recording-") {
@@ -231,7 +260,7 @@ do {
         cameraDuration: cameraDuration, screenDuration: screenDuration, screenNote: screenNote,
         sync: sync, extraCameras: extraCameras, transcript: transcript, retakes: retakes,
         chapters: chapters, chapterSource: chapterSource, candidateChapters: candidates, chaptersWanted: chaptersWanted,
-        events: events))
+        events: events, video: composed, videoProblem: composeProblem, videoWanted: videoWanted))
     try writeText(report, to: file("report.md"))
 
     if case .failed(let reason) = transcript {

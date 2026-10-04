@@ -85,6 +85,10 @@ final class Studio: ObservableObject {
     }
     /// The screen is being recorded in the take in progress: from the start, or since it was shared.
     @Published private(set) var takeHasScreen = true
+    /// What the finished video shows right now. Both files keep recording either way; the finisher
+    /// makes video.mp4 follow each switch with a short fade.
+    enum Show: String { case camera, screen }
+    @Published private(set) var showing: Show = .camera
     /// Why sharing the screen mid-take did not work, shown in the face box.
     @Published var shareProblem: String?
     /// True while the screen recorder is starting for a mid-take share.
@@ -610,11 +614,22 @@ final class Studio: ObservableObject {
                                        to: folder.appendingPathComponent("screen.mov"))
                 guard phase == .recording else { return }
                 takeHasScreen = true
+                // Sharing is a click on Screen, so the video shows it from here.
+                showing = .screen
+                log?.write(["type": "show", "what": "screen"])
             } catch {
                 log?.write(["type": "screen-error", "message": error.localizedDescription])
                 if phase == .recording { shareProblem = plain(error) }
             }
         }
+    }
+
+    /// One click of Me or Screen. Screen needs the screen recording: in a camera-first take the
+    /// first click shares it (after the face box asks), and that switches too.
+    func show(_ what: Show) {
+        guard phase == .recording, what != showing, what == .camera || takeHasScreen else { return }
+        showing = what
+        log?.write(["type": "show", "what": what.rawValue])
     }
 
     private func rolling(from time: CFTimeInterval) {
@@ -632,6 +647,8 @@ final class Studio: ObservableObject {
                     "cameraName": cameraName ?? "", "micName": micName ?? "", "screenName": display?.name ?? "",
                     "extraCameras": activeExtras.prefix(extras.count).enumerated().map { ["file": "camera-\($0.offset + 2).mov", "name": $0.element.localizedName] }],
                    at: time)
+        showing = takeHasScreen ? .screen : .camera
+        log?.write(["type": "show", "what": showing.rawValue], at: time)
 
         if let i = queue.firstIndex(where: { $0.id == currentID }) {
             queue[i].recordings += 1
@@ -1032,6 +1049,15 @@ extension Studio {
                 try? await Task.sleep(nanoseconds: 200_000_000); waited += 0.2
             }
             guard phase == .recording else { report(["ok": false, "stage": "start", "reason": "timed out"]); return }
+            // AVA_SWITCHES=4:camera,9:screen clicks Me or Screen at those seconds into the take.
+            for item in (ProcessInfo.processInfo.environment["AVA_SWITCHES"] ?? "").split(separator: ",") {
+                let parts = item.split(separator: ":")
+                guard parts.count == 2, let at = Double(parts[0]), let what = Show(rawValue: String(parts[1])) else { continue }
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: UInt64(at * 1_000_000_000))
+                    if what == .screen && !takeHasScreen { shareScreen() } else { show(what) }
+                }
+            }
             // AVA_SHARE_AT=<seconds>: a camera-first take shares the screen that far in.
             if let at = ProcessInfo.processInfo.environment["AVA_SHARE_AT"].flatMap(Double.init) {
                 Task { @MainActor in
@@ -1101,6 +1127,11 @@ extension Studio {
     func stageCameraFirst() {
         recordScreen = false
         takeHasScreen = false
+        showing = .camera
+    }
+
+    func stageShowing(_ what: Show) {
+        showing = what
     }
 
     func stageReactions(_ on: Bool) {

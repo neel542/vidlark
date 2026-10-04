@@ -51,7 +51,7 @@ done_ok() { [ "$(cat "$OUT/$1.exit")" = 0 ] && grep -q "^DONE $OUT/$1/report.md$
 # main: full run
 run main
 check "exit 0 and DONE line" done_ok main
-check "six STEP lines" steps_ok main 6
+check "seven STEP lines" steps_ok main 7
 check "offset within 10 ms of $EXPECTED_OFFSET_MAIN" offset_near "$OUT/main" "$EXPECTED_OFFSET_MAIN"
 check "mic.wav is 48 kHz mono 16-bit" bash -c "[ \"\$(/opt/homebrew/bin/ffprobe -v error -show_entries stream=sample_rate,channels,codec_name -of csv=p=0 '$OUT/main/mic.wav')\" = 'pcm_s16le,48000,1' ]"
 check "words.json close to the spoken text" py '
@@ -75,7 +75,7 @@ check "no em dashes in output" no_em_dash "$OUT/main" "$OUT/main.stdout"
 # --no-transcribe
 run notranscribe --no-transcribe
 check "exit 0 and DONE line" done_ok notranscribe
-check "four STEP lines" steps_ok notranscribe 4
+check "five STEP lines" steps_ok notranscribe 5
 check "no words.json or retakes.json" bash -c "[ ! -e '$OUT/notranscribe/words.json' ] && [ ! -e '$OUT/notranscribe/retakes.json' ]"
 check "offset within 10 ms of $EXPECTED_OFFSET_MAIN" offset_near "$OUT/notranscribe" "$EXPECTED_OFFSET_MAIN"
 check "chapters.txt is Hook, Setup, Payoff" chapters_are "$OUT/notranscribe" "00:00 Hook|00:15 Setup|00:30 Payoff|"
@@ -115,6 +115,34 @@ print("        measured %+.4f s, confidence %.3f, method %s" % (d["screenOffsetS
 sys.exit(0 if d["method"]=="audio" and abs(d["screenOffsetSec"]-20) <= 0.020 else 1)' "$OUT/shared"
 check "report says when the screen was shared" grep -q "shared 00:19 into the take" "$OUT/shared/report.md"
 
+# Me and Screen: the video starts on the camera, shows the screen at 10 s and the camera again at 25 s
+rm -rf "$OUT/switches" && mkdir -p "$OUT/switches"
+cp "$OUT/notranscribe/camera.mov" "$OUT/notranscribe/screen.mov" "$OUT/switches/"
+{ head -1 "$OUT/notranscribe/events.jsonl"
+  echo '{"t":0,"type":"show","what":"camera"}'
+  tail -n +2 "$OUT/notranscribe/events.jsonl"
+  echo '{"t":10,"type":"show","what":"screen"}'
+  echo '{"t":25,"type":"show","what":"camera"}'; } > "$OUT/switches/events.jsonl"
+run switches --no-transcribe
+check "exit 0 and DONE line" done_ok switches
+looks_like() { # video time, source file, source time, wanted: same or different
+    local score
+    score=$(/opt/homebrew/bin/ffmpeg -v info -ss "$1" -i "$OUT/switches/video.mp4" -ss "$3" -i "$OUT/switches/$2" \
+        -filter_complex "[0:v]scale=640:360,format=yuv420p[a];[1:v]scale=640:360,format=yuv420p[b];[a][b]ssim" -frames:v 1 -f null - 2>&1 \
+        | sed -n 's/.*All:\([0-9.]*\).*/\1/p' | tail -1)
+    echo "        video at $1 s against $2 at $3 s: SSIM $score"
+    if [ "$4" = same ]; then python3 -c "import sys; sys.exit(0 if float('$score') > 0.9 else 1)"
+    else python3 -c "import sys; sys.exit(0 if float('$score') < 0.6 else 1)"; fi
+}
+check "video.mp4 runs as long as the camera" py 'import subprocess,sys
+d=float(subprocess.check_output(["/opt/homebrew/bin/ffprobe","-v","error","-show_entries","format=duration","-of","csv=p=0",sys.argv[1]]).decode())
+print("        video.mp4 is %.2f s" % d); sys.exit(0 if abs(d-45) < 0.2 else 1)' "$OUT/switches/video.mp4"
+check "at 5 s the video is the camera" looks_like 5 camera.mov 5 same
+check "at 17 s the video is the screen" looks_like 17 screen.mov 17 same
+check "at 17 s the video is not the camera" looks_like 17 camera.mov 17 different
+check "at 35 s the video is the camera again" looks_like 35 camera.mov 35 same
+check "report lists the clicks" bash -c "grep -q '^- 00:10 Screen' '$OUT/switches/report.md' && grep -q '^- 00:25 Me' '$OUT/switches/report.md'"
+
 # camera first and never shared: no screen.mov, said plainly
 rm -rf "$OUT/nevershared" && mkdir -p "$OUT/nevershared"
 cp "$OUT/notranscribe/camera.mov" "$OUT/nevershared/"
@@ -127,7 +155,7 @@ check "report says the screen was not shared" grep -q "none, the screen was not 
 rm -rf "$OUT/nochapters" && cp -R "$OUT/notranscribe" "$OUT/nochapters" && rm -f "$OUT/nochapters"/{chapters.txt,report.md,sync.json,mic.wav}
 run nochapters --no-transcribe --no-chapters
 check "exit 0 and DONE line" done_ok nochapters
-check "three STEP lines" steps_ok nochapters 3
+check "four STEP lines" steps_ok nochapters 4
 check "no chapters.txt or words.json" bash -c "[ ! -e '$OUT/nochapters/chapters.txt' ] && [ ! -e '$OUT/nochapters/words.json' ]"
 check "sync still measured" offset_near "$OUT/nochapters" "$EXPECTED_OFFSET_MAIN"
 check "report says chapters skipped" grep -q "^Skipped (the take was recorded with the transcript and chapters box unticked)" "$OUT/nochapters/report.md"

@@ -10,6 +10,8 @@ struct RecordingEvents {
     var cameraFirst = false
     /// When the screen was shared in a camera-first take, in camera time.
     var screenShared: Double?
+    /// Each click of Me or Screen, in camera time. The first is where the take started.
+    var shows: [ShowChange] = []
     var skippedLines = 0
 }
 
@@ -41,6 +43,8 @@ func readEvents(_ url: URL) -> RecordingEvents? {
             events.cameraFirst = (object["screen"] as? String) == ""
         case "screen-start":
             if events.screenShared == nil { events.screenShared = t }
+        case "show":
+            if let what = text("what") { events.shows.append(ShowChange(t: t, screen: what == "screen")) }
         case "card":
             if let section = text("section") { events.cards.append((t, section)) }
         case "app":

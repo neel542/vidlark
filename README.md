@@ -15,11 +15,12 @@ Built by AVA INC for our own channel. You are welcome to build your own copy and
 - **More than one camera.** Any extra camera records its own file next to the main one.
 - **Live view.** Watch the shoot from another laptop or phone in a browser, with no login: every camera, the screen, the mic level and the checks.
 - **Recordings page.** Every take with a picture, search, filters, rename, save a copy and delete. Click a take to watch it in the app, camera or screen.
+- **Me | Screen, one click.** Camera and screen both record the whole take. One click says what the video shows, and the finished `video.mp4` follows every click with a short fade, with no cutting.
 - **Camera first, share the screen when ready.** A take can start with only the camera, and the screen joins when you press Share in the face box, with or without the Mac's sound.
 - **A transcript tick box,** for quick videos that do not need a transcript.
 - **Checks before you start.** Camera, mic, screen, disk space, battery and macOS camera effects, each with a plain fix when something is wrong.
 - **Camera watchdog.** If the camera file stops growing during a take, the take stops at once and says so, instead of filming on without a camera.
-- **Finishing.** After every take, `ava-finish` lines up the files by their sound and writes `words.json`, `chapters.txt`, `retakes.json` and `report.md`, all on the Mac.
+- **Finishing.** After every take, `ava-finish` lines up the files by their sound, makes `video.mp4` and writes `words.json`, `chapters.txt`, `retakes.json` and `report.md`, all on the Mac.
 
 ## What you need
 

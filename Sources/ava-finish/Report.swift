@@ -22,6 +22,9 @@ struct ReportInput {
     var candidateChapters: Int
     var chaptersWanted = true
     var events: RecordingEvents?
+    var video: ComposeResult?
+    var videoProblem: String?
+    var videoWanted = false
 }
 
 private func length(_ seconds: Double?) -> String {
@@ -164,6 +167,23 @@ func buildReport(_ r: ReportInput) -> String {
         }
     } else {
         out.append("Not checked, because there is no transcript.")
+    }
+
+    out.append("")
+    out.append("## Video")
+    out.append("")
+    if let video = r.video {
+        out.append("video.mp4 is the finished video: \(clock(video.seconds)), \(video.width) by \(video.height), following each click of Me and Screen with a \(String(format: "%.1f", fadeSeconds)) second fade.")
+        out.append("")
+        for change in video.changes {
+            out.append("- \(clock(change.t)) \(change.screen ? "Screen" : "Me")")
+        }
+    } else if let problem = r.videoProblem {
+        out.append("Not made, because \(problem). camera.mov and screen.mov are whole, so the video can still be edited from them.")
+    } else if r.videoWanted == false && r.screenDuration == nil {
+        out.append("No screen in this take, so camera.mov is the video.")
+    } else {
+        out.append("Not made (finished with --no-video).")
     }
 
     out.append("")

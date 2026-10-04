@@ -12,13 +12,17 @@ struct TakeSource: Identifiable, Equatable {
     /// camera time = this file's time + offset, as in sync.json. Zero for camera.mov.
     var offset: Double
 
-    /// Every video file in the folder, the camera first.
+    /// Every video file in the folder: the finished video first, then the camera and the screen.
     static func all(in take: TakeInfo) -> [TakeSource] {
         let folder = take.folder
         let sync = (try? Data(contentsOf: folder.appendingPathComponent("sync.json")))
             .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
         var out: [TakeSource] = []
         let fm = FileManager.default
+        // video.mp4 follows the Me and Screen clicks, on the camera's timeline.
+        if Snapshots.active ? take.hasScreen : fm.fileExists(atPath: folder.appendingPathComponent("video.mp4").path) {
+            out.append(TakeSource(id: "video", title: "Video", url: folder.appendingPathComponent("video.mp4"), offset: 0))
+        }
         if Snapshots.active ? take.hasCamera : fm.fileExists(atPath: folder.appendingPathComponent("camera.mov").path) {
             out.append(TakeSource(id: "camera", title: "Camera", url: folder.appendingPathComponent("camera.mov"), offset: 0))
         }
