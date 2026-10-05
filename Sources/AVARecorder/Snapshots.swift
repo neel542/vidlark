@@ -50,7 +50,7 @@ enum Snapshots {
         wide("ready") { $0.stage(phase: .idle, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
         wide("recording") { $0.stage(phase: .recording, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -14, elapsed: 462, cardIndex: 5, cardElapsed: 41, countdown: nil, screenAllowed: true, script: script) }
 
-        for (name, open, showing) in [("pill-open", true, Studio.Show.screen), ("pill-closed", false, .screen), ("pill-me", false, .camera)] {
+        for (name, open, showing) in [("pill-open", true, Studio.Show.screen), ("pill-closed", false, .screen), ("pill-me", true, .camera)] {
             let s = Studio()
             s.stage(phase: .recording, camera: "x", mic: "x", level: -18, elapsed: 312, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: nil)
             s.stageShowing(showing)
@@ -59,6 +59,17 @@ enum Snapshots {
             // Closed, the box still holds the switch, the Mac sound row and the controls.
             let size = open ? CGSize(width: 290, height: 390) : CGSize(width: 290, height: 170)
             write(RecordingPillView(studio: s, state: state, tracker: FaceTracker(), preview: ZoomPreviewNSView()), size: size,
+                  to: dir.appendingPathComponent("\(name).png"))
+        }
+        for (name, showing) in [("box-screen", Studio.Show.screen), ("box-me", .camera)] {
+            // The face out of the video, so the box holds the face picture while the screen shows.
+            let s = Studio()
+            s.stage(phase: .recording, camera: "x", mic: "x", level: -18, elapsed: 312, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: nil)
+            s.faceInVideo = false
+            s.stageShowing(showing)
+            let state = PillState()
+            state.expanded = true
+            write(RecordingPillView(studio: s, state: state, tracker: FaceTracker(), preview: ZoomPreviewNSView()), size: CGSize(width: 290, height: 440),
                   to: dir.appendingPathComponent("\(name).png"))
         }
         do {

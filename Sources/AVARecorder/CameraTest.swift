@@ -238,6 +238,85 @@ enum CameraCPUTest {
 /// 5 looks a second, next to the framing used before 4 Oct, and reports how much each moved and
 /// how often the face stayed inside the frame.
 enum FramingTest {
+    /// The face framing as it was until 5 Oct, kept only to compare against: 5 looks a second,
+    /// a new Vision request each time, a still zone of 0.12 and a 30% step towards it per look.
+    final class Before {
+        private var smoothed: CGRect?
+        private var goal: CGRect?
+        private var misses = 0
+
+        private func square(side: CGFloat, cx: CGFloat, cy: CGFloat, _ width: CGFloat, _ height: CGFloat) -> CGRect {
+            let x = min(max(cx, side / 2), width - side / 2)
+            let y = min(max(cy, side / 2), height - side / 2)
+            return CGRect(x: (x - side / 2) / width, y: (y - side / 2) / height, width: side / width, height: side / height)
+        }
+
+        func frame(_ pixels: CVPixelBuffer) -> CGRect? {
+            let width = CGFloat(CVPixelBufferGetWidth(pixels)), height = CGFloat(CVPixelBufferGetHeight(pixels))
+            let handler = VNImageRequestHandler(cvPixelBuffer: pixels, orientation: .up)
+            let faces = VNDetectFaceRectanglesRequest()
+            try? handler.perform([faces])
+            let face = (faces.results ?? []).max { $0.boundingBox.width * $0.boundingBox.height < $1.boundingBox.width * $1.boundingBox.height }
+            var target: CGRect?
+            if let box = face?.boundingBox {
+                misses = 0
+                let side = min(height, width, max(box.height * height * 2.8, height * 0.25))
+                target = square(side: side, cx: box.midX * width, cy: box.midY * height - box.height * height * 0.15, width, height)
+            } else {
+                misses += 1
+                if misses > 10 {
+                    let bodies = VNDetectHumanRectanglesRequest()
+                    bodies.upperBodyOnly = true
+                    try? handler.perform([bodies])
+                    if let body = (bodies.results ?? []).max(by: { $0.boundingBox.height < $1.boundingBox.height })?.boundingBox {
+                        let side = min(height, width, max(body.width * width * 1.25, height * 0.35))
+                        target = square(side: side, cx: body.midX * width, cy: body.maxY * height - side * 0.45, width, height)
+                    } else if misses > 25 || smoothed == nil {
+                        let side = min(width, height)
+                        target = CGRect(x: (width - side) / 2 / width, y: 0, width: side / width, height: side / height)
+                    }
+                }
+            }
+            if let target {
+                if let goal, let current = smoothed {
+                    let drift = hypot(target.midX - goal.midX, (target.midY - goal.midY) * height / width) / current.width
+                    if drift > 0.12 || abs(target.width / goal.width - 1) > 0.18 { self.goal = target }
+                } else {
+                    goal = target
+                }
+            }
+            guard let goal else { return nil }
+            guard let old = smoothed else { smoothed = goal; return goal }
+            let k: CGFloat = 0.3
+            let next = CGRect(x: old.minX + (goal.minX - old.minX) * k, y: old.minY + (goal.minY - old.minY) * k,
+                              width: old.width + (goal.width - old.width) * k, height: old.height + (goal.height - old.height) * k)
+            if abs(next.minX - old.minX) < 0.0005, abs(next.minY - old.minY) < 0.0005, abs(next.width - old.width) < 0.0005 { return nil }
+            smoothed = next
+            return next
+        }
+    }
+
+    /// What the box shows: a glide from where the picture is to each new framing.
+    struct Screen {
+        var duration: Double
+        var from = CGRect.zero, to = CGRect.zero, start = -100.0
+
+        mutating func set(_ crop: CGRect, at t: Double) {
+            from = start < -50 ? crop : at(t)
+            to = crop
+            start = t
+        }
+
+        func at(_ t: Double) -> CGRect {
+            let p = min(max((t - start) / duration, 0), 1)
+            let e = 1 - pow(1 - p, 3)
+            return CGRect(x: from.minX + (to.minX - from.minX) * e, y: from.minY + (to.minY - from.minY) * e,
+                          width: from.width + (to.width - from.width) * e, height: from.height + (to.height - from.height) * e)
+        }
+    }
+
+    /// `--test-framing <camera.mov> <out.json>`: runs the old and new framing over a real take and
+    /// scores what the box would show, 30 times a second, against where the face really is.
     @MainActor
     static func run(movie: URL, out: URL) {
         NSApp.windows.forEach { $0.orderOut(nil) }
@@ -249,64 +328,74 @@ enum FramingTest {
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange])
             reader.add(output)
             reader.startReading()
-            let tracker = FaceTracker()
-            var old: CGRect?
-            var oldMisses = 0
-            var current: CGRect?
-            var stats = (newMoves: 0, oldMoves: 0, newTravel: 0.0, oldTravel: 0.0, looks: 0, faces: 0, newHolds: 0, oldHolds: 0)
-            var lastTime = -1.0
+
+            func cpu() -> Double {
+                var usage = rusage()
+                getrusage(RUSAGE_SELF, &usage)
+                return Double(usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) + Double(usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1e6
+            }
+            struct Score {
+                var looks = 0, cpu = 0.0, moves = 0, inside = 0, offCentre = 0.0, offFrames = 0, scored = 0
+                var last: CGRect?
+            }
+            let before = Before(), after = FaceTracker()
+            var b = Score(), a = Score()
+            var bScreen = Screen(duration: 0.4), aScreen = Screen(duration: 0.5)
+            var bLast = -1.0, aLast = -1.0, truthLast = -1.0, frameLast = -1.0, end = 0.0
+            var truth: CGRect?
+            let truthRequest = VNDetectFaceRectanglesRequest()
+
+            func score(_ s: inout Score, _ shown: CGRect, face: CGRect, aspect: CGFloat) {
+                s.scored += 1
+                if shown.contains(face) { s.inside += 1 }
+                let off = hypot(face.midX - shown.midX, (face.midY - shown.midY) / aspect) / shown.width
+                s.offCentre += off
+                if off > 0.25 { s.offFrames += 1 }
+            }
+
             while let sample = output.copyNextSampleBuffer() {
                 let t = sample.presentationTimeStamp.seconds
-                guard t - lastTime >= 0.2, let pixels = CMSampleBufferGetImageBuffer(sample) else { continue }
-                lastTime = t
-                stats.looks += 1
-                let w = CGFloat(CVPixelBufferGetWidth(pixels)), h = CGFloat(CVPixelBufferGetHeight(pixels))
-                let request = VNDetectFaceRectanglesRequest()
-                try? VNImageRequestHandler(cvPixelBuffer: pixels, orientation: .up).perform([request])
-                let face = (request.results ?? []).max { $0.boundingBox.width * $0.boundingBox.height < $1.boundingBox.width * $1.boundingBox.height }?.boundingBox
-
-                // New framing.
-                if let next = tracker.frame(pixels) {
-                    if let c = current { let d = hypot(next.midX - c.midX, next.midY - c.midY); if d > 0.002 { stats.newMoves += 1 }; stats.newTravel += d }
-                    current = next
+                end = t
+                guard let pixels = CMSampleBufferGetImageBuffer(sample) else { continue }
+                let aspect = CGFloat(CVPixelBufferGetWidth(pixels)) / CGFloat(CVPixelBufferGetHeight(pixels))
+                // Where the face really is, 10 times a second. Not counted as either tracker's cost.
+                if t - truthLast >= 0.1 {
+                    truthLast = t
+                    try? VNImageRequestHandler(cvPixelBuffer: pixels, orientation: .up).perform([truthRequest])
+                    truth = (truthRequest.results ?? []).max { $0.boundingBox.width < $1.boundingBox.width }?.boundingBox
                 }
-                // The framing before 4 Oct: follow every look, no dead zone.
-                var target: CGRect?
-                if let box = face {
-                    oldMisses = 0
-                    let side = min(h, w, max(box.height * h * 2.8, h * 0.25))
-                    let cx = min(max(box.midX * w, side / 2), w - side / 2)
-                    let cy = min(max(box.midY * h - box.height * h * 0.15, side / 2), h - side / 2)
-                    target = CGRect(x: (cx - side / 2) / w, y: (cy - side / 2) / h, width: side / w, height: side / h)
-                } else {
-                    oldMisses += 1
-                    if oldMisses > 10 || old == nil {
-                        let side = min(w, h)
-                        target = CGRect(x: (w - side) / 2 / w, y: 0, width: side / w, height: side / h)
-                    }
+                if t - bLast >= 0.2 {
+                    bLast = t
+                    let c = cpu()
+                    let next = before.frame(pixels)
+                    b.cpu += cpu() - c
+                    b.looks += 1
+                    if let next { if let l = b.last, hypot(next.midX - l.midX, next.midY - l.midY) > 0.002 { b.moves += 1 }; b.last = next; bScreen.set(next, at: t) }
                 }
-                if let target {
-                    let next = old.map { o in
-                        CGRect(x: o.minX + (target.minX - o.minX) * 0.35, y: o.minY + (target.minY - o.minY) * 0.35,
-                               width: o.width + (target.width - o.width) * 0.35, height: o.height + (target.height - o.height) * 0.35)
-                    } ?? target
-                    if let o = old { let d = hypot(next.midX - o.midX, next.midY - o.midY); if d > 0.002 { stats.oldMoves += 1 }; stats.oldTravel += d }
-                    old = next
+                if t - aLast >= after.interval(at: t) - 0.01 {
+                    aLast = t
+                    let c = cpu()
+                    let next = after.frame(pixels, at: t)
+                    a.cpu += cpu() - c
+                    a.looks += 1
+                    if let next { if let l = a.last, hypot(next.midX - l.midX, next.midY - l.midY) > 0.002 { a.moves += 1 }; a.last = next; aScreen.set(next, at: t) }
                 }
-                if let face {
-                    stats.faces += 1
-                    if let c = current, c.contains(face) { stats.newHolds += 1 }
-                    if let o = old, o.contains(face) { stats.oldHolds += 1 }
+                if t - frameLast >= 1.0 / 30, let face = truth {
+                    frameLast = t
+                    if b.last != nil { score(&b, bScreen.at(t), face: face, aspect: aspect) }
+                    if a.last != nil { score(&a, aScreen.at(t), face: face, aspect: aspect) }
                 }
             }
-            let minutes = max(lastTime, 1) / 60
-            let result: [String: Any] = [
-                "minutes": minutes, "looks": stats.looks, "looksWithFace": stats.faces,
-                "new": ["visibleMovesPerMinute": Double(stats.newMoves) / minutes, "travelPerMinute": stats.newTravel / minutes,
-                        "faceInsideFrame": Double(stats.newHolds) / Double(max(stats.faces, 1))],
-                "old": ["visibleMovesPerMinute": Double(stats.oldMoves) / minutes, "travelPerMinute": stats.oldTravel / minutes,
-                        "faceInsideFrame": Double(stats.oldHolds) / Double(max(stats.faces, 1))],
-            ]
+            let minutes = max(end, 1) / 60
+            func report(_ s: Score) -> [String: Any] {
+                ["looksPerSecond": Double(s.looks) / (minutes * 60),
+                 "cpuMillisecondsPerSecond": s.cpu * 1000 / (minutes * 60),
+                 "framingChangesPerMinute": Double(s.moves) / minutes,
+                 "faceWhollyInBox": Double(s.inside) / Double(max(s.scored, 1)),
+                 "averageOffCentre": s.offCentre / Double(max(s.scored, 1)),
+                 "secondsBadlyOffCentrePerMinute": Double(s.offFrames) / 30 / minutes]
+            }
+            let result: [String: Any] = ["seconds": end, "before": report(b), "after": report(a)]
             try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys]).write(to: out)
             exit(0)
         }

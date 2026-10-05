@@ -17,7 +17,7 @@
    - Mac (free space and power)
    - An amber **Effects** row means macOS Reactions are on. Click it and switch Reactions off: they cost battery, and with gestures on a thumbs-up puts balloons in the video.
 3. Press the red button. The big window steps aside, so the presenter has the whole monitor for slides, screenshots and Seller Central. Three short beeps count down 3, 2, 1, and a higher beep means go. The clock starts at 00:00 on go.
-4. In the top right corner, a small box shows her face, zoomed in automatically:
+4. In the top right corner, a small box holds the controls. While the video shows the screen it also shows her face, zoomed in automatically: it holds still while she talks and glides over when she really moves. While the video shows her (Me), her camera already fills the screen, so the box keeps only the controls:
    - Click the picture to switch between her face and the whole camera view.
    - The minus button shrinks the box to a small pill, and the face button brings it back.
    - The square button stops the recording.

@@ -10,7 +10,7 @@ Built by AVA INC for our own channel. You are welcome to build your own copy and
 
 - **One Start button.** Camera and mic start together, and the screen joins when you share it; everything stops together. Files are written in 2-second pieces, so a crash keeps the take.
 - **Clean screen recording.** The app's own windows, pop-up banners and Notification Center are kept out of the video.
-- **Face box.** While recording, a small box in the corner shows your face, zoomed in automatically, with the time, the mic level and a stop button. It is only on your screen, never in the video.
+- **Face box.** While recording, a small box in the corner has Me | Screen, the time, the mic level and a stop button. While the screen shows, it also shows your face, framed automatically like a camera operator would: still while you talk, a smooth glide when you move. It is only on your screen, never in the video.
 - **Face in the video, if you want it.** A face bubble can go into the screen recording, in a circle, square, oval or wide shape. The camera is also saved as its own file, so the shape can still change in editing.
 - **More than one camera.** Any extra camera records its own file next to the main one.
 - **Live view.** Watch the shoot from another laptop or phone in a browser, with no login: every camera, the screen, the mic level and the checks.
