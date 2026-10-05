@@ -37,16 +37,22 @@ enum ShareTarget: Codable, Equatable {
         return mine.first { $0.title == title } ?? mine.max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
     }
 
-    /// Windows a person would share: on screen, a real size, not this app's and not the system's.
+    /// Windows a person would share: a real size, not this app's and not the system's. Windows
+    /// on another desktop count too (an app in full screen has a desktop of its own), as long as
+    /// they have a name and belong to an app in the Dock; sharing one brings it forward first.
     static func windows(in content: SCShareableContent) -> [SCWindow] {
         let skip: Set<String> = [Bundle.main.bundleIdentifier ?? "inc.ava.recorder", "com.apple.dock", "com.apple.WindowManager",
                                  "com.apple.controlcenter", "com.apple.notificationcenterui", "com.apple.Spotlight",
                                  "com.apple.systemuiserver", "com.apple.wallpaper.agent"]
         return content.windows
             .filter { w in
-                guard w.isOnScreen, w.windowLayer == 0, w.frame.width >= 120, w.frame.height >= 80,
-                      let app = w.owningApplication, !skip.contains(app.bundleIdentifier) else { return false }
-                return true
+                guard w.windowLayer == 0, let app = w.owningApplication, !skip.contains(app.bundleIdentifier) else { return false }
+                let named = !(w.title ?? "").isEmpty
+                // Nameless strips, like Chrome's toolbar in full screen, are parts of a window, not windows.
+                guard w.frame.width >= 120, w.frame.height >= (named ? 80 : 300) else { return false }
+                if w.isOnScreen { return true }
+                return named && w.frame.width >= 300 && w.frame.height >= 200
+                    && NSRunningApplication(processIdentifier: app.processID)?.activationPolicy == .regular
             }
             .sorted {
                 let a = $0.owningApplication?.applicationName ?? "", b = $1.owningApplication?.applicationName ?? ""
@@ -118,7 +124,6 @@ struct SharePickerView: View {
     @State private var windows: [ShareChoice] = []
     @State private var pictures: [String: CGImage] = [:]
     @State private var picked: String?
-    @State private var everyTime = false
     @State private var loading = true
     @State private var failure: String?
 
@@ -146,9 +151,9 @@ struct SharePickerView: View {
             Rectangle().fill(Palette.hairline).frame(height: 1).padding(.top, 14)
 
             HStack(spacing: 18) {
-                // A window's own app is the sound people mean, like the video playing in Chrome.
-                Tick(on: studio.screenAudio, title: "Include \(pickedApp.map { "\($0)'s sound" } ?? "the Mac's sound")") { studio.screenAudio.toggle() }
-                Tick(on: everyTime, title: purpose == .shareNow ? "Share this every time, without asking" : "Use it without asking") { everyTime.toggle() }
+                // The pick is remembered and comes up already picked next time. The Mac's sound is
+                // set in the recording box, so it is not asked again here.
+                Text("Your pick is remembered for next time.").font(.system(size: 12)).foregroundStyle(Palette.engraved)
                 Spacer(minLength: 0)
                 SmallButton(title: "Cancel") { close() }
                     .keyboardShortcut(.cancelAction)
@@ -167,11 +172,6 @@ struct SharePickerView: View {
 
     private var shown: [ShareChoice] { tab == .screen ? screens : windows }
 
-    /// The app of the picked window, if a window is picked.
-    private var pickedApp: String? {
-        if case .window(_, let appName, _) = choice?.target { return appName }
-        return nil
-    }
     private var choice: ShareChoice? { shown.first { $0.id == picked } }
 
     @ViewBuilder private var grid: some View {
@@ -197,15 +197,13 @@ struct SharePickerView: View {
 
     private func done() {
         guard let choice else { return }
-        // A window shares its own app's sound; the entire screen shares every app's.
+        // A window shares its own app's sound, like the video playing in Chrome; the entire screen
+        // shares every app's. Only matters when the Mac's sound is on.
         if studio.screenAudio {
             if case .window(let app, let appName, _) = choice.target { studio.rememberSound(from: app, name: appName) }
             else { studio.rememberSound(from: nil, name: nil) }
         }
-        if everyTime || purpose == .chooseDefault {
-            studio.shareTarget = choice.target
-        }
-        if everyTime { studio.askBeforeSharing = false }
+        studio.shareTarget = choice.target
         close()
         if purpose == .shareNow { studio.shareScreen(choice.target) }
     }
@@ -217,7 +215,7 @@ struct SharePickerView: View {
             return
         }
         do {
-            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
             screens = content.displays.map { d in
                 let name = studio.displays.first { $0.id == d.displayID }?.name ?? "Screen"
                 return ShareChoice(id: "screen-\(d.displayID)", target: .screen(d.displayID), title: name,
@@ -231,7 +229,7 @@ struct SharePickerView: View {
                 let title = (w.title ?? "").isEmpty ? appName : (w.title ?? appName)
                 let icon = app.flatMap { NSRunningApplication(processIdentifier: $0.processID)?.icon }
                 return ShareChoice(id: "window-\(w.windowID)", target: .window(app: app?.bundleIdentifier ?? appName, appName: appName, title: w.title ?? ""),
-                                   title: title, detail: appName, icon: icon,
+                                   title: title, detail: w.isOnScreen ? appName : "\(appName), on another desktop", icon: icon,
                                    filter: SCContentFilter(desktopIndependentWindow: w),
                                    aspect: w.frame.width / max(w.frame.height, 1))
             }

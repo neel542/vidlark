@@ -8,7 +8,7 @@ Built by AVA INC for our own channel. You are welcome to build your own copy and
 
 ## What it does
 
-- **One Start button.** Camera, mic and screen start and stop together. Files are written in 2-second pieces, so a crash keeps the take.
+- **One Start button.** Camera and mic start together, and the screen joins when you share it; everything stops together. Files are written in 2-second pieces, so a crash keeps the take.
 - **Clean screen recording.** The app's own windows, pop-up banners and Notification Center are kept out of the video.
 - **Face box.** While recording, a small box in the corner shows your face, zoomed in automatically, with the time, the mic level and a stop button. It is only on your screen, never in the video.
 - **Face in the video, if you want it.** A face bubble can go into the screen recording, in a circle, square, oval or wide shape. The camera is also saved as its own file, so the shape can still change in editing.
@@ -16,7 +16,7 @@ Built by AVA INC for our own channel. You are welcome to build your own copy and
 - **Live view.** Watch the shoot from another laptop or phone in a browser, with no login: every camera, the screen, the mic level and the checks.
 - **Recordings page.** Every take with a picture, search, filters, rename, save a copy and delete. Click a take to watch it in the app, camera or screen.
 - **Me | Screen, one click.** Click Me and your camera grows out of the face circle to fill the screen; click Screen and it shrinks back. The screen recording captures that, so the finished `video.mp4` needs no cutting.
-- **Share the entire screen or one window,** picked from pictures like Google Meet, and make it the default. A take can also start with only the camera and share when ready.
+- **Starts on your face, shares when you are ready.** Every take starts on the camera. Press Screen to share the entire screen or one window, picked from pictures like Google Meet, even an app in full screen on another desktop. The last pick comes up already picked.
 - **Mac sound, any moment.** Switch what the Mac plays into the video or out of it during the take, from every app or only one (a video in Chrome).
 - **A prompter that scrolls by itself** at a chosen speed, or follows your voice or a key, with adjustable text size.
 - **A transcript tick box,** for quick videos that do not need a transcript.

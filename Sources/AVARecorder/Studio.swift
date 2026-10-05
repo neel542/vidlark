@@ -78,9 +78,10 @@ final class Studio: ObservableObject {
     }
     /// Off for camera-first takes: the take starts with the camera only, and the screen joins
     /// when it is shared from the face box. A take that is never shared has no screen.mov.
-    @Published var recordScreen = UserDefaults.standard.object(forKey: "recordScreen") as? Bool ?? true {
-        didSet { if !Snapshots.active { UserDefaults.standard.set(recordScreen, forKey: "recordScreen") } }
-    }
+    /// Every take starts on her face; the screen is shared when she presses Screen (4 Oct, Neel:
+    /// nobody wants the screen from the first second). Only the self test starts with the screen,
+    /// with AVA_SCREEN_FIRST=1.
+    @Published var recordScreen = ProcessInfo.processInfo.environment["AVA_SCREEN_FIRST"] != nil
     /// The tick box: write the transcript and chapters after a take, or skip them for a quick one.
     @Published var writeTranscript = UserDefaults.standard.object(forKey: "writeTranscript") as? Bool ?? true {
         didSet { if !Snapshots.active { UserDefaults.standard.set(writeTranscript, forKey: "writeTranscript") } }
@@ -126,7 +127,7 @@ final class Studio: ObservableObject {
     /// What the screen recording shows by default: a whole screen or one window.
     @Published var shareTarget: ShareTarget = ShareTarget.saved() {
         didSet {
-            if !Snapshots.active { shareTarget.save() }
+            if !Snapshots.active && !Self.selfTesting { shareTarget.save() }
             if case .screen(let id) = shareTarget, displayID != id { displayID = id }
         }
     }
@@ -143,6 +144,9 @@ final class Studio: ObservableObject {
         }
     }
 
+    /// A self test changes what is shared and heard for its own take only, never the saved choices.
+    static let selfTesting = CommandLine.arguments.contains("--self-test")
+
     /// Where the Mac's sound comes from at the start of a take: one app's name, or nil for every app.
     var soundFromName: String? { Snapshots.active ? stagedSoundName : UserDefaults.standard.string(forKey: "soundFromName") }
     private var stagedSoundName: String?
@@ -152,7 +156,7 @@ final class Studio: ObservableObject {
 
     /// Remembers where the Mac's sound should come from next time: one app, or every app with nil.
     func rememberSound(from id: String?, name: String?) {
-        guard !Snapshots.active else { return }
+        guard !Snapshots.active, !Self.selfTesting else { return }
         UserDefaults.standard.set(id, forKey: "soundFrom")
         UserDefaults.standard.set(name, forKey: "soundFromName")
         objectWillChange.send()
@@ -568,7 +572,7 @@ final class Studio: ObservableObject {
 
         let sound = screenAudio ? " · Mac sound" : ""
         if !recordScreen {
-            out.append(Check(id: "screen", state: .ok, value: "Camera first, share later" + sound))
+            out.append(Check(id: "screen", state: screenAllowed ? .ok : .warn, value: "Shared with the Screen button: \(shareLabel)" + sound))
         } else if !screenAllowed {
             out.append(Check(id: "screen", state: .fail, value: "Not allowed", problem: "Click the screen row to allow screen recording."))
         } else {
@@ -633,8 +637,8 @@ final class Studio: ObservableObject {
         if micName == nil {
             return Attention(level: .fail, text: "No microphone found. Plug in the mic receiver or connect a Bluetooth mic.")
         }
-        if recordScreen && !screenAllowed {
-            return Attention(level: .fail, text: "Screen recording is not allowed yet. Allow it, or remove the Screen source to record only the camera.",
+        if !screenAllowed {
+            return Attention(level: recordScreen ? .fail : .warn, text: "Screen recording is not allowed yet, so Screen cannot share during a take. Your camera still records.",
                              fix: .screenAccess, fixTitle: "Allow")
         }
         if cameraName == nil {
@@ -762,7 +766,7 @@ final class Studio: ObservableObject {
                 extras.forEach { $0.prepareForTake() }
 
                 if withScreen {
-                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+                let content = try await shareableContent(for: shareTarget)
                 let capture = try capture(content, shareTarget)
 
                 screen.onError = { [weak self] error in
@@ -855,6 +859,32 @@ final class Studio: ObservableObject {
     /// What is being shared in the take in progress.
     private var sharing_: ShareTarget?
 
+    /// What can be recorded right now. A window on another desktop (its app in full screen, say)
+    /// cannot be recorded from here, so its app is brought forward first and macOS moves to it.
+    private func shareableContent(for wanted: ShareTarget) async throws -> SCShareableContent {
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        guard case .window(let app, _, let title) = wanted else { return content }
+        let everything = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
+        guard let window = ShareTarget.find(app: app, title: title, in: everything), !window.isOnScreen,
+              let pid = window.owningApplication?.processID,
+              let url = NSRunningApplication(processIdentifier: pid)?.bundleURL else { return content }
+        log?.write(["type": "share-bring-forward", "app": app])
+        let open = NSWorkspace.OpenConfiguration()
+        open.activates = true
+        _ = try? await NSWorkspace.shared.openApplication(at: url, configuration: open)
+        // Wait for the desktop to slide over, then a moment more for it to settle.
+        for _ in 0..<20 where !Self.isOnScreen(window.windowID) {
+            try? await Task.sleep(nanoseconds: 150_000_000)
+        }
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        return try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+    }
+
+    private static func isOnScreen(_ id: CGWindowID) -> Bool {
+        let list = CGWindowListCopyWindowInfo([.optionIncludingWindow], id) as? [[String: Any]]
+        return (list?.first?[kCGWindowIsOnscreen as String] as? Bool) == true
+    }
+
     /// Lets these windows of the app into the screen recording (the stage and the bubble), or none
     /// with an empty list. `bubble` says whether the face bubble is one of them, for the log.
     func showInRecording(_ windowIDs: [CGWindowID], bubble: Bool) {
@@ -882,7 +912,7 @@ final class Studio: ObservableObject {
                 guard screenAllowed else {
                     throw RecorderError("Screen recording is not allowed yet. Allow AVA Recorder in System Settings, Privacy, then open the app again.")
                 }
-                let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+                let content = try await shareableContent(for: wanted)
                 let capture = try capture(content, wanted)
                 screen.onError = { [weak self] error in
                     Task { @MainActor in self?.screenFailed(error) }
@@ -1550,6 +1580,7 @@ extension Studio {
         meter.peak = level + 6
         displays = [DisplayChoice(id: 1, name: "Samsung S24R35A", pixelSize: CGSize(width: 1920, height: 1080), builtIn: false)]
         displayID = 1
+        shareTarget = .screen(1)
         if mic != nil { micID = "staged" }
         followVoice = true
         voice = .ready

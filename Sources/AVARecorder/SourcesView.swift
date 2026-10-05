@@ -79,23 +79,13 @@ struct SourcesPanel: View {
         }
     }
 
-    @ViewBuilder private var screenRow: some View {
-        if studio.recordScreen {
-            let lamp: LampState = !studio.screenAllowed ? .fail : studio.display == nil ? .warn : .ok
-            let detail = !studio.screenAllowed ? "Not allowed yet" : sharedName
-            let also = studio.screenAllowed && studio.screenAudio ? "With \(studio.soundWords)" : nil
-            SourceRow(symbol: isWindow ? "macwindow" : "display", title: "Screen", detail: detail, also: also, lamp: lamp, dense: dense,
-                      menu: shareChoices, more: [
-                          MenuChoice(title: "Include \(studio.soundWords)", selected: studio.screenAudio) { studio.screenAudio.toggle() },
-                          MenuChoice(title: "Remove (share it during the take instead)", selected: false) { studio.recordScreen = false },
-                      ])
-        } else {
-            let detail = studio.askBeforeSharing ? "Shared during the take, with the Screen button" : "Shares \(sharedName) when you press Screen"
-            SourceRow(symbol: isWindow ? "macwindow" : "display", title: "Screen", detail: detail, lamp: .off, dense: dense,
-                      menu: shareChoices, more: [
-                          MenuChoice(title: "Record it from the start", selected: false) { studio.recordScreen = true },
-                      ], quiet: true)
-        }
+    /// Every take starts on her face. This row only says what Screen will share when pressed
+    /// (already picked in the chooser), and changes it. The Mac's sound is set in the recording box.
+    private var screenRow: some View {
+        let lamp: LampState = !studio.screenAllowed ? .fail : .ok
+        let detail = !studio.screenAllowed ? "Not allowed yet" : sharedName
+        return SourceRow(symbol: isWindow ? "macwindow" : "display", title: "Screen", detail: detail,
+                         also: studio.screenAllowed ? "Shared when you press Screen" : nil, lamp: lamp, dense: dense, menu: shareChoices)
     }
 
     private var isWindow: Bool {
@@ -263,20 +253,6 @@ struct AddSourceButton: View {
                             Button(device.localizedName) { studio.toggleExtra(device.uniqueID) }
                         }
                     }
-                    if !studio.recordScreen {
-                        Section("Screen, from the start") {
-                            ForEach(studio.displays) { display in
-                                Button(studio.displays.count > 1 ? "Entire screen: \(display.name)" : "Entire screen") {
-                                    studio.shareTarget = .screen(display.id)
-                                    studio.recordScreen = true
-                                }
-                            }
-                            Button("A window…") {
-                                studio.recordScreen = true
-                                SharePicker.show(.chooseDefault, studio: studio)
-                            }
-                        }
-                    }
                 } label: { face }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
@@ -284,7 +260,7 @@ struct AddSourceButton: View {
         }
         .fixedSize()
         .onHover { hover = $0 }
-        .help("Add another camera, or the screen")
+        .help("Add another camera")
     }
 }
 

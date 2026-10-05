@@ -35,7 +35,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
 
     var intro: String {
         switch self {
-        case .video: "What the finished video shows, and how a take starts."
+        case .video: "Every take starts on your face. Press Screen in the recording box to share the screen."
         case .quality: "How sharp the camera records. Sharper looks better on YouTube and makes bigger files."
         case .after: "What AVA Recorder makes once you press stop. The camera and screen files are always kept."
         case .effects: "macOS can change the camera picture for every app on this Mac. Only you can switch these, in Video Effects. Here is what each one does, and whether it is on."
@@ -181,24 +181,14 @@ private struct VideoSettings: View {
 
     var body: some View {
         SettingsGroup {
-            SettingRow("Start each take with",
-                       "Me starts with only your camera; press Screen in the recording box when you are ready to share the screen. Screen records the screen from the first second.") {
-                Segments(choices: [("Me", false), ("Screen", true)], selected: studio.recordScreen) { studio.recordScreen = $0 }
-            }
             SettingRow("Your face on the screen",
                        "While the video shows the screen, your face sits in a corner in this shape. Drag it anywhere during the take. The camera file is always saved too.") {
                 EmptyView()
             } below: {
                 ShapePicker(studio: studio)
             }
-            SettingRow("What to share",
-                       "The entire screen, or one window, like a single Chrome window. With one window, only that window goes into the video, even if something covers it.") {
-                SmallButton(title: "Change…") { SharePicker.show(.chooseDefault, studio: studio) }
-            } below: {
-                Readout(lamp: .ok, text: studio.shareLabel)
-            }
             SettingRow("Ask what to share each time",
-                       "On: pressing Screen during a take shows the screens and windows to pick from. Off: it shares the screen or window you chose, straight away.") {
+                       "On: pressing Screen during a take shows the screens and windows, with your last pick ready. Off: it shares your last pick straight away.") {
                 Switch(on: studio.askBeforeSharing) { studio.askBeforeSharing = $0 }
             }
             SettingRow("Include the Mac's sound",

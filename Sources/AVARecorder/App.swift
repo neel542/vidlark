@@ -1,4 +1,5 @@
 import AppKit
+import ScreenCaptureKit
 import SwiftUI
 
 @main
@@ -15,6 +16,27 @@ struct AVARecorderApp: App {
         // `AVA Recorder --test-follow <audio or .txt> <script.md>` prints where the prompter would move.
         if let i = args.firstIndex(of: "--test-follow"), i + 2 < args.count {
             FollowTest.run(source: args[i + 1], script: args[i + 2])
+        }
+        // `AVA Recorder --list-windows <file.json>` writes every window ScreenCaptureKit sees and
+        // whether the share chooser would offer it. For finding out why a window is missing.
+        if let i = args.firstIndex(of: "--list-windows"), i + 1 < args.count {
+            let out = URL(fileURLWithPath: args[i + 1])
+            Task {
+                var rows: [[String: Any]] = []
+                if let all = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false) {
+                    let offered = Set(ShareTarget.windows(in: all).map(\.windowID))
+                    for w in all.windows where w.windowLayer == 0 && w.frame.width >= 120 {
+                        rows.append(["app": w.owningApplication?.applicationName ?? "?", "title": w.title ?? "",
+                                     "onScreen": w.isOnScreen, "active": w.isActive, "offered": offered.contains(w.windowID),
+                                     "frame": "\(Int(w.frame.minX)),\(Int(w.frame.minY)) \(Int(w.frame.width))x\(Int(w.frame.height))"])
+                    }
+                    rows.append(["displays": all.displays.map { "\($0.displayID) \(Int($0.frame.width))x\(Int($0.frame.height))" }])
+                }
+                let data = try? JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted, .sortedKeys])
+                try? data?.write(to: out)
+                exit(0)
+            }
+            RunLoop.main.run()
         }
         if let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count {
             Snapshots.render(to: URL(fileURLWithPath: args[i + 1], isDirectory: true))
