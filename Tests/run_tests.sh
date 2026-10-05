@@ -187,6 +187,20 @@ check "exit 0 and DONE line" done_ok noscreen
 check "sync method none, offset 0" py 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["method"]=="none" and d["screenOffsetSec"]==0 else 1)' "$OUT/noscreen/sync.json"
 check "chapters.txt is empty" bash -c "[ -f '$OUT/noscreen/chapters.txt' ] && [ ! -s '$OUT/noscreen/chapters.txt' ]"
 
+# camera.mov padded the way the Mac's camera writer pads it: the finisher takes the padding out
+# before anything reads the file, and every packet stays as it was
+rm -rf "$OUT/padded"; mkdir -p "$OUT/padded"
+"$PY" "$HERE/pad_movie.py" "$OUT/main/camera.mov" "$OUT/padded/camera.mov"
+cp "$OUT/main/screen.mov" "$OUT/main/events.jsonl" "$OUT/main/script.md" "$OUT/padded/"
+packets() { /opt/homebrew/bin/ffmpeg -v error -i "$1" -map 0 -c copy -f framemd5 - | grep -v '^#' | md5; }
+BEFORE_PACKETS="$(packets "$OUT/main/camera.mov")"
+run padded --no-transcribe
+check "exit 0 and DONE line" done_ok padded
+check "padding taken out: camera.mov is back to its unpadded size" bash -c "[ \$(stat -f%z '$OUT/padded/camera.mov') = \$(stat -f%z '$OUT/main/camera.mov') ]"
+check "every packet of camera.mov unchanged" bash -c "[ \"\$1\" = \"\$2\" ]" _ "$BEFORE_PACKETS" "$(packets "$OUT/padded/camera.mov")"
+check "offset within 10 ms of $EXPECTED_OFFSET_MAIN" offset_near "$OUT/padded" "$EXPECTED_OFFSET_MAIN"
+check "no tidy copy left behind" bash -c "! ls -a '$OUT/padded' | grep -q '\.tidy$'"
+
 # unreadable camera.mov
 run badcamera --no-transcribe
 check "non-zero exit" bash -c "[ \"\$(cat '$OUT/badcamera.exit')\" != 0 ]"

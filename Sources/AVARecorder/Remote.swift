@@ -98,10 +98,15 @@ final class RemoteControl: ObservableObject {
 
     /// On for a take only. Learned buttons then run their action and do nothing else.
     func setActive(_ on: Bool) {
+        var changed = on != active
         if on {
             refreshTrust()
-            learning = nil
+            if learning != nil { learning = nil; changed = true }
         }
+        // Asked again on every change of the take, so only a real change touches the listeners.
+        // Setting `learning` every time used to wake the app's watcher, which asked again: a loop
+        // that kept one core busy for the whole take.
+        guard changed else { return }
         active = on
         held = []
         reconcile()

@@ -35,6 +35,19 @@ while argIndex < argv.count {
         argIndex += 1
         guard argIndex < argv.count else { fail(usage) }
         modelOverride = argv[argIndex]
+    case "--tidy":
+        // ava-finish --tidy <movie>: takes the padding out of one movie and says what it saved.
+        argIndex += 1
+        guard argIndex < argv.count else { fail(usage) }
+        do {
+            let result = try tidyMovie(URL(fileURLWithPath: argv[argIndex]))
+            print(result.map { "TIDY \($0.before) \($0.after)" } ?? "TIDY nothing to take out")
+            exit(0)
+        } catch let error as FinishError {
+            fail(error.message)
+        } catch {
+            fail(error.localizedDescription)
+        }
     case "-h", "--help":
         FileHandle.standardError.write((usage + "\n").data(using: .utf8)!)
         exit(0)
@@ -76,6 +89,12 @@ do {
     workDir = work
 
     let events = readEvents(file("events.jsonl"))
+
+    // Before anything reads them: the camera movies without their padding (see Tidy.swift).
+    let tidy = tidyCameraMovies(in: folder)
+    for (name, why) in tidy.skipped.sorted(by: { $0.key < $1.key }) {
+        FileHandle.standardError.write("\(name) left as it was: \(why)\n".data(using: .utf8)!)
+    }
 
     // 1. Audio
     step("Taking the sound out of the videos")

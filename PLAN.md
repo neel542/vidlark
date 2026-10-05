@@ -67,7 +67,7 @@ The app writes these files:
   - `{"t":900,"type":"stop"}`
 - `script.md`: a copy of the script used.
 
-`ava-finish <folder>` adds these files:
+`ava-finish <folder>` first takes the padding out of `camera.mov` (and `camera-2.mov` and so on): the Mac's camera writer starts every chunk of picture or sound on a 16 KB boundary and fills the gap with zeros, which was 35% to 44% of the file on 5 Oct. Only the chunk table changes; every packet, timestamp and edit stays as it was, and anything unusual leaves the file alone. `ava-finish --tidy <movie>` does it to one file. Then it adds these files:
 
 - `sync.json`: `{"screenOffsetSec":x,"method":"audio","confidence":c}`. `camera_t = screen_t + screenOffsetSec`. With extra cameras it also has `"cameras":[{"file":"camera-2.mov","offsetSec":y,"method":"audio","confidence":c}]`, where `camera_t = camera-2_t + offsetSec`.
 - `mic.wav`: the clean mic track, taken from `camera.mov` (48 kHz).

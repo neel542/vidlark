@@ -1166,13 +1166,17 @@ final class Studio: ObservableObject {
 
     private func tick() {
         let now = CACurrentMediaTime()
-        elapsed = goAt.map { now - $0 } ?? 0
+        // Every clock on screen shows whole seconds, and each change redraws every window that
+        // watches the studio, so the clocks change once a second instead of five times.
+        let sinceGo = goAt.map { now - $0 } ?? 0
+        if Int(sinceGo) != Int(elapsed) || sinceGo < elapsed { elapsed = sinceGo }
         if now - lastWatch > 2 {
             lastWatch = now
             watchCamera(now)
         }
         followScroll()
-        cardElapsed = countdown == nil ? now - cardStart : 0
+        let onCard = countdown == nil ? now - cardStart : 0
+        if Int(onCard) != Int(cardElapsed) || onCard < cardElapsed { cardElapsed = onCard }
         if listener != nil {
             if let move = follower?.tick(at: now, loudAt: lastLoud) { voiceMove(to: move) }
             let heard = now - lastHeard < 1.2
@@ -1537,8 +1541,11 @@ extension Studio {
                 sleepCamera(true)
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
             }
-            // AVA_SHARE_WINDOW=<bundle id>|<window title> shares one window instead of the whole screen.
-            if let spec = ProcessInfo.processInfo.environment["AVA_SHARE_WINDOW"] {
+            // AVA_SHARE_WINDOW=<bundle id>|<window title> shares one window instead of the whole screen,
+            // and AVA_SHARE_WINDOW=screen the whole main screen, whatever was picked last.
+            if ProcessInfo.processInfo.environment["AVA_SHARE_WINDOW"] == "screen" {
+                shareTarget = .screen(CGMainDisplayID())
+            } else if let spec = ProcessInfo.processInfo.environment["AVA_SHARE_WINDOW"] {
                 let parts = spec.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
                 shareTarget = .window(app: parts[0], appName: parts[0], title: parts.count > 1 ? parts[1] : "")
             }
@@ -1602,12 +1609,13 @@ extension Studio {
             }
             try? await Task.sleep(nanoseconds: UInt64(step * 1_000_000_000))
             let clock = elapsed
+            let lamps = BreathingLampView.onScreen()
             stop()
             waited = 0
             while waited < 300 {
                 switch phase {
                 case .done(let folder, let note):
-                    report(["ok": true, "folder": folder.path, "note": note ?? "", "clockAtStop": clock, "screen": FileManager.default.fileExists(atPath: folder.appendingPathComponent("screen.mov").path) ? "recorded" : "none: \(probe ?? "")"]); return
+                    report(["ok": true, "folder": folder.path, "note": note ?? "", "clockAtStop": clock, "lampsBreathing": lamps, "screen": FileManager.default.fileExists(atPath: folder.appendingPathComponent("screen.mov").path) ? "recorded" : "none: \(probe ?? "")"]); return
                 case .failed(let why):
                     report(["ok": false, "stage": "stop", "reason": why]); return
                 default:

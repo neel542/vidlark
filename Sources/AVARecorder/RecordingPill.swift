@@ -377,7 +377,6 @@ struct RecordingPillView: View {
     @ObservedObject var state: PillState
     @ObservedObject var tracker: FaceTracker
     var preview: ZoomPreviewNSView
-    @State private var breathe = false
     /// The width of the box or pill, so the share card under it lines up with it.
     @State private var topWidth: CGFloat = 252
 
@@ -394,9 +393,6 @@ struct RecordingPillView: View {
         }
         .padding(10)
         .preferredColorScheme(.dark)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) { breathe = true }
-        }
     }
 
     /// Open: her face on top, controls underneath.
@@ -510,8 +506,7 @@ struct RecordingPillView: View {
 
     private var controls: some View {
         HStack(spacing: 8) {
-            Lamp(state: studio.isRolling ? .fail : .off, size: 9)
-                .opacity(breathe ? 1 : 0.45)
+            BreathingLamp(state: studio.isRolling ? .fail : .off, size: 9, breathing: studio.isRolling)
             Text(label)
                 .font(.system(size: 15, weight: .semibold))
                 .monospacedDigit()
@@ -1089,5 +1084,74 @@ final class RecordingPillController {
         let old = panel.frame
         panel.setFrame(NSRect(x: old.maxX - size.width, y: old.maxY - size.height, width: size.width, height: size.height),
                        display: true, animate: false)
+    }
+}
+
+/// The record lamp, breathing while a take runs. Core Animation runs the breath, so it costs the
+/// app nothing per frame. As a SwiftUI animation it redrew the whole box 60 times a second, and
+/// kept doing it while the box was hidden: 3 to 4% of a core all day (measured 5 Oct).
+struct BreathingLamp: View {
+    var state: LampState
+    var size: CGFloat
+    var breathing: Bool
+
+    var body: some View {
+        // Snapshots draw with ImageRenderer, which cannot draw an AppKit view.
+        if Snapshots.active { Lamp(state: state, size: size) } else { BreathingLampHost(state: state, size: size, breathing: breathing) }
+    }
+}
+
+private struct BreathingLampHost: NSViewRepresentable {
+    var state: LampState
+    var size: CGFloat
+    var breathing: Bool
+
+    func makeNSView(context: Context) -> BreathingLampView {
+        BreathingLampView(rootView: Lamp(state: state, size: size))
+    }
+
+    func updateNSView(_ view: BreathingLampView, context: Context) {
+        view.rootView = Lamp(state: state, size: size)
+        view.breathing = breathing
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: BreathingLampView, context: Context) -> CGSize? {
+        CGSize(width: size, height: size)
+    }
+}
+
+final class BreathingLampView: NSHostingView<Lamp> {
+    /// For the self test: whether each lamp in a visible window is breathing right now.
+    static func onScreen() -> [Bool] {
+        func lamps(in view: NSView) -> [BreathingLampView] {
+            [view as? BreathingLampView].compactMap { $0 } + view.subviews.flatMap(lamps)
+        }
+        return NSApp.windows.filter(\.isVisible).compactMap(\.contentView).flatMap(lamps)
+            .map { $0.layer?.animation(forKey: "breathe") != nil }
+    }
+
+    var breathing = false {
+        didSet { if breathing != oldValue { breathe() } }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        breathe()
+    }
+
+    /// From 45% to full and back, 1.4 seconds each way, for as long as the take runs.
+    private func breathe() {
+        wantsLayer = true
+        guard let layer else { return }
+        layer.removeAnimation(forKey: "breathe")
+        guard breathing, window != nil else { return }
+        let animation = CABasicAnimation(keyPath: "opacity")
+        animation.fromValue = 0.45
+        animation.toValue = 1.0
+        animation.duration = 1.4
+        animation.autoreverses = true
+        animation.repeatCount = .infinity
+        animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        layer.add(animation, forKey: "breathe")
     }
 }

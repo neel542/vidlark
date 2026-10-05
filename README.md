@@ -23,7 +23,7 @@ Built by AVA INC for our own channel. You are welcome to build your own copy and
 - **A guide to connecting cameras,** in Settings: iPhone, USB webcam or a real camera, with the cameras the Mac sees right now.
 - **Checks before you start.** Camera, mic, screen, disk space, battery and macOS camera effects, each with a plain fix when something is wrong.
 - **Camera watchdog.** If the camera file stops growing during a take, the take stops at once and says so, instead of filming on without a camera.
-- **Finishing.** After every take, `ava-finish` lines up the files by their sound, makes `video.mp4` and writes `words.json`, `chapters.txt`, `retakes.json` and `report.md`, all on the Mac.
+- **Finishing.** After every take, `ava-finish` takes the empty padding out of the camera file (about a third of it, with no change to the picture or sound), lines up the files by their sound, makes `video.mp4` and writes `words.json`, `chapters.txt`, `retakes.json` and `report.md`, all on the Mac.
 
 ## What you need
 
