@@ -4,6 +4,9 @@ import UniformTypeIdentifiers
 
 struct PanelView: View {
     @ObservedObject var studio: Studio
+    /// The camera picture to show. The recorder brought back during a take has its own, since
+    /// one view can only be in one window.
+    var preview: PreviewNSView?
     @State private var showQueue = false
     @State private var dropTargeted = false
 
@@ -28,7 +31,7 @@ struct PanelView: View {
     }
 
     private var viewfinder: some View {
-        Viewfinder(preview: studio.mainPreview, hasCamera: studio.cameraName != nil && studio.cameraAllowed,
+        Viewfinder(preview: preview ?? studio.mainPreview, hasCamera: studio.cameraName != nil && studio.cameraAllowed,
                    rolling: studio.isRolling, resting: studio.cameraResting)
     }
 

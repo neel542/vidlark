@@ -239,6 +239,7 @@ final class Studio: ObservableObject {
     private var ticker: Timer?
     private var checker: Timer?
     private var appObserver: NSObjectProtocol?
+    private var spaceObserver: NSObjectProtocol?
     private var countdownTask: Task<Void, Never>?
     private var booted = false
     var onDisplaysChanged: (() -> Void)?
@@ -859,6 +860,15 @@ final class Studio: ObservableObject {
     /// What is being shared in the take in progress.
     private var sharing_: ShareTarget?
 
+    /// The AVA Recorder window is showing during the take ("Back to recorder" in the recording box).
+    @Published var recorderOpen = false
+
+    /// The app whose window is being shared in this take, by bundle id and by name; nil for a whole screen.
+    var sharedApp: (id: String, name: String)? {
+        guard takeHasScreen, case .window(let app, let appName, _) = sharing_ else { return nil }
+        return (app, appName)
+    }
+
     /// What can be recorded right now. A window on another desktop (its app in full screen, say)
     /// cannot be recorded from here, so its app is brought forward first and macOS moves to it.
     private func shareableContent(for wanted: ShareTarget) async throws -> SCShareableContent {
@@ -868,15 +878,19 @@ final class Studio: ObservableObject {
         guard let window = ShareTarget.find(app: app, title: title, in: everything), !window.isOnScreen,
               let pid = window.owningApplication?.processID,
               let url = NSRunningApplication(processIdentifier: pid)?.bundleURL else { return content }
-        log?.write(["type": "share-bring-forward", "app": app])
-        let open = NSWorkspace.OpenConfiguration()
-        open.activates = true
-        _ = try? await NSWorkspace.shared.openApplication(at: url, configuration: open)
-        // Wait for the desktop to slide over, then a moment more for it to settle.
-        for _ in 0..<20 where !Self.isOnScreen(window.windowID) {
-            try? await Task.sleep(nanoseconds: 150_000_000)
+        // Twice at most: if something takes the Mac back to the old desktop as it settles, once more.
+        for attempt in 1...2 {
+            log?.write(["type": "share-bring-forward", "app": app, "attempt": attempt])
+            let open = NSWorkspace.OpenConfiguration()
+            open.activates = true
+            _ = try? await NSWorkspace.shared.openApplication(at: url, configuration: open)
+            // Wait for the desktop to slide over, then a moment more for it to settle.
+            for _ in 0..<20 where !Self.isOnScreen(window.windowID) {
+                try? await Task.sleep(nanoseconds: 150_000_000)
+            }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            if Self.isOnScreen(window.windowID) { break }
         }
-        try? await Task.sleep(nanoseconds: 500_000_000)
         return try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
     }
 
@@ -912,15 +926,24 @@ final class Studio: ObservableObject {
                 guard screenAllowed else {
                     throw RecorderError("Screen recording is not allowed yet. Allow AVA Recorder in System Settings, Privacy, then open the app again.")
                 }
-                let content = try await shareableContent(for: wanted)
-                let capture = try capture(content, wanted)
+                var capture = try capture(try await shareableContent(for: wanted), wanted)
                 screen.onError = { [weak self] error in
                     Task { @MainActor in self?.screenFailed(error) }
                 }
                 log?.write(["type": "screen-start", "screen": "screen.mov", "screenName": capture.name, "macSound": screenAudio])
-                try await screen.start(filter: capture.filter, display: capture.display, pixelSize: capture.pixelSize,
-                                       source: capture.source, micID: micAllowed ? micID : nil,
-                                       to: folder.appendingPathComponent("screen.mov"))
+                do {
+                    try await screen.start(filter: capture.filter, display: capture.display, pixelSize: capture.pixelSize,
+                                           source: capture.source, micID: micAllowed ? micID : nil,
+                                           to: folder.appendingPathComponent("screen.mov"))
+                } catch where capture.windowID != nil && phase == .recording {
+                    // The window left the screen just as recording began ("invalid parameter"):
+                    // bring it back and try once more.
+                    log?.write(["type": "screen-retry", "message": error.localizedDescription])
+                    capture = try self.capture(try await shareableContent(for: wanted), wanted)
+                    try await screen.start(filter: capture.filter, display: capture.display, pixelSize: capture.pixelSize,
+                                           source: capture.source, micID: micAllowed ? micID : nil,
+                                           to: folder.appendingPathComponent("screen.mov"))
+                }
                 guard phase == .recording else { return }
                 began(capture, wanted)
                 takeHasScreen = true
@@ -1068,6 +1091,13 @@ final class Studio: ObservableObject {
         ticker = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
         }
+        // Which desktop is showing, for working out later why a shared window went off screen.
+        spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            let front = NSWorkspace.shared.frontmostApplication
+            let name = front?.processIdentifier == getpid() ? "this app" : front?.localizedName ?? "?"
+            Task { @MainActor in self?.log?.write(["type": "desktop", "front": name]) }
+        }
         appObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] note in
             guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
@@ -1202,6 +1232,8 @@ final class Studio: ObservableObject {
         ticker?.invalidate()
         if let appObserver { NSWorkspace.shared.notificationCenter.removeObserver(appObserver) }
         appObserver = nil
+        if let spaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver) }
+        spaceObserver = nil
         log?.write(["type": "stop"])
 
         Task {
@@ -1358,6 +1390,9 @@ final class Studio: ObservableObject {
     private func plain(_ error: Error) -> String {
         if let e = error as? RecorderError { return e.message }
         let text = error.localizedDescription
+        if text.lowercased().contains("invalid parameter") {
+            return "The window was not on screen when sharing began. Open it, then press Screen again."
+        }
         if text.lowercased().contains("declined") || text.lowercased().contains("permission") {
             return "Screen recording is not allowed yet. Allow it in System Settings, then try again."
         }
@@ -1533,6 +1568,22 @@ extension Studio {
                     case "from": setSoundFrom(parts.count > 2 ? parts[2] : nil)
                     default: break
                     }
+                }
+            }
+            // AVA_RECORDER_AT=<seconds>: presses Back to recorder that far in, and says what is on screen then.
+            if let at = ProcessInfo.processInfo.environment["AVA_RECORDER_AT"].flatMap(Double.init) {
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: UInt64(at * 1_000_000_000))
+                    recorderOpen = true
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    let mine = NSApp.windows.first { $0 is RecorderPanel && $0.isVisible && $0.isOnActiveSpace }
+                    let owner = sharedApp.flatMap { NSRunningApplication.runningApplications(withBundleIdentifier: $0.id).first?.localizedName }
+                    let shared = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? [])
+                        .contains { ($0[kCGWindowOwnerName as String] as? String) == owner && ($0[kCGWindowLayer as String] as? Int) == 0 }
+                    log?.write(["type": "selftest-recorder", "recorderOnScreen": mine != nil, "sharedStillOnScreen": shared,
+                                "front": NSWorkspace.shared.frontmostApplication?.localizedName ?? "?"])
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    recorderOpen = false
                 }
             }
             // AVA_SHARE_AT=<seconds>: a camera-first take shares the screen that far in.

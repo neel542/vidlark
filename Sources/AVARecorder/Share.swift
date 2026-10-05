@@ -29,12 +29,15 @@ enum ShareTarget: Codable, Equatable {
         if let data = try? JSONEncoder().encode(self) { UserDefaults.standard.set(data, forKey: "shareTarget") }
     }
 
-    /// The window again: the same title first, otherwise that app's biggest window.
+    /// The window again: the same title first (a browser's title follows its tab, so it may have
+    /// changed), otherwise that app's biggest named window, otherwise its biggest.
     static func find(app: String, title: String, in content: SCShareableContent) -> SCWindow? {
         let mine = windows(in: content).filter { w in
             w.owningApplication.map { $0.bundleIdentifier == app || $0.applicationName == app } ?? false
         }
-        return mine.first { $0.title == title } ?? mine.max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
+        if !title.isEmpty, let same = mine.first(where: { $0.title == title }) { return same }
+        func area(_ w: SCWindow) -> CGFloat { w.frame.width * w.frame.height }
+        return mine.filter { !($0.title ?? "").isEmpty }.max { area($0) < area($1) } ?? mine.max { area($0) < area($1) }
     }
 
     /// Windows a person would share: a real size, not this app's and not the system's. Windows
@@ -82,12 +85,16 @@ enum SharePicker {
         p.isMovableByWindowBackground = true
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         p.contentView = NSHostingView(rootView: SharePickerView(studio: studio, purpose: purpose, close: close).preferredColorScheme(.dark))
+        // Clicks only, no keyboard: a chooser that took the keyboard handed it back to the app
+        // underneath when it closed, and macOS followed that app back to its own desktop, two
+        // seconds after moving to the shared window (Neel's takes, 5 Oct).
         let screen = studio.displayID.flatMap(DisplayChoice.screen(for:)) ?? NSScreen.main
         if let visible = screen?.visibleFrame {
             p.setFrameOrigin(NSPoint(x: visible.midX - 380, y: visible.midY - 280))
         }
         panel = p
-        p.makeKeyAndOrderFront(nil)
+        p.becomesKeyOnlyIfNeeded = true
+        p.orderFrontRegardless()
     }
 
     static func close() {

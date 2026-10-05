@@ -354,6 +354,7 @@ struct RecordingPillView: View {
         // The controls stay on top and never move; her face picture comes and goes under them as
         // the video switches between Screen and Me.
         VStack(spacing: 8) {
+            recorderButton
             viewSwitch
             if showsSound { SoundButton(studio: studio) }
             // Lamp, time, meter and up to three buttons fit the box's 236pt exactly.
@@ -394,6 +395,7 @@ struct RecordingPillView: View {
     /// Minimised: just the essentials.
     private var pill: some View {
         VStack(spacing: 6) {
+            recorderButton
             viewSwitch
             if showsSound { SoundButton(studio: studio) }
             controls
@@ -402,6 +404,34 @@ struct RecordingPillView: View {
         .padding(8)
         .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Palette.glass.opacity(0.95)))
         .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.white.opacity(0.09)))
+    }
+
+    /// Brings the AVA Recorder window up on this desktop during the take, or puts it away again
+    /// and goes back to the shared window. The recording carries on either way: the app's own
+    /// windows are never in it.
+    private var recorderButton: some View {
+        let open = studio.recorderOpen
+        return Button { studio.recorderOpen.toggle() } label: {
+            HStack(spacing: 7) {
+                Image(systemName: open ? "arrow.uturn.backward" : "macwindow")
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 16)
+                Text(open ? "Hide recorder" : "Back to recorder")
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(Palette.dim)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity)
+            .frame(height: 28)
+            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Palette.face))
+            .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(Palette.hairline))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!studio.isRolling)
+        .help(open ? "Put the recorder away. Recording carries on." : "Show the AVA Recorder window here. Recording carries on, and the window is not in the video.")
     }
 
     /// Me or Screen: what the finished video shows from now on. One click switches; the finished
@@ -681,6 +711,11 @@ private struct CardButton: View {
 
 // MARK: - Window
 
+/// The recorder brought back during a take. It can take the keyboard for typing.
+final class RecorderPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+}
+
 @MainActor
 final class RecordingPillController {
     private let panel: PrompterPanel
@@ -791,6 +826,12 @@ final class RecordingPillController {
             .dropFirst(2)
             .receive(on: RunLoop.main)
             .sink { [weak self] in DispatchQueue.main.async { self?.resize() } })
+        // Back to recorder: the main window on this desktop, over whatever is shared.
+        watches.append(studio.$recorderOpen
+            .dropFirst()
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] open in DispatchQueue.main.async { self?.showRecorder(open) } })
         watches.append(studio.$bubbleShape
             .dropFirst()
             .receive(on: RunLoop.main)
@@ -900,6 +941,7 @@ final class RecordingPillController {
         default:
             tracker.active = false
             state.askingToShare = false
+            studio.recorderOpen = false
             stage.reset()
             bubble.alphaValue = 1
             bubblePreview.dimmed = false
@@ -910,6 +952,50 @@ final class RecordingPillController {
             NSApp.activate(ignoringOtherApps: true)
             hiddenWindow?.makeKeyAndOrderFront(nil)
         }
+    }
+
+    /// Back to recorder: the recorder in a floating panel on the desktop in front. macOS keeps an
+    /// ordinary window off a desktop that belongs to a full screen app, and moving to the window's
+    /// own desktop took the shared window off the screen and out of the video (5 Oct tests). A
+    /// panel shows over anything, never takes the Mac to another desktop and never takes the app
+    /// forward, and like every app window it is never in the video.
+    private func showRecorder(_ open: Bool) {
+        guard open, studio.isRolling else {
+            recorderPanel?.orderOut(nil)
+            return
+        }
+        let p = recorderPanel ?? makeRecorderPanel()
+        p.orderFrontRegardless()
+    }
+
+    private var recorderPanel: NSPanel?
+    private let recorderPreview = PreviewNSView()
+    private var recorderClosed: NSObjectProtocol?
+
+    private func makeRecorderPanel() -> NSPanel {
+        let p = RecorderPanel(contentRect: NSRect(x: 0, y: 0, width: 400, height: 769),
+                              styleMask: [.titled, .closable, .resizable, .fullSizeContentView, .nonactivatingPanel],
+                              backing: .buffered, defer: false)
+        p.titlebarAppearsTransparent = true
+        p.titleVisibility = .hidden
+        p.isFloatingPanel = true
+        // With the recording box, above the stage that holds her camera during Me.
+        p.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
+        p.hidesOnDeactivate = false
+        // Takes the keyboard only for typing, so closing it never hands focus to another app.
+        p.becomesKeyOnlyIfNeeded = true
+        p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        p.isMovableByWindowBackground = true
+        recorderPreview.feed = studio.feed
+        p.contentView = NSHostingView(rootView: PanelView(studio: studio, preview: recorderPreview).preferredColorScheme(.dark))
+        // Where the recorder window was before the take, or the middle of the screen.
+        if let frame = hiddenWindow?.frame, frame.width > 0 { p.setFrame(frame, display: false) } else { p.center() }
+        recorderClosed = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: p, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.studio.recorderOpen = false }
+        }
+        p.isReleasedWhenClosed = false
+        recorderPanel = p
+        return p
     }
 
     /// The tracker runs only while a face picture shows: the box during Screen, or the bubble.
