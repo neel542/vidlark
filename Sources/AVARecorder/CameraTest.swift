@@ -337,17 +337,19 @@ enum FramingTest {
             struct Score {
                 var looks = 0, cpu = 0.0, moves = 0, inside = 0, offCentre = 0.0, offFrames = 0, scored = 0
                 var last: CGRect?
+                /// When the face was not wholly in the box, to the tenth of a second.
+                var outside: [Double] = []
             }
             let before = Before(), after = FaceTracker()
             var b = Score(), a = Score()
-            var bScreen = Screen(duration: 0.4), aScreen = Screen(duration: 0.5)
+            var bScreen = Screen(duration: 0.4), aScreen = Screen(duration: 0.9)
             var bLast = -1.0, aLast = -1.0, truthLast = -1.0, frameLast = -1.0, end = 0.0
             var truth: CGRect?
             let truthRequest = VNDetectFaceRectanglesRequest()
 
-            func score(_ s: inout Score, _ shown: CGRect, face: CGRect, aspect: CGFloat) {
+            func score(_ s: inout Score, _ shown: CGRect, face: CGRect, aspect: CGFloat, at t: Double) {
                 s.scored += 1
-                if shown.contains(face) { s.inside += 1 }
+                if shown.contains(face) { s.inside += 1 } else if s.outside.last.map({ t - $0 > 0.09 }) ?? true { s.outside.append((t * 10).rounded() / 10) }
                 let off = hypot(face.midX - shown.midX, (face.midY - shown.midY) / aspect) / shown.width
                 s.offCentre += off
                 if off > 0.25 { s.offFrames += 1 }
@@ -378,12 +380,12 @@ enum FramingTest {
                     let next = after.frame(pixels, at: t)
                     a.cpu += cpu() - c
                     a.looks += 1
-                    if let next { if let l = a.last, hypot(next.midX - l.midX, next.midY - l.midY) > 0.002 { a.moves += 1 }; a.last = next; aScreen.set(next, at: t) }
+                    if let next { if let l = a.last, hypot(next.midX - l.midX, next.midY - l.midY) > 0.002 { a.moves += 1 }; a.last = next; aScreen.duration = after.lastGlide; aScreen.set(next, at: t) }
                 }
                 if t - frameLast >= 1.0 / 30, let face = truth {
                     frameLast = t
-                    if b.last != nil { score(&b, bScreen.at(t), face: face, aspect: aspect) }
-                    if a.last != nil { score(&a, aScreen.at(t), face: face, aspect: aspect) }
+                    if b.last != nil { score(&b, bScreen.at(t), face: face, aspect: aspect, at: t) }
+                    if a.last != nil { score(&a, aScreen.at(t), face: face, aspect: aspect, at: t) }
                 }
             }
             let minutes = max(end, 1) / 60
@@ -393,7 +395,8 @@ enum FramingTest {
                  "framingChangesPerMinute": Double(s.moves) / minutes,
                  "faceWhollyInBox": Double(s.inside) / Double(max(s.scored, 1)),
                  "averageOffCentre": s.offCentre / Double(max(s.scored, 1)),
-                 "secondsBadlyOffCentrePerMinute": Double(s.offFrames) / 30 / minutes]
+                 "secondsBadlyOffCentrePerMinute": Double(s.offFrames) / 30 / minutes,
+                 "faceNotWhollyInBoxAt": Array(s.outside.prefix(40))]
             }
             let result: [String: Any] = ["seconds": end, "before": report(b), "after": report(a)]
             try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys]).write(to: out)

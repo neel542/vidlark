@@ -11,13 +11,22 @@ import Vision
 
 // MARK: - Face tracking
 
-/// Finds the face in the camera picture and keeps a square crop around it, like a camera operator:
-/// it holds still while she talks and moves a little, and glides over when she really moves.
+/// Finds the face in the camera picture and keeps a square crop around it, built like a building
+/// on base isolation: the frame stays put while she talks, gestures, leans or holds something
+/// up, and only moves when her face has really gone somewhere else. There is a margin around
+/// the face's resting place; inside it nothing moves at all. Outside it for a while (a moment if
+/// her face nears the edge), the frame glides once to centre her again. The zoom changes only
+/// when she has clearly come closer or moved back, and stays that way.
 /// It looks 10 times a second while she moves (or is not found) and 4 times while she is still.
 final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     /// Normalised to the camera picture, origin bottom left (Vision's convention).
     @Published private(set) var crop = CGRect(x: 0.21875, y: 0, width: 0.5625, height: 1)
     @Published private(set) var found = false
+    /// How long the picture takes to glide to the latest framing: slow and calm normally, quicker
+    /// when her face was about to leave the frame.
+    @Published private(set) var glide: Double = 0.9
+    /// The glide for the framing `frame` returned last. Face queue only, or the framing test.
+    private(set) var lastGlide: Double = 0.9
     /// Width over height of the camera picture.
     @Published private(set) var aspect: CGFloat = 16 / 9
 
@@ -62,13 +71,15 @@ final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSam
         request.upperBodyOnly = true
         return request
     }()
-    /// Where the framing is. Only changes when she moves past the still zone.
+    /// Where the framing is. Only changes when her face has been out of the margin for a while.
     private var goal: CGRect?
-    /// The last few framings asked for, averaged so the detector's own wobble never moves it.
-    private var recent: [CGRect] = []
+    /// Her face, smoothed, so the detector's own wobble never counts as a move.
+    private var steadyFace: CGRect?
     /// The face followed last, so a second face in the picture does not steal the framing.
     private var lastFace: CGRect?
     private var lostSince: CFTimeInterval?
+    /// Since when her face has been outside the margin, or a different size.
+    private var awaySince: CFTimeInterval?
     /// Looks often until then: she has just moved, or is not found.
     private var busyUntil: CFTimeInterval = 0
     /// What was last sent to the main thread. Face queue only.
@@ -104,6 +115,7 @@ final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSam
         guard now - last >= interval(at: now) - 0.01, let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         last = now
         let next = frame(pixels, at: now)
+        let glide = lastGlide
         let hasFace = lostSince.map { now - $0 < 2 } ?? true
         let ratio = CGFloat(CVPixelBufferGetWidth(pixels)) / CGFloat(CVPixelBufferGetHeight(pixels))
         // Only a real change reaches the screen, so a still face costs the window nothing.
@@ -111,11 +123,15 @@ final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSam
         sentFound = hasFace
         sentAspect = ratio
         DispatchQueue.main.async {
-            if let next { self.crop = next }
+            if let next { self.glide = glide; self.crop = next }
             if self.found != hasFace { self.found = hasFace }
             if self.aspect != ratio { self.aspect = ratio }
         }
     }
+
+    /// How far her face may wander from its resting place, as a share of the frame, before the
+    /// frame follows: across, and up or down. Inside this margin the frame never moves.
+    static let margin = (across: 0.17, upDown: 0.15)
 
     /// One look at the picture. Returns the new framing, or nil to hold it where it is. `time` is
     /// in seconds, from the camera clock or, for `--test-framing`, from a recorded file.
@@ -133,58 +149,88 @@ final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSam
                 .min { hypot($0.midX - lastFace.midX, $0.midY - lastFace.midY) < hypot($1.midX - lastFace.midX, $1.midY - lastFace.midY) } ?? biggest
         }
 
-        var target: CGRect?
-        if let box = face {
-            lostSince = nil
-            lastFace = box
-            // Head and shoulders: about 2.8 face heights, centred a little below the face.
-            let side = min(height, width, max(box.height * height * 2.8, height * 0.25))
-            target = square(side: side, cx: box.midX * width, cy: box.midY * height - box.height * height * 0.15, width, height)
-        } else {
+        /// Head and shoulders around a face: about 2.8 face heights, the face a little above the middle.
+        func framing(_ box: CGRect, side wanted: CGFloat? = nil) -> CGRect {
+            let side = wanted ?? min(height, width, max(box.height * height * 2.8, height * 0.25))
+            return square(side: side, cx: box.midX * width, cy: box.midY * height - box.height * height * 0.15, width, height)
+        }
+
+        guard let box = face else {
             let since = lostSince ?? time
             lostSince = since
-            // Quick looks for 2 seconds to catch her the moment she looks up again; after that
-            // nobody may be there at all, so it goes back to 4 looks a second.
+            awaySince = nil
+            // Quick looks for 2 seconds to catch her the moment she looks up again.
             if time - since < 2 { busyUntil = time + 0.1 }
-            // Looking down at notes or turned away: hold the framing for 2 seconds, then follow
-            // her body, and after 5 seconds with nobody there show the middle of the picture.
-            if time - since > 2 {
-                try? handler.perform([bodies], on: pixels, orientation: .up)
-                if let body = (bodies.results ?? []).max(by: { $0.boundingBox.height < $1.boundingBox.height })?.boundingBox {
-                    let side = min(height, width, max(body.width * width * 1.25, height * 0.35))
-                    target = square(side: side, cx: body.midX * width, cy: body.maxY * height - side * 0.45, width, height)
-                } else if time - since > 5 || goal == nil {
-                    let side = min(width, height)
-                    target = CGRect(x: (width - side) / 2 / width, y: 0, width: side / width, height: side / height)
-                }
+            // Looking down, turned away, or her face hidden behind what she is showing: hold the
+            // frame for 8 seconds. Only then follow her body, and after 12 with nobody there,
+            // show the middle of the picture.
+            guard time - since > 8 || goal == nil else { return nil }
+            try? handler.perform([bodies], on: pixels, orientation: .up)
+            var target: CGRect?
+            if let body = (bodies.results ?? []).max(by: { $0.boundingBox.height < $1.boundingBox.height })?.boundingBox {
+                let side = min(height, width, max(body.width * width * 1.25, height * 0.35))
+                target = square(side: side, cx: body.midX * width, cy: body.maxY * height - side * 0.45, width, height)
+            } else if time - since > 12 || goal == nil {
+                let side = min(width, height)
+                target = CGRect(x: (width - side) / 2 / width, y: 0, width: side / width, height: side / height)
             }
-        }
-        guard let target else { return nil }
-
-        recent.append(target)
-        if recent.count > 3 { recent.removeFirst() }
-        let n = CGFloat(recent.count)
-        let steady = CGRect(x: recent.map(\.minX).reduce(0, +) / n, y: recent.map(\.minY).reduce(0, +) / n,
-                            width: recent.map(\.width).reduce(0, +) / n, height: recent.map(\.height).reduce(0, +) / n)
-        guard let current = goal else {
+            guard let target else { return nil }
+            if let goal, hypot(target.midX - goal.midX, (target.midY - goal.midY) * height / width) / goal.width < 0.15,
+               abs(target.width / goal.width - 1) < 0.25 { return nil }
             goal = target
-            busyUntil = time + 1
             return target
         }
-        // Hold still while she talks and moves a little.
-        let drift = hypot(steady.midX - current.midX, (steady.midY - current.midY) * height / width) / current.width
-        let grow = abs(steady.width / current.width - 1)
-        guard drift > 0.1 || grow > 0.15 else { return nil }
-        // A big move (she sat down, or leaned right in) goes straight to where she is now.
-        let next: CGRect
-        if hypot(target.midX - current.midX, (target.midY - current.midY) * height / width) / current.width > 0.35 {
-            recent = [target]
-            next = target
-        } else {
-            next = steady
+
+        lostSince = nil
+        lastFace = box
+        // Smooth the face itself: a third of the way to each new look.
+        let steady = steadyFace.map { old in
+            CGRect(x: old.minX + (box.minX - old.minX) * 0.35, y: old.minY + (box.minY - old.minY) * 0.35,
+                   width: old.width + (box.width - old.width) * 0.35, height: old.height + (box.height - old.height) * 0.35)
+        } ?? box
+        steadyFace = steady
+        let ideal = framing(steady)
+        guard let current = goal else {
+            goal = ideal
+            busyUntil = time + 1
+            return ideal
         }
-        goal = next
+
+        // Where her face sits in the frame now, against where it rests in an ideal frame.
+        func spot(_ frame: CGRect) -> CGPoint {
+            CGPoint(x: (steady.midX - frame.minX) / frame.width, y: (steady.midY - frame.minY) / frame.height)
+        }
+        let now = spot(current), rest = spot(ideal)
+        let drifted = abs(now.x - rest.x) > Self.margin.across || abs(now.y - rest.y) > Self.margin.upDown
+        // Her face nearing the frame's edge (within a tenth of it) cannot wait: that is judged on
+        // the face as seen this moment, not the smoothed one, which trails a quick move.
+        let edge = !current.insetBy(dx: current.width * 0.1, dy: current.height * 0.1).contains(box)
+        let zoom = ideal.width / current.width
+        let resized = zoom < 0.72 || zoom > 1.38
+
+        guard drifted || edge || resized else {
+            awaySince = nil
+            return nil
+        }
         busyUntil = time + 1
+        let since = awaySince ?? time
+        awaySince = since
+        // A gesture or a lean comes back by itself: wait to see that it does not.
+        let wait = edge ? 0 : resized ? 1.5 : 0.7
+        guard time - since >= wait else { return nil }
+        // Centre her again, at the same zoom unless she has clearly come closer or moved back.
+        // Heading for the edge, follow where she is now, a little quicker.
+        let next = resized ? ideal : framing(edge ? box : steady, side: current.width * width)
+        // Up against the edge of the camera picture the frame cannot go further, so a move that
+        // would barely shift it is no move at all.
+        let shift = hypot(next.midX - current.midX, (next.midY - current.midY) * height / width) / current.width
+        guard resized || shift > 0.05 else {
+            awaySince = nil
+            return nil
+        }
+        awaySince = nil
+        lastGlide = edge ? 0.45 : 0.9
+        goal = next
         return next
     }
 }
@@ -195,16 +241,18 @@ final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSam
 struct FaceZoomView: NSViewRepresentable {
     var view: ZoomPreviewNSView
     var crop: CGRect
+    var glide: Double = 0.9
 
     func makeNSView(context: Context) -> ZoomPreviewNSView { view }
 
     func updateNSView(_ view: ZoomPreviewNSView, context: Context) {
-        view.show(crop)
+        view.show(crop, glide: glide)
     }
 }
 
 final class ZoomPreviewNSView: FeedView {
     private var crop = CGRect(x: 0, y: 0, width: 1, height: 1)
+    private var glide = 0.9
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -218,9 +266,10 @@ final class ZoomPreviewNSView: FeedView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    func show(_ newCrop: CGRect) {
+    func show(_ newCrop: CGRect, glide seconds: Double = 0.9) {
         guard newCrop != crop else { return }
         crop = newCrop
+        glide = seconds
         place(animated: true)
     }
 
@@ -244,9 +293,10 @@ final class ZoomPreviewNSView: FeedView {
         for (key, from) in [("position", NSValue(point: now.position)), ("bounds", NSValue(rect: now.bounds))] {
             let glide = CABasicAnimation(keyPath: key)
             glide.fromValue = from
-            glide.duration = 0.5
-            // Starts gently and settles softly, like a hand on a tripod head.
-            glide.timingFunction = CAMediaTimingFunction(controlPoints: 0.3, 0.05, 0.2, 1)
+            glide.duration = self.glide
+            // Starts gently and settles softly, like a hand on a tripod head: slow enough that a
+            // move reads as one calm pan, never a jolt.
+            glide.timingFunction = CAMediaTimingFunction(controlPoints: 0.45, 0, 0.25, 1)
             preview.add(glide, forKey: key)
         }
     }
@@ -311,7 +361,7 @@ struct FaceBubbleView: View {
             if Snapshots.active {
                 LinearGradient(colors: [Color(hex: 0x3A403C), Color(hex: 0x141716)], startPoint: .top, endPoint: .bottom)
             } else {
-                FaceZoomView(view: preview, crop: tracker.framing(aspect: shape.size.width / shape.size.height))
+                FaceZoomView(view: preview, crop: tracker.framing(aspect: shape.size.width / shape.size.height), glide: tracker.glide)
             }
         }
         .frame(width: shape.size.width, height: shape.size.height)
@@ -374,7 +424,7 @@ struct RecordingPillView: View {
                 if Snapshots.active {
                     LinearGradient(colors: [Color(hex: 0x3A403C), Color(hex: 0x141716)], startPoint: .top, endPoint: .bottom)
                 } else {
-                    FaceZoomView(view: preview, crop: state.faceZoom ? tracker.crop : tracker.wholePicture)
+                    FaceZoomView(view: preview, crop: state.faceZoom ? tracker.crop : tracker.wholePicture, glide: tracker.glide)
                 }
             }
                 .frame(width: 236, height: 236)

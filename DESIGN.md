@@ -46,7 +46,7 @@ The system sans for everything. Engraved labels are 9.5pt semibold, uppercase, w
 - 0.2 to 0.24 s ease-out on state changes.
 - A prompter line enters 14pt from below while fading in.
 - The record disc closes into a square on a 0.32 s spring.
-- The face framing holds still inside a still zone (10% of the crop) and glides to a new framing over 0.5 s from wherever the picture is on screen, so a framing that changes mid-glide never jumps.
+- The face framing is built like base isolation: inside a margin around her face's resting place (17% of the frame across, 15% up and down) nothing moves at all. Outside it for 0.7 s, the frame glides once to centre her again, over 0.9 s, from wherever the picture is on screen. Near the frame's edge it moves at once, over 0.45 s. The zoom changes only when her face is clearly bigger or smaller (by more than about a third) for 1.5 s. A hidden face holds the frame for 8 s.
 - Me and Screen: her camera grows out of the face bubble to fill the screen, or shrinks back in, over 0.5 s ease-in-out.
 - By itself, the prompter scrolls the whole script up continuously at the chosen words a minute, under a 3pt green reading mark, fading out at the top and well above the rail.
 - Nothing else moves.
