@@ -45,6 +45,10 @@ Connect the second camera first: an iPhone, a USB webcam, or a real camera throu
 
 The **Live** row shows the shoot on any browser, with no login: every camera, the screen while recording, the mic level and the checks. A camera picture that stops updating is marked "No new picture".
 
+- **Listen** plays the mic as it is being recorded, about a quarter of a second late, to hear echo, hum or a loose cable. Use headphones: through speakers in the same room it echoes.
+- **Pin** (or click a picture) makes that camera or the screen the big one, like pinning in Zoom; **Full screen** fills the screen with it. The picture the finished video is showing right now says **In the video**.
+- During a take, **Reading now** shows the prompter line she is on.
+
 - **Home Wi-Fi**: works on the same Wi-Fi. The link stays the same, so bookmark it once.
 - **Anywhere**: works from any internet connection through a free Cloudflare tunnel. The link changes every time it starts, so copy it again each time. Needs `cloudflared` installed.
 - **Copy link** puts the link on the clipboard. On a Mac signed in to the same Apple ID, just paste it on the other laptop.

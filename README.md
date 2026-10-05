@@ -13,7 +13,7 @@ Built by AVA INC for our own channel. You are welcome to build your own copy and
 - **Face box.** While recording, a small box in the corner has Me | Screen, the time, the mic level and a stop button. While the screen shows, it also shows your face, framed automatically like a camera operator would: still while you talk, a smooth glide when you move. It is only on your screen, never in the video.
 - **Face in the video, if you want it.** A face bubble can go into the screen recording, in a circle, square, oval or wide shape. The camera is also saved as its own file, so the shape can still change in editing.
 - **More than one camera.** Any extra camera records its own file next to the main one.
-- **Live view.** Watch the shoot from another laptop or phone in a browser, with no login: every camera, the screen, the mic level and the checks.
+- **Live view.** Watch the shoot from another laptop or phone in a browser, with no login: every camera, the screen, the mic level and the checks. Listen to the mic on headphones, pin any picture big or go full screen, see which one is in the video and the line being read.
 - **Recordings page.** Every take with a picture, search, filters, rename, save a copy and delete. Click a take to watch it in the app, camera or screen.
 - **Me | Screen, one click.** Click Me and your camera grows out of the face circle to fill the screen; click Screen and it shrinks back. The screen recording captures that, so the finished `video.mp4` needs no cutting.
 - **Starts on your face, shares when you are ready.** Every take starts on the camera. Press Screen to share the entire screen or one window, picked from pictures like Google Meet, even an app in full screen on another desktop. The last pick comes up already picked.

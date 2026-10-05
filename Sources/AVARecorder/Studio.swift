@@ -215,7 +215,8 @@ final class Studio: ObservableObject {
     private var extras: [CameraRecorder] = []
     private var extraOrder: [String] = []
     let liveFrames = LiveFrames()
-    private lazy var liveServer = LiveServer(frames: liveFrames, token: liveToken)
+    let liveAudio = LiveAudio()
+    private lazy var liveServer = LiveServer(frames: liveFrames, audio: liveAudio, token: liveToken)
     private let tunnel = Tunnel()
     private var liveTaps: [String: LiveTap] = [:]
     private var liveToken = UserDefaults.standard.string(forKey: "liveToken") ?? ""
@@ -533,8 +534,8 @@ final class Studio: ObservableObject {
 
         var label: String {
             if id.hasPrefix("camera-") { return "Camera \(id.dropFirst(7))" }
-            return ["camera": "Camera", "effects": "Effects", "touchup": "Touch up", "mic": "Mic", "screen": "Record",
-                    "face": "In video", "after": "After", "prompter": "Prompter", "mac": "Mac", "live": "Live"][id] ?? id
+            return ["camera": "Camera", "effects": "Effects", "touchup": "Touch up", "mic": "Mic", "screen": "Screen",
+                    "face": "Face", "after": "After", "prompter": "Prompter", "mac": "Mac", "live": "Live"][id] ?? id
         }
     }
 
@@ -573,14 +574,15 @@ final class Studio: ObservableObject {
 
         let sound = screenAudio ? " · Mac sound" : ""
         if !recordScreen {
-            out.append(Check(id: "screen", state: screenAllowed ? .ok : .warn, value: "Shared with the Screen button: \(shareLabel)" + sound))
+            let when = isRolling && takeHasScreen ? "sharing now" : "shared when you press Screen"
+            out.append(Check(id: "screen", state: screenAllowed ? .ok : .warn, value: "\(shareLabel) · \(when)" + sound))
         } else if !screenAllowed {
             out.append(Check(id: "screen", state: .fail, value: "Not allowed", problem: "Click the screen row to allow screen recording."))
         } else {
             out.append(Check(id: "screen", state: display == nil ? .warn : .ok, value: (display?.name ?? "No screen") + sound))
         }
         out.append(Check(id: "face", state: faceInVideo ? .ok : .off,
-                         value: faceInVideo ? "Face, \(bubbleShape.title.lowercased())" : "Screen only"))
+                         value: faceInVideo ? "\(bubbleShape.title), over the screen" : "Not over the screen"))
         out.append(Check(id: "after", state: writeTranscript ? .ok : .off,
                          value: writeTranscript ? "Transcript and chapters" : "Just save the files", tick: writeTranscript))
 
@@ -1731,7 +1733,7 @@ extension Studio {
         guard booted, !Snapshots.active else { return }
         let now = CACurrentMediaTime()
         let looking = feed.anySeen && now - (inactiveSince ?? now) < 60
-        let watched = liveTaps.keys.contains(where: liveFrames.watching)
+        let watched = liveTaps.keys.contains(where: liveFrames.watching) || liveAudio.listening
         if isBusy || looking || watched {
             unneededSince = nil
             if cameraAsleep { sleepCamera(false) }
@@ -1784,6 +1786,11 @@ extension Studio {
             Task { @MainActor in
                 self?.liveFailure = "The live view could not start (\(reason)). Quit any other copy of AVA Recorder, then pick Home Wi-Fi again."
             }
+        }
+        // Listen on the page hears the mic as it is recorded; the first listener wakes a resting mic.
+        camera.streamAudio { [audio = liveAudio] in audio.offer($0) }
+        liveAudio.onFirstListener = { [weak self] in
+            Task { @MainActor in self?.restCheck() }
         }
         liveFrames.onWake = { [weak self] name in
             Task { @MainActor in
@@ -1884,7 +1891,14 @@ extension Studio {
             if let problem = check.problem { row["problem"] = problem }
             return row
         }
+        var line: Any = NSNull()
+        if isRolling, countdown == nil, let card = currentCard {
+            line = ["section": card.section, "number": cardIndex + 1, "total": script.cards.count, "text": card.text]
+        }
         let object: [String: Any] = [
+            "showing": isRolling ? (takeHasScreen ? showing.rawValue : "camera") : NSNull(),
+            "line": line,
+            "listen": micAllowed && micID != nil,
             "phase": name,
             "message": message ?? NSNull(),
             "title": script.title.isEmpty ? (currentItem?.title ?? "") : script.title,

@@ -109,6 +109,7 @@ final class CameraRecorder: NSObject {
     private var audioInput: AVCaptureDeviceInput?
     private var lastLevel: CFTimeInterval = 0
     private var onAudio: ((CMSampleBuffer) -> Void)?
+    private var onLiveAudio: ((CMSampleBuffer) -> Void)?
     /// Extra frame outputs (face tracker, live view) and whether each wants frames. Camera queue only.
     private var frameOutputs: [(output: AVCaptureOutput, wanted: Bool)] = []
     /// True from the start of a take until its file closes. Camera queue only.
@@ -302,6 +303,11 @@ final class CameraRecorder: NSObject {
         tapQueue.async { [self] in onAudio = handler }
     }
 
+    /// Hands every mic buffer to the live page's Listen as well. Set on the tap queue.
+    func streamAudio(_ handler: ((CMSampleBuffer) -> Void)?) {
+        tapQueue.async { [self] in onLiveAudio = handler }
+    }
+
     var dimensions: CGSize? {
         guard let device = videoInput?.device else { return nil }
         let d = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
@@ -330,6 +336,7 @@ extension CameraRecorder: AVCaptureFileOutputRecordingDelegate {
 extension CameraRecorder: AVCaptureAudioDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         onAudio?(sampleBuffer)
+        onLiveAudio?(sampleBuffer)
         let now = CACurrentMediaTime()
         guard now - lastLevel > 0.066 else { return }
         lastLevel = now

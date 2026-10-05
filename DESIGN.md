@@ -41,6 +41,14 @@ The system sans for everything. Engraved labels are 9.5pt semibold, uppercase, w
 - **Prompter rail:** one segment per line (spent at 35% green, current solid green), with the section and position on the left and line time against budget on the right. While the prompter follows her voice, a lamp leads the left side, lit while she is heard.
 - **Spoken words:** while following, the words of a prose line she has already said turn signal green at 50%, and the rest stay full ink, so the edge between them is where she is.
 
+## Live page
+
+The browser page for whoever runs the shoot, served by the Mac, in the same graphite world.
+- **Header:** a status dot (red and pulsing while recording), the state word and the time, the video's title, a "Listen" pill with a headphones glyph (green-tinted "Stop listening" while on), then the MIC meter. While listening, one line under the header says it is the mic as it goes into the video, a quarter of a second late, and to use headphones.
+- **Pictures:** one big tile and the rest at the side. Big is the pinned picture or, with no pin, the one in the video, following Me and Screen. Each caption has its kind (engraved), its name, an "In the video" badge on the picture being filmed (with a green-tinted border), and a "Pin" or "Unpin" chip when there are two or more; the big one also has "Full screen". Chips always keep their word next to the icon. Clicking a picture pins it.
+- **Reading now:** during a take, a panel with "Reading now · section · n of total" and the prompter line at 16pt.
+- **Checks:** lamp, engraved label, value, and any advice on the right; on a phone the advice wraps under the value.
+
 ## Motion
 
 - 0.2 to 0.24 s ease-out on state changes.
