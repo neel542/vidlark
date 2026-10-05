@@ -29,7 +29,7 @@ struct PanelView: View {
 
     private var viewfinder: some View {
         Viewfinder(preview: studio.mainPreview, hasCamera: studio.cameraName != nil && studio.cameraAllowed,
-                   rolling: studio.isRolling)
+                   rolling: studio.isRolling, resting: studio.cameraResting)
     }
 
     /// The small window: everything stacked, like the face of a pocket recorder.
@@ -441,17 +441,38 @@ struct Viewfinder: View {
     var preview: PreviewNSView
     var hasCamera: Bool
     var rolling: Bool
+    var resting = false
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             Palette.well
             if hasCamera && Snapshots.active {
                 LinearGradient(colors: [Color(hex: 0x2A302D), Color(hex: 0x111413)], startPoint: .top, endPoint: .bottom)
-                Text("Camera picture").font(.system(size: 12)).foregroundStyle(Palette.engraved)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if !resting {
+                    Text("Camera picture").font(.system(size: 12)).foregroundStyle(Palette.engraved)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             } else if hasCamera {
                 PreviewLayerView(view: preview)
-            } else {
+            }
+            if hasCamera && resting {
+                // The camera is off to save power. Clicking the window brings the app forward, which wakes it.
+                Color.black.opacity(0.62)
+                VStack(spacing: 6) {
+                    Image(systemName: "moon.zzz")
+                        .font(.system(size: 18, weight: .light))
+                        .foregroundStyle(Palette.engraved)
+                    Text("Camera resting to save power")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Palette.ink.opacity(0.85))
+                    Text("Click here to wake it")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Palette.engraved)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.opacity)
+            }
+            if !hasCamera {
                 VStack(spacing: 6) {
                     Image(systemName: "video.slash")
                         .font(.system(size: 18, weight: .light))
@@ -478,6 +499,7 @@ struct Viewfinder: View {
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Palette.hairline))
         .animation(.easeOut(duration: 0.2), value: rolling)
+        .animation(.easeOut(duration: 0.25), value: resting)
     }
 }
 

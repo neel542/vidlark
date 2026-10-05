@@ -18,7 +18,10 @@ enum Snapshots {
         func prompter(_ name: String, _ setup: (Studio) -> Void) {
             let s = Studio()
             setup(s)
-            write(PrompterView(studio: s).frame(width: 920, height: 230), size: CGSize(width: 920, height: 230), to: dir.appendingPathComponent("prompter-\(name).png"))
+            // The strip grows with the text size, as the real one does.
+            let height = (230 * s.prompterSize).rounded()
+            write(PrompterView(studio: s).frame(width: 920, height: height), size: CGSize(width: 920, height: height),
+                  to: dir.appendingPathComponent("prompter-\(name).png"))
         }
 
         panel("ready") { $0.stage(phase: .idle, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
@@ -27,6 +30,14 @@ enum Snapshots {
         panel("reactions-on") {
             $0.stage(phase: .idle, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script)
             $0.stageReactions(true)
+        }
+        panel("resting") {
+            $0.stage(phase: .idle, camera: "MacBook Air Camera", mic: "MacBook Air Microphone", level: -60, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script)
+            $0.stageResting()
+        }
+        panel("sound") {
+            $0.stage(phase: .idle, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script)
+            $0.stageSound(from: "Google Chrome")
         }
         panel("not-ready") { $0.stage(phase: .idle, camera: nil, mic: "MacBook Air Microphone", level: -70, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: false, script: nil) }
         panel("done") { $0.stage(phase: .done(folder: URL(fileURLWithPath: "/tmp"), note: nil), camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -50, elapsed: 905, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
@@ -45,7 +56,8 @@ enum Snapshots {
             s.stageShowing(showing)
             let state = PillState()
             state.expanded = open
-            let size = open ? CGSize(width: 290, height: 390) : CGSize(width: 290, height: 120)
+            // Closed, the box still holds the switch, the Mac sound row and the controls.
+            let size = open ? CGSize(width: 290, height: 390) : CGSize(width: 290, height: 170)
             write(RecordingPillView(studio: s, state: state, tracker: FaceTracker(), preview: ZoomPreviewNSView()), size: size,
                   to: dir.appendingPathComponent("\(name).png"))
         }
@@ -74,9 +86,12 @@ enum Snapshots {
             let s = Studio()
             s.stage(phase: .idle, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: nil)
             s.stageReactions(page == .effects)
+            if page == .video { s.stageSound(from: "Google Chrome") }
+            if page == .prompter { s.autoScroll = true }
             let selection = SettingsSelection()
             selection.current = page
-            write(SettingsView(studio: s, selection: selection).preferredColorScheme(.dark), size: CGSize(width: 920, height: 660),
+            // Taller than the real window, which scrolls, so each whole page is in the picture.
+            write(SettingsView(studio: s, selection: selection).preferredColorScheme(.dark), size: CGSize(width: 920, height: 1000),
                   to: dir.appendingPathComponent("settings-\(page.rawValue).png"))
         }
 
@@ -86,6 +101,27 @@ enum Snapshots {
         prompter("following") {
             $0.stage(phase: .recording, camera: "x", mic: "x", level: -30, elapsed: 9, cardIndex: 0, cardElapsed: 5, countdown: nil, screenAllowed: true, script: script)
             $0.stageVoice(spoken: 10, hearing: true)
+        }
+        prompter("scrolling") {
+            $0.stage(phase: .recording, camera: "x", mic: "x", level: -30, elapsed: 40, cardIndex: 1, cardElapsed: 3, countdown: nil, screenAllowed: true, script: script)
+            $0.stageScroll(words: 24)
+        }
+        do {
+            let s = Studio()
+            s.stage(phase: .recording, camera: "x", mic: "x", level: -18, elapsed: 74, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: nil)
+            write(SharePickerView(studio: s, purpose: .shareNow, close: {}, sample: true).preferredColorScheme(.dark),
+                  size: CGSize(width: 760, height: 560), to: dir.appendingPathComponent("share-picker.png"))
+        }
+        for (name, size) in [("large", 1.3), ("extra-large", 1.6)] {
+            prompter("hook-\(name)") {
+                $0.stage(phase: .recording, camera: "x", mic: "x", level: -30, elapsed: 8, cardIndex: 0, cardElapsed: 6, countdown: nil, screenAllowed: true, script: script)
+                $0.prompterSize = size
+            }
+            prompter("scrolling-\(name)") {
+                $0.stage(phase: .recording, camera: "x", mic: "x", level: -30, elapsed: 40, cardIndex: 1, cardElapsed: 3, countdown: nil, screenAllowed: true, script: script)
+                $0.prompterSize = size
+                $0.stageScroll(words: 24)
+            }
         }
         prompter("bullet") { $0.stage(phase: .recording, camera: "x", mic: "x", level: -30, elapsed: 200, cardIndex: 3, cardElapsed: 52, countdown: nil, screenAllowed: true, script: script) }
         prompter("over") { $0.stage(phase: .recording, camera: "x", mic: "x", level: -30, elapsed: 400, cardIndex: 5, cardElapsed: 260, countdown: nil, screenAllowed: true, script: script) }

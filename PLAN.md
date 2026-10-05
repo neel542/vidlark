@@ -35,6 +35,9 @@ A native Mac app for filming the presenter's YouTube videos. It replaces Loom. I
 | 19 | Countdown beeps | Added 4 Oct: a beep on 3, 2 and 1, a higher one on go |
 | 20 | Recordings page | Added 4 Oct: every take with a thumbnail, search, filters, rename, save a copy and delete to Trash. Click a take to watch it in the app; Camera and Screen switch at the same moment of the take |
 | 21 | Me and Screen | Added 4 Oct: a two-way switch in the face box. Me grows her camera out of the bubble to fill the recorded screen (a click-through window, `Stage`, that is part of the screen recording); Screen shrinks it back in 0.5 s. `ava-finish` makes `video.mp4` from screen.mov, and from camera.mov before a camera-first share (AVFoundation, HEVC, the screen's shape up to 1920 wide). Previews only get frames while they can be seen |
+| 22 | One window | Added 5 Oct: "What to share" chooser (Entire screen / A window, real thumbnails), remembered as the default with "Share this every time". One window is captured from its display with only it and the stage and bubble windows included, cropped to it (`sourceRect`), and followed if it moves |
+| 23 | Mac sound, any moment | Added 5 Oct: the screen recorder always listens and writes silence while off; "Only <App>" uses a small stream of its own. "sound" lines in events.jsonl |
+| 24 | Prompter by itself | Added 5 Oct: scrolls at Slow, Medium or Fast (110, 140, 170 words a minute); Text size Small to Extra large; can be shown during takes |
 | 14 | Live view | Added 4 Oct: a no-login web page with every camera, the screen while recording, the mic level and the checks. Served by the Mac on port 8790 behind a secret link; Anywhere mode adds a Cloudflare quick tunnel. Pictures are only made while someone watches |
 
 Not building: the Shorts cutter, and iPhone remote control.
@@ -55,6 +58,7 @@ The app writes these files:
 - `events.jsonl`: one JSON object per line, written live. `t` is seconds since `camera.mov` started.
   - `{"t":0,"type":"start","wall":"<ISO8601>","title":"...","targetMinutes":15,"camera":"camera.mov","screen":"screen.mov","extraCameras":[{"file":"camera-2.mov","name":"..."}]}`. `"screen":""` means a camera-first take.
   - `{"t":0,"type":"show","what":"screen"}`: what the video shows, `"camera"` or `"screen"`. One at the start, then one per click of Me or Screen.
+  - `{"t":4.1,"type":"sound","on":true,"from":"Google Chrome"}`: the Mac's sound switched; "from" is "every app" or one app's name.
   - `{"t":125.3,"type":"screen-start","screen":"screen.mov","screenName":"...","macSound":false}` when the screen is shared in a camera-first take. The finisher matches the screen's sound against the camera's from just before this moment.
   - `{"t":61.0,"type":"camera-error","file":"camera-2.mov","message":"..."}` when an extra camera stops early. The take carries on.
   - `{"t":3.2,"type":"card","index":1,"section":"Hook","text":"..."}`. Every move after the first card adds `"by":"key"` or `"by":"voice"`, and so does `{"type":"end"}`.

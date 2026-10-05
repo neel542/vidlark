@@ -44,10 +44,15 @@ struct SourcesPanel: View {
     }
 
     private var cameraRow: some View {
-        let lamp: LampState = !studio.cameraAllowed ? .fail : studio.cameraName == nil ? .warn : .ok
+        let resting = studio.cameraResting && studio.cameraAllowed && studio.cameraName != nil
+        let lamp: LampState = !studio.cameraAllowed ? .fail : studio.cameraName == nil ? .warn : resting ? .off : .ok
         var detail = studio.cameraAllowed ? (studio.cameraName ?? "None connected") : "Not allowed yet"
-        if let format = studio.cameraFormat, studio.cameraName != nil { detail += " · \(format.name)" }
-        if studio.touchUpOn && studio.cameraName != nil { detail += " · Studio Light" }
+        if resting {
+            detail += " · Resting"
+        } else {
+            if let format = studio.cameraFormat, studio.cameraName != nil { detail += " · \(format.name)" }
+            if studio.touchUpOn && studio.cameraName != nil { detail += " · Studio Light" }
+        }
         let choices = studio.cameras.map { d in MenuChoice(title: d.localizedName, selected: d.uniqueID == studio.cameraID) { studio.cameraID = d.uniqueID } }
         // Quality straight from the camera's menu, without opening Settings.
         let more = CameraQuality.allCases.map { q in
@@ -60,31 +65,55 @@ struct SourcesPanel: View {
         let device = studio.mics.first { $0.uniqueID == studio.micID }
         let name = studio.micName
         let connection = device.map(Studio.connection) ?? (Snapshots.active ? "USB" : nil)
-        let lamp: LampState = !studio.micAllowed || name == nil ? .fail : studio.micHeardRecently ? .ok : .warn
+        // The mic rests with the camera; both wake together.
+        let resting = studio.cameraResting && studio.micAllowed && name != nil
+        let lamp: LampState = !studio.micAllowed || name == nil ? .fail : resting ? .off : studio.micHeardRecently ? .ok : .warn
         let detail = !studio.micAllowed ? "Not allowed yet"
-            : name.map { n in connection.map { "\(n) · \($0)" } ?? n } ?? "None found"
+            : name.map { n in resting ? "\(n) · Resting" : connection.map { "\(n) · \($0)" } ?? n } ?? "None found"
         let choices = studio.mics.map { d in
             MenuChoice(title: "\(d.localizedName) (\(Studio.connection(d)))", selected: d.uniqueID == studio.micID) { studio.micID = d.uniqueID }
         }
         return SourceRow(symbol: "mic.fill", title: "Microphone", detail: detail, lamp: lamp, dense: dense, menu: choices,
-                         note: name != nil && !studio.micHeardRecently && studio.micAllowed ? "Say something to test it." : nil) {
-            LiveMeter(meter: studio.meter)
+                         note: name != nil && !studio.micHeardRecently && studio.micAllowed && !resting ? "Say something to test it." : nil) {
+            if !resting { LiveMeter(meter: studio.meter) }
         }
     }
 
     @ViewBuilder private var screenRow: some View {
         if studio.recordScreen {
             let lamp: LampState = !studio.screenAllowed ? .fail : studio.display == nil ? .warn : .ok
-            let detail = !studio.screenAllowed ? "Not allowed yet"
-                : (studio.display?.name ?? "No screen") + (studio.screenAudio ? " · with the Mac's sound" : "")
-            let choices = studio.displays.map { d in MenuChoice(title: d.name, selected: d.id == studio.displayID) { studio.displayID = d.id } }
-            let more = [MenuChoice(title: "Include the Mac's sound", selected: studio.screenAudio) { studio.screenAudio.toggle() },
-                        MenuChoice(title: "Remove (share it during the take instead)", selected: false) { studio.recordScreen = false }]
-            SourceRow(symbol: "display", title: "Screen", detail: detail, lamp: lamp, dense: dense, menu: choices, more: more)
+            let detail = !studio.screenAllowed ? "Not allowed yet" : sharedName
+            let also = studio.screenAllowed && studio.screenAudio ? "With \(studio.soundWords)" : nil
+            SourceRow(symbol: isWindow ? "macwindow" : "display", title: "Screen", detail: detail, also: also, lamp: lamp, dense: dense,
+                      menu: shareChoices, more: [
+                          MenuChoice(title: "Include \(studio.soundWords)", selected: studio.screenAudio) { studio.screenAudio.toggle() },
+                          MenuChoice(title: "Remove (share it during the take instead)", selected: false) { studio.recordScreen = false },
+                      ])
         } else {
-            SourceRow(symbol: "display", title: "Screen", detail: "Shared during the take, with the Screen button", lamp: .off, dense: dense,
-                      menu: [MenuChoice(title: "Record the screen from the start", selected: false) { studio.recordScreen = true }], quiet: true)
+            let detail = studio.askBeforeSharing ? "Shared during the take, with the Screen button" : "Shares \(sharedName) when you press Screen"
+            SourceRow(symbol: isWindow ? "macwindow" : "display", title: "Screen", detail: detail, lamp: .off, dense: dense,
+                      menu: shareChoices, more: [
+                          MenuChoice(title: "Record it from the start", selected: false) { studio.recordScreen = true },
+                      ], quiet: true)
         }
+    }
+
+    private var isWindow: Bool {
+        if case .window = studio.shareTarget { true } else { false }
+    }
+
+    /// The screen's name, or the window's, in the same words as Settings.
+    private var sharedName: String { studio.shareLabel }
+
+    /// Each whole screen, then "A window…", which opens the chooser.
+    private var shareChoices: [MenuChoice] {
+        studio.displays.map { d in
+            MenuChoice(title: "Entire screen: \(d.name)", selected: studio.shareTarget == .screen(d.id) || (!isWindow && d.id == studio.displayID)) {
+                studio.shareTarget = .screen(d.id)
+            }
+        } + [MenuChoice(title: isWindow ? "A window: \(studio.shareTarget.label)…" : "A window…", selected: isWindow) {
+            SharePicker.show(.chooseDefault, studio: studio)
+        }]
     }
 }
 
@@ -94,6 +123,8 @@ struct SourceRow<Below: View>: View {
     var badge: String?
     var title: String
     var detail: String
+    /// A second quiet line under the detail, so neither has to be cut short.
+    var also: String?
     var lamp: LampState
     var dense: Bool
     var menu: [MenuChoice]
@@ -103,13 +134,14 @@ struct SourceRow<Below: View>: View {
     @ViewBuilder var below: Below
     @State private var hover = false
 
-    init(symbol: String, badge: String? = nil, title: String, detail: String, lamp: LampState, dense: Bool,
+    init(symbol: String, badge: String? = nil, title: String, detail: String, also: String? = nil, lamp: LampState, dense: Bool,
          menu: [MenuChoice], more: [MenuChoice] = [], note: String? = nil, quiet: Bool = false,
          @ViewBuilder below: () -> Below = { EmptyView() }) {
         self.symbol = symbol
         self.badge = badge
         self.title = title
         self.detail = detail
+        self.also = also
         self.lamp = lamp
         self.dense = dense
         self.menu = menu
@@ -182,11 +214,13 @@ struct SourceRow<Below: View>: View {
                 Text(title)
                     .font(.system(size: 12.5, weight: .semibold))
                     .foregroundStyle(quiet ? Palette.dim : Palette.ink)
-                Text(detail)
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(Palette.dim)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                ForEach([detail] + (also.map { [$0] } ?? []), id: \.self) { line in
+                    Text(line)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Palette.dim)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
             }
             Spacer(minLength: 6)
             if !quiet { Lamp(state: lamp) }
@@ -230,12 +264,16 @@ struct AddSourceButton: View {
                         }
                     }
                     if !studio.recordScreen {
-                        Section("Screen") {
+                        Section("Screen, from the start") {
                             ForEach(studio.displays) { display in
-                                Button(studio.displays.count > 1 ? display.name : "The screen, from the start") {
-                                    studio.displayID = display.id
+                                Button(studio.displays.count > 1 ? "Entire screen: \(display.name)" : "Entire screen") {
+                                    studio.shareTarget = .screen(display.id)
                                     studio.recordScreen = true
                                 }
+                            }
+                            Button("A window…") {
+                                studio.recordScreen = true
+                                SharePicker.show(.chooseDefault, studio: studio)
                             }
                         }
                     }

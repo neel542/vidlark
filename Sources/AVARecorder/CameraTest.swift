@@ -201,7 +201,7 @@ enum CameraCPUTest {
             await measure("6 frame output on, no previews")
 
             // As the app sits idle: the panel's picture on screen, the face box and bubble hidden.
-            func window(_ layer: CALayer) -> NSPanel {
+            @MainActor func window(_ layer: CALayer) -> NSPanel {
                 let view = NSView(frame: NSRect(x: 0, y: 0, width: 640, height: 360))
                 view.wantsLayer = true
                 layer.frame = view.bounds

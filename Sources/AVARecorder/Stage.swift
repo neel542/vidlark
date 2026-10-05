@@ -81,7 +81,12 @@ final class Stage {
     /// Covers the recorded screen, empty, ready for a take. It has to be on screen before the take
     /// starts so the screen recording can include it.
     func cover(_ screen: NSScreen) {
-        window.setFrame(screen.frame, display: false)
+        cover(screen.frame)
+    }
+
+    /// Covers just this part of the screen, the shared window, in AppKit coordinates.
+    func cover(_ frame: CGRect) {
+        window.setFrame(frame, display: false)
         window.orderFrontRegardless()
     }
 

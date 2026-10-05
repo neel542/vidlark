@@ -191,15 +191,26 @@ private struct VideoSettings: View {
             } below: {
                 ShapePicker(studio: studio)
             }
-            if studio.displays.count > 1 {
-                SettingRow("Which screen", "The screen that goes into the video. The other one is free for notes.") {
-                    ValueMenu(value: studio.display?.name ?? "None",
-                              choices: studio.displays.map { d in MenuChoice(title: d.name, selected: d.id == studio.displayID) { studio.displayID = d.id } })
-                }
+            SettingRow("What to share",
+                       "The entire screen, or one window, like a single Chrome window. With one window, only that window goes into the video, even if something covers it.") {
+                SmallButton(title: "Change…") { SharePicker.show(.chooseDefault, studio: studio) }
+            } below: {
+                Readout(lamp: .ok, text: studio.shareLabel)
             }
-            SettingRow("Record the Mac's sound",
-                       "Adds what the Mac plays, like a video on the screen, as a second sound track. Your microphone is always recorded.") {
+            SettingRow("Ask what to share each time",
+                       "On: pressing Screen during a take shows the screens and windows to pick from. Off: it shares the screen or window you chose, straight away.") {
+                Switch(on: studio.askBeforeSharing) { studio.askBeforeSharing = $0 }
+            }
+            SettingRow("Include the Mac's sound",
+                       "Adds what the Mac plays, like a video on the screen, as a second sound track. Your microphone is always recorded. During a take, the Mac sound button switches it and picks the app.") {
                 Switch(on: studio.screenAudio) { studio.screenAudio = $0 }
+            } below: {
+                if studio.screenAudio, let name = studio.soundFromName {
+                    HStack(spacing: 10) {
+                        Text("Only \(name)'s sound, as picked last time.").note()
+                        SmallButton(title: "Every app instead") { studio.rememberSound(from: nil, name: nil) }
+                    }
+                }
             }
         }
         .disabled(studio.isBusy)
@@ -297,7 +308,7 @@ private struct PrompterSettings: View {
                         Segments(choices: [("Slow", 110), ("Medium", 140), ("Fast", 170)], selected: studio.scrollWordsPerMinute) { studio.scrollWordsPerMinute = $0 }
                     }
                 }
-                SettingRow("Text size", "Bigger is easier to read from further away; fewer words fit.") {
+                SettingRow("Text size", "Bigger is easier to read from further away; fewer words fit. Drag the strip's edge to make it taller.") {
                     Segments(choices: [("Small", 0.8), ("Medium", 1.0), ("Large", 1.3), ("Extra large", 1.6)], selected: studio.prompterSize) { studio.prompterSize = $0 }
                 }
                 SettingRow("Keyboard", "The key under Esc moves to the next line. Hold Shift with it to go back.") {

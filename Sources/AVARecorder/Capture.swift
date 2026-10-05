@@ -115,6 +115,8 @@ final class CameraRecorder: NSObject {
     private var taking = false
     /// When the session will have settled after the last connection was switched on. Camera queue only.
     private var settled: CFTimeInterval = 0
+    /// True while the camera rests: the session is stopped and the camera light is off. Camera queue only.
+    private var resting = false
 
     var onLevel: ((Float, Float) -> Void)?
     /// The format the camera ended up recording in, after each `use`. Called on the camera queue.
@@ -148,7 +150,31 @@ final class CameraRecorder: NSObject {
                 movie.setOutputSettings([AVVideoCodecKey: AVVideoCodecType.hevc], for: connection)
             }
             if !taking { frameOutputs.forEach { $0.output.connection(with: .video)?.isEnabled = $0.wanted } }
-            if !session.isRunning { session.startRunning() }
+            if !resting, !session.isRunning { session.startRunning() }
+        }
+    }
+
+    /// Stops the camera and mic while nobody needs them, or starts them again. A take always wakes
+    /// it first, and a resting camera is never stopped in the middle of one.
+    func rest(_ on: Bool) {
+        queue.async { [self] in
+            if on {
+                guard !taking, !movie.isRecording else { return }
+                resting = true
+                if session.isRunning { session.stopRunning() }
+            } else {
+                wake()
+            }
+        }
+    }
+
+    /// Camera queue only. A camera that has just woken gets a second before a file opens on it.
+    private func wake() {
+        guard resting else { return }
+        resting = false
+        if !session.isRunning, !session.inputs.isEmpty {
+            session.startRunning()
+            settled = max(settled, CACurrentMediaTime() + 1)
         }
     }
 
@@ -191,6 +217,7 @@ final class CameraRecorder: NSObject {
 
     func startRecording(to url: URL) {
         queue.async { [self] in
+            wake()
             frameOutputsOnForTake()
             // Give a just-changed session half a second to settle before the file opens.
             let wait = max(0, settled - CACurrentMediaTime())
@@ -201,7 +228,10 @@ final class CameraRecorder: NSObject {
     /// Switches every extra output on ahead of a take, so nothing about the session changes once
     /// the file is open. Turning one on or off mid-take is what lost a whole camera file on 4 Oct.
     func prepareForTake() {
-        queue.async { [self] in frameOutputsOnForTake() }
+        queue.async { [self] in
+            wake()
+            frameOutputsOnForTake()
+        }
     }
 
     /// Asks for frames to an extra output, or stops them. During a take the change waits until
@@ -328,6 +358,13 @@ final class CameraFeed: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     private var seen = Set<ObjectIdentifier>()
     private var handed = 0
     private var frameSize = CGSize(width: 16, height: 9)
+    private var nextFrame: (() -> Void)?
+
+    /// Called on the main thread whenever a preview comes into view or the last one goes out of it.
+    var onSeenChange: (() -> Void)?
+
+    /// Whether any preview can be seen right now.
+    var anySeen: Bool { lock.withLock { !seen.isEmpty } }
 
     /// Width over height of the camera picture, from the latest frame.
     var aspect: CGFloat { lock.withLock { frameSize.width / max(frameSize.height, 1) } }
@@ -363,8 +400,18 @@ final class CameraFeed: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
 
     /// Whether this layer can be seen. Hidden, it lets go of every frame it holds.
     func set(_ layer: AVSampleBufferDisplayLayer, seen visible: Bool) {
-        lock.withLock { if visible { seen.insert(ObjectIdentifier(layer)) } else { seen.remove(ObjectIdentifier(layer)) } }
+        let changed = lock.withLock { () -> Bool in
+            let before = seen.isEmpty
+            if visible { seen.insert(ObjectIdentifier(layer)) } else { seen.remove(ObjectIdentifier(layer)) }
+            return before != seen.isEmpty
+        }
         if !visible { layer.sampleBufferRenderer.flush(removingDisplayedImage: false, completionHandler: nil) }
+        if changed { onSeenChange?() }
+    }
+
+    /// Runs `action` once, on the preview queue, when the next frame arrives (the camera has woken).
+    func whenNextFrame(_ action: @escaping () -> Void) {
+        lock.withLock { nextFrame = action }
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
@@ -372,6 +419,7 @@ final class CameraFeed: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
             let size = CGSize(width: CVPixelBufferGetWidth(pixels), height: CVPixelBufferGetHeight(pixels))
             lock.withLock { frameSize = size }
         }
+        if let woke = lock.withLock({ () -> (() -> Void)? in defer { nextFrame = nil }; return nextFrame }) { woke() }
         for layer in lock.withLock({ layers.allObjects.filter { seen.contains(ObjectIdentifier($0)) } }) {
             let renderer = layer.sampleBufferRenderer
             if renderer.status == .failed { renderer.flush() }
@@ -391,7 +439,7 @@ final class CameraFeed: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
 /// cut out of the picture. What the Mac plays goes in as a second sound track (the mic stays the
 /// first, which the finisher reads): silence while the sound is off, every app's sound, or one app's
 /// from a small stream of its own. It can change at any moment of the take.
-final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
+final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
     private var stream: SCStream?
     private var writer: AVAssetWriter?
     private var videoIn: AVAssetWriterInput?
@@ -405,6 +453,8 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
     /// One app's sound, when only that app is wanted.
     private var appStream: SCStream?
     private var display: SCDisplay?
+    /// Kept so a shared window that moves can be followed.
+    private var config: SCStreamConfiguration?
     private let queue = DispatchQueue(label: "ava.screen")
     private var started = false
     private var wantsAudio = false
@@ -418,7 +468,8 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
     /// Every complete screen frame, for the live view. Called on the stream queue.
     var onFrame: ((CVPixelBuffer) -> Void)?
 
-    func start(filter: SCContentFilter, display: SCDisplay, pixelSize: CGSize, micID: String?, to url: URL) async throws {
+    /// `source` crops to one window's part of the display, in display points.
+    func start(filter: SCContentFilter, display: SCDisplay, pixelSize: CGSize, source: CGRect? = nil, micID: String?, to url: URL) async throws {
         self.url = url
         self.display = display
         started = false
@@ -434,6 +485,8 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
         config.colorSpaceName = CGColorSpace.sRGB
         config.showsCursor = true
         config.queueDepth = 8
+        if let source { config.sourceRect = source }
+        self.config = config
         // The Mac's sound is always listened to, so it can be switched on at any moment; while it is
         // off, silence is written instead. The app's own sounds (the countdown beeps) stay out.
         config.capturesAudio = true
@@ -518,6 +571,13 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
         default:
             break
         }
+    }
+
+    /// Follows a shared window to where it is now.
+    func move(source: CGRect) async throws {
+        guard let config, let stream else { return }
+        config.sourceRect = source
+        try await stream.updateConfiguration(config)
     }
 
     /// Changes what is recorded mid-take, for example to let the face bubble in.

@@ -22,7 +22,7 @@ final class Studio: ObservableObject {
 
     // Take state
     @Published private(set) var phase: Phase = .idle {
-        didSet { updateRemote() }
+        didSet { updateRemote(); restCheck() }
     }
     @Published private(set) var elapsed: TimeInterval = 0
     @Published private(set) var cardElapsed: TimeInterval = 0
@@ -56,6 +56,8 @@ final class Studio: ObservableObject {
     /// gestures off, Reactions being on keeps hand detection running, about 10% CPU (measured 4 Oct).
     @Published private(set) var reactionsOn = false
     @Published private(set) var gesturesOn = false
+    /// True while the camera rests to save power, until its first picture after waking arrives.
+    @Published private(set) var cameraResting = false
     /// Extra cameras, recorded as camera-2.mov, camera-3.mov and so on, in the order they were added.
     @Published var extraCameraIDs: [String] = UserDefaults.standard.stringArray(forKey: "extraCameras") ?? [] {
         didSet {
@@ -121,6 +123,44 @@ final class Studio: ObservableObject {
         var id: String
         var name: String
     }
+    /// What the screen recording shows by default: a whole screen or one window.
+    @Published var shareTarget: ShareTarget = ShareTarget.saved() {
+        didSet {
+            if !Snapshots.active { shareTarget.save() }
+            if case .screen(let id) = shareTarget, displayID != id { displayID = id }
+        }
+    }
+    /// Show the chooser when Screen is pressed. Off shares `shareTarget` at once.
+    @Published var askBeforeSharing = UserDefaults.standard.object(forKey: "askBeforeSharing") as? Bool ?? true {
+        didSet { if !Snapshots.active { UserDefaults.standard.set(askBeforeSharing, forKey: "askBeforeSharing") } }
+    }
+    /// The share choice in one set of words everywhere: "Entire screen: Samsung S24R35A" or
+    /// "Google Chrome: Seller Central".
+    var shareLabel: String {
+        switch shareTarget {
+        case .screen(let id): "Entire screen: \((displays.first { $0.id == id } ?? display)?.name ?? "this Mac")"
+        case .window: shareTarget.label
+        }
+    }
+
+    /// Where the Mac's sound comes from at the start of a take: one app's name, or nil for every app.
+    var soundFromName: String? { Snapshots.active ? stagedSoundName : UserDefaults.standard.string(forKey: "soundFromName") }
+    private var stagedSoundName: String?
+
+    /// The Mac's sound in plain words: "the Mac's sound" or "Google Chrome's sound".
+    var soundWords: String { soundFromName.map { "\($0)'s sound" } ?? "the Mac's sound" }
+
+    /// Remembers where the Mac's sound should come from next time: one app, or every app with nil.
+    func rememberSound(from id: String?, name: String?) {
+        guard !Snapshots.active else { return }
+        UserDefaults.standard.set(id, forKey: "soundFrom")
+        UserDefaults.standard.set(name, forKey: "soundFromName")
+        objectWillChange.send()
+    }
+
+    /// The shared window during a take, in AppKit screen coordinates; nil for a whole screen.
+    @Published private(set) var sharedArea: CGRect?
+    private var windowWatch: Timer?
     /// Bumped when the remote asks for the screen in a camera-first take: the face box asks first.
     @Published private(set) var shareRequest = 0
     private var remoteWatch: [AnyCancellable] = []
@@ -187,6 +227,11 @@ final class Studio: ObservableObject {
     private var cardStart: CFTimeInterval = 0
     private var lastLoud: CFTimeInterval = 0
     private var lastSpaceCheck: CFTimeInterval = 0
+    /// Camera rest: whether the session is stopped, since when nobody has needed it, and since
+    /// when the app has been in the background.
+    private var cameraAsleep = false
+    private var unneededSince: CFTimeInterval?
+    private var inactiveSince: CFTimeInterval?
     private var ticker: Timer?
     private var checker: Timer?
     private var appObserver: NSObjectProtocol?
@@ -236,6 +281,17 @@ final class Studio: ObservableObject {
         bootLive()
         camera.attach(feed.output)
         mainPreview.feed = feed
+        feed.onSeenChange = { [weak self] in MainActor.assumeIsolated { self?.restCheck() } }
+        // Opened in the background (at login, say), the app counts as away from the start.
+        if !NSApp.isActive { inactiveSince = CACurrentMediaTime() }
+        for name in [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification] {
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                MainActor.assumeIsolated {
+                    self?.inactiveSince = note.name == NSApplication.didResignActiveNotification ? CACurrentMediaTime() : nil
+                    self?.restCheck()
+                }
+            }
+        }
 
         let defaults = UserDefaults.standard
         refreshDevices(preferredCamera: defaults.string(forKey: "camera"), preferredMic: defaults.string(forKey: "mic"))
@@ -362,6 +418,7 @@ final class Studio: ObservableObject {
         touchUpOn = AVCaptureDevice.isStudioLightEnabled
         portraitOn = AVCaptureDevice.isPortraitEffectEnabled
         centerStageOn = AVCaptureDevice.isCenterStageEnabled
+        restCheck()
     }
 
     private func refreshDevices(preferredCamera: String?, preferredMic: String?) {
@@ -401,6 +458,7 @@ final class Studio: ObservableObject {
             }
             extras = wanted.indices.map { i in
                 let recorder = CameraRecorder()
+                if cameraAsleep { recorder.rest(true) }
                 let tap = LiveTap(name: "camera-\(i + 2)", frames: liveFrames)
                 tap.camera = recorder
                 liveTaps[tap.name] = tap
@@ -705,15 +763,15 @@ final class Studio: ObservableObject {
 
                 if withScreen {
                 let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-                guard let choice = display ?? displays.first else { throw RecorderError("No screen to record.") }
-                let filter = try makeFilter(content)
+                let capture = try capture(content, shareTarget)
 
                 screen.onError = { [weak self] error in
                     Task { @MainActor in self?.screenFailed(error) }
                 }
-                try await screen.start(filter: filter, display: try target(content), pixelSize: choice.pixelSize,
-                                       micID: micAllowed ? micID : nil,
+                try await screen.start(filter: capture.filter, display: capture.display, pixelSize: capture.pixelSize,
+                                       source: capture.source, micID: micAllowed ? micID : nil,
                                        to: folder.appendingPathComponent("screen.mov"))
+                began(capture, shareTarget)
                 await startSound()
                 }
 
@@ -750,21 +808,52 @@ final class Studio: ObservableObject {
     /// of this app's windows asked for by `showInRecording` (the face bubble).
     private var shownWindowIDs: [CGWindowID] = []
 
-    /// The screen being recorded, as ScreenCaptureKit knows it.
-    private func target(_ content: SCShareableContent) throws -> SCDisplay {
-        guard let target = content.displays.first(where: { $0.displayID == displayID }) ?? content.displays.first else {
-            throw RecorderError("No screen to record.")
-        }
-        return target
+    /// What a screen recording takes in: the filter, its display, the picture size, and for one
+    /// window, the part of the display the window covers.
+    struct Capture {
+        var filter: SCContentFilter
+        var display: SCDisplay
+        var pixelSize: CGSize
+        /// Display points; nil for the whole screen.
+        var source: CGRect?
+        var windowID: CGWindowID?
+        var name: String
     }
 
-    private func makeFilter(_ content: SCShareableContent) throws -> SCContentFilter {
-        let target = try target(content)
-        let hidden = Set([Bundle.main.bundleIdentifier ?? "inc.ava.recorder", "com.apple.notificationcenterui"])
-        let excluded = content.applications.filter { hidden.contains($0.bundleIdentifier) }
-        let shown = content.windows.filter { shownWindowIDs.contains($0.windowID) }
-        return SCContentFilter(display: target, excludingApplications: excluded, exceptingWindows: shown)
+    /// The chosen screen, or the chosen window and this app's own windows over it (the stage and
+    /// the bubble), cropped to the window. Throws in plain words when the window is not open.
+    private func capture(_ content: SCShareableContent, _ wanted: ShareTarget) throws -> Capture {
+        let ours = content.windows.filter { shownWindowIDs.contains($0.windowID) }
+        switch wanted {
+        case .screen(let id):
+            guard let target = content.displays.first(where: { $0.displayID == id }) ?? content.displays.first(where: { $0.displayID == displayID })
+                    ?? content.displays.first else { throw RecorderError("No screen to record.") }
+            let hidden = Set([Bundle.main.bundleIdentifier ?? "inc.ava.recorder", "com.apple.notificationcenterui"])
+            let excluded = content.applications.filter { hidden.contains($0.bundleIdentifier) }
+            let size = displays.first { $0.id == target.displayID }?.pixelSize ?? CGSize(width: target.width * 2, height: target.height * 2)
+            return Capture(filter: SCContentFilter(display: target, excludingApplications: excluded, exceptingWindows: ours),
+                           display: target, pixelSize: size, source: nil, windowID: nil,
+                           name: displays.first { $0.id == target.displayID }?.name ?? "Screen")
+        case .window(let app, let appName, let title):
+            guard let window = ShareTarget.find(app: app, title: title, in: content) else {
+                throw RecorderError("The \(appName) window to share is not open. Open it, or choose the entire screen in Sources.")
+            }
+            let center = CGPoint(x: window.frame.midX, y: window.frame.midY)
+            guard let target = content.displays.first(where: { $0.frame.contains(center) }) ?? content.displays.first else {
+                throw RecorderError("No screen to record.")
+            }
+            let source = window.frame.offsetBy(dx: -target.frame.minX, dy: -target.frame.minY)
+            let scale = (displays.first { $0.id == target.displayID }?.pixelSize.width ?? target.frame.width * 2) / max(target.frame.width, 1)
+            let k = min(scale, 1920 / max(source.width, 1))
+            let size = CGSize(width: CGFloat(Int(source.width * k) & ~1), height: CGFloat(Int(source.height * k) & ~1))
+            return Capture(filter: SCContentFilter(display: target, including: [window] + ours),
+                           display: target, pixelSize: size, source: source, windowID: window.windowID,
+                           name: "\(appName): \(window.title?.isEmpty == false ? window.title! : appName)")
+        }
     }
+
+    /// What is being shared in the take in progress.
+    private var sharing_: ShareTarget?
 
     /// Lets these windows of the app into the screen recording (the stage and the bubble), or none
     /// with an empty list. `bubble` says whether the face bubble is one of them, for the log.
@@ -772,17 +861,19 @@ final class Studio: ObservableObject {
         shownWindowIDs = windowIDs
         guard phase == .recording || phase == .starting else { return }
         Task {
-            guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true),
-                  let filter = try? makeFilter(content) else { return }
-            try? await screen.update(filter)
+            guard let wanted = sharing_,
+                  let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true),
+                  let capture = try? capture(content, wanted) else { return }
+            try? await screen.update(capture.filter)
             log?.write(["type": "bubble", "visible": bubble])
         }
     }
 
     /// Starts recording the screen in the middle of a camera-first take, into screen.mov. The
     /// finisher lines it up with the camera by sound, starting from the "screen-start" event.
-    func shareScreen() {
+    func shareScreen(_ wanted: ShareTarget? = nil) {
         guard phase == .recording, !takeHasScreen, !sharing, let folder else { return }
+        let wanted = wanted ?? shareTarget
         shareProblem = nil
         sharing = true
         Task {
@@ -792,16 +883,16 @@ final class Studio: ObservableObject {
                     throw RecorderError("Screen recording is not allowed yet. Allow AVA Recorder in System Settings, Privacy, then open the app again.")
                 }
                 let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-                guard let choice = display ?? displays.first else { throw RecorderError("No screen to record.") }
-                let filter = try makeFilter(content)
+                let capture = try capture(content, wanted)
                 screen.onError = { [weak self] error in
                     Task { @MainActor in self?.screenFailed(error) }
                 }
-                log?.write(["type": "screen-start", "screen": "screen.mov", "screenName": choice.name, "macSound": screenAudio])
-                try await screen.start(filter: filter, display: try target(content), pixelSize: choice.pixelSize,
-                                       micID: micAllowed ? micID : nil,
+                log?.write(["type": "screen-start", "screen": "screen.mov", "screenName": capture.name, "macSound": screenAudio])
+                try await screen.start(filter: capture.filter, display: capture.display, pixelSize: capture.pixelSize,
+                                       source: capture.source, micID: micAllowed ? micID : nil,
                                        to: folder.appendingPathComponent("screen.mov"))
                 guard phase == .recording else { return }
+                began(capture, wanted)
                 takeHasScreen = true
                 await startSound()
                 // Sharing is a click on Screen. screen.mov first holds a moment of her camera across
@@ -822,6 +913,42 @@ final class Studio: ObservableObject {
         guard phase == .recording, what != showing, what == .camera || takeHasScreen else { return }
         showing = what
         log?.write(["type": "show", "what": what.rawValue])
+    }
+
+    // MARK: One window
+
+    /// The screen recording has started: for one window, the stage and bubble move to it, and the
+    /// recording follows the window if it is moved or resized.
+    private func began(_ capture: Capture, _ wanted: ShareTarget) {
+        sharing_ = wanted
+        windowWatch?.invalidate()
+        windowWatch = nil
+        guard let id = capture.windowID, let source = capture.source else { sharedArea = nil; return }
+        let origin = capture.display.frame.origin
+        var last = source.offsetBy(dx: origin.x, dy: origin.y)
+        sharedArea = Self.appKitRect(last)
+        windowWatch = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, let frame = Self.windowFrame(id), frame != last, frame.width > 50 else { return }
+                last = frame
+                self.sharedArea = Self.appKitRect(frame)
+                let display = capture.display.frame
+                Task { try? await self.screen.move(source: frame.offsetBy(dx: -display.minX, dy: -display.minY)) }
+            }
+        }
+    }
+
+    /// Where a window is now, in global display coordinates (top left origin).
+    private static func windowFrame(_ id: CGWindowID) -> CGRect? {
+        guard let list = CGWindowListCopyWindowInfo([.optionIncludingWindow], id) as? [[String: Any]],
+              let bounds = list.first?[kCGWindowBounds as String] as? NSDictionary else { return nil }
+        return CGRect(dictionaryRepresentation: bounds)
+    }
+
+    /// Global display coordinates (top left origin) to AppKit's (bottom left of the main screen).
+    static func appKitRect(_ rect: CGRect) -> CGRect {
+        let height = NSScreen.screens.first?.frame.height ?? 0
+        return CGRect(x: rect.minX, y: height - rect.maxY, width: rect.width, height: rect.height)
     }
 
     // MARK: The Mac's sound
@@ -848,7 +975,7 @@ final class Studio: ObservableObject {
         guard isRolling, takeHasScreen else { return }
         soundOn = true
         soundFrom = id
-        if !Snapshots.active { UserDefaults.standard.set(id, forKey: "soundFrom") }
+        rememberSound(from: id, name: id.flatMap { id in soundApps.first { $0.id == id }?.name })
         Task { await applySound() }
     }
 
@@ -1034,6 +1161,10 @@ final class Studio: ObservableObject {
     func stop(thenFinish: Bool = true) {
         guard phase == .recording || phase == .starting else { return }
         phase = .stopping
+        windowWatch?.invalidate()
+        windowWatch = nil
+        sharing_ = nil
+        sharedArea = nil
         countdownTask?.cancel()
         countdown = nil
         PrompterKeys.shared.disable()
@@ -1334,6 +1465,16 @@ extension Studio {
             guard canStart || (micAllowed && micID != nil) else {
                 report(["ok": false, "stage": "preflight", "cgPreflight": preflight, "screenProbe": probe ?? "ok"]); return
             }
+            // AVA_REST_FIRST=1 puts the camera to rest first, so the take has to wake it.
+            if ProcessInfo.processInfo.environment["AVA_REST_FIRST"] != nil {
+                sleepCamera(true)
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+            }
+            // AVA_SHARE_WINDOW=<bundle id>|<window title> shares one window instead of the whole screen.
+            if let spec = ProcessInfo.processInfo.environment["AVA_SHARE_WINDOW"] {
+                let parts = spec.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+                shareTarget = .window(app: parts[0], appName: parts[0], title: parts.count > 1 ? parts[1] : "")
+            }
             start(withScreen: withScreen)
             var waited = 0.0
             while phase != .recording && waited < 15 {
@@ -1441,6 +1582,22 @@ extension Studio {
         showing = what
     }
 
+    func stageScroll(words: Double) {
+        autoScroll = true
+        scrollFrom = words
+        scrollAt = Date()
+    }
+
+    /// The Mac's sound switched on in Settings, from one app picked last time (nil is every app).
+    func stageSound(from name: String?) {
+        screenAudio = true
+        stagedSoundName = name
+    }
+
+    func stageResting() {
+        cameraResting = true
+    }
+
     func stageReactions(_ on: Bool) {
         reactionsOn = on
         gesturesOn = on
@@ -1481,6 +1638,49 @@ final class LineReader: @unchecked Sendable {
     }
 }
 
+// MARK: - Camera rest
+
+extension Studio {
+    /// The camera, the mic and Apple's effects on them (Reactions, Portrait) cost about 40% of a
+    /// processor core even when nobody looks: measured 5 Oct with the app open but unseen all night.
+    /// So they rest once no preview has been seen, or the app has sat in the background for a minute,
+    /// for 15 seconds, and wake the moment anyone looks, a take starts or the live page asks.
+    func restCheck() {
+        guard booted, !Snapshots.active else { return }
+        let now = CACurrentMediaTime()
+        let looking = feed.anySeen && now - (inactiveSince ?? now) < 60
+        let watched = liveTaps.keys.contains(where: liveFrames.watching)
+        if isBusy || looking || watched {
+            unneededSince = nil
+            if cameraAsleep { sleepCamera(false) }
+        } else {
+            let since = unneededSince ?? now
+            unneededSince = since
+            if !cameraAsleep, now - since >= 15 { sleepCamera(true) }
+        }
+    }
+
+    private func sleepCamera(_ asleep: Bool) {
+        cameraAsleep = asleep
+        if asleep {
+            cameraResting = true
+        } else {
+            // The panel keeps saying so until a fresh picture replaces the old one.
+            feed.whenNextFrame { DispatchQueue.main.async { [weak self] in
+                MainActor.assumeIsolated { if self?.cameraAsleep == false { self?.cameraResting = false } }
+            } }
+        }
+        camera.rest(asleep)
+        extras.forEach { $0.rest(asleep) }
+        // A camera that never sends a picture again (unplugged while resting) must not leave the word up.
+        if !asleep {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+                MainActor.assumeIsolated { if self?.cameraAsleep == false { self?.cameraResting = false } }
+            }
+        }
+    }
+}
+
 struct RecorderError: Error {
     let message: String
     init(_ message: String) { self.message = message }
@@ -1504,7 +1704,10 @@ extension Studio {
             }
         }
         liveFrames.onWake = { [weak self] name in
-            Task { @MainActor in self?.liveTaps[name]?.wake() }
+            Task { @MainActor in
+                self?.liveTaps[name]?.wake()
+                self?.restCheck()
+            }
         }
         let tap = LiveTap(name: "camera", frames: liveFrames)
         // Without its camera the tap could never switch itself off, and took 30 frames a second

@@ -319,6 +319,7 @@ struct RecordingPillView: View {
                     .allowsHitTesting(false)
             }
             viewSwitch
+            if showsSound { SoundButton(studio: studio) }
             controls
                 .padding(.horizontal, 6)
         }
@@ -331,6 +332,7 @@ struct RecordingPillView: View {
     private var pill: some View {
         VStack(spacing: 6) {
             viewSwitch
+            if showsSound { SoundButton(studio: studio) }
             controls
                 .padding(.leading, 4)
         }
@@ -347,9 +349,11 @@ struct RecordingPillView: View {
             ViewChoice(title: "Screen", symbol: "display", on: studio.showing == .screen) {
                 if studio.takeHasScreen {
                     studio.show(.screen)
-                } else {
+                } else if studio.askBeforeSharing {
                     studio.shareProblem = nil
-                    state.askingToShare = true
+                    SharePicker.show(.shareNow, studio: studio)
+                } else {
+                    studio.shareScreen()
                 }
             }
         }
@@ -372,10 +376,6 @@ struct RecordingPillView: View {
                 .frame(minWidth: 52, alignment: .leading)
             LiveMeter(meter: studio.meter)
                 .frame(width: state.expanded && !faceInVideo ? 52 : 44)
-            // The Mac's sound, any moment of the take.
-            if studio.takeHasScreen && studio.isRolling {
-                SoundButton(studio: studio)
-            }
             // Her face in the screen part of the video, or not.
             if studio.showing == .screen && studio.takeHasScreen {
                 RoundButton(symbol: studio.faceInVideo ? "person.crop.circle.fill" : "person.crop.circle", lit: studio.faceInVideo,
@@ -394,6 +394,9 @@ struct RecordingPillView: View {
         }
         .frame(height: 38)
     }
+
+    /// The Mac's sound control: only while the screen is being recorded.
+    private var showsSound: Bool { studio.takeHasScreen && studio.isRolling }
 
     /// The face bubble is showing for this take.
     private var faceInVideo: Bool { studio.faceInVideo && studio.takeHasScreen }
@@ -498,25 +501,33 @@ private struct RoundButton: View {
     }
 }
 
-/// The Mac's sound: click to switch it on or off; the arrow beside it picks which app it comes
-/// from, so a video in Chrome can go in without notifications or music from elsewhere.
+/// The Mac's sound, in words: "Mac sound: Off", "Mac sound: Every app", "Mac sound: Only Chrome".
+/// Click to switch it on or off; the arrow picks which app it comes from, so a video in Chrome can
+/// go in without notifications or music from elsewhere.
 private struct SoundButton: View {
     @ObservedObject var studio: Studio
 
     var body: some View {
-        let face = Image(systemName: studio.soundOn ? "speaker.wave.2.fill" : "speaker.slash.fill")
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(studio.soundOn ? Palette.signal : Palette.dim)
+        let face = HStack(spacing: 7) {
+            Image(systemName: studio.soundOn ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(studio.soundOn ? Palette.signal : Palette.engraved)
+                .frame(width: 16)
+            Text("Mac sound:").font(.system(size: 12, weight: .semibold)).foregroundStyle(Palette.dim)
+            Text(value).font(.system(size: 12, weight: .semibold)).foregroundStyle(studio.soundOn ? Palette.ink : Palette.dim)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
         Group {
             if Snapshots.active {
                 HStack(spacing: 4) {
                     face
-                    Image(systemName: "chevron.down").font(.system(size: 7, weight: .bold)).foregroundStyle(Palette.engraved)
+                    Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).foregroundStyle(Palette.engraved)
                 }
             } else {
                 Menu {
-                    Button { studio.setSound(on: false) } label: { tick(!studio.soundOn, "Mac sound off") }
-                    Section("Mac sound on, from") {
+                    Button { studio.setSound(on: false) } label: { tick(!studio.soundOn, "Off") }
+                    Section("On, from") {
                         Button { studio.setSoundFrom(nil) } label: { tick(studio.soundOn && studio.soundFrom == nil, "Every app") }
                         ForEach(studio.soundApps) { app in
                             Button { studio.setSoundFrom(app.id) } label: { tick(studio.soundOn && studio.soundFrom == app.id, "Only \(app.name)") }
@@ -524,25 +535,23 @@ private struct SoundButton: View {
                     }
                 } label: {
                     face
-                } primaryAction: {
-                    studio.setSound(on: !studio.soundOn)
                 }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.visible)
             }
         }
-        .fixedSize()
-        .padding(.horizontal, 9)
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity)
         .frame(height: 30)
-        .background(Capsule().fill(Palette.raised))
-        .overlay(Capsule().strokeBorder(Palette.hairline))
-        .help(help)
+        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Palette.face))
+        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(Palette.hairline))
+        .help("Pick whether the Mac's sound goes into the video, and from which app.")
     }
 
-    private var help: String {
-        let from = studio.soundFrom.map { id in studio.soundApps.first { $0.id == id }?.name ?? id } ?? "every app"
-        return studio.soundOn ? "The Mac's sound is going in, from \(from). Click to turn it off; the arrow picks the app."
-            : "The Mac's sound is off. Click to turn it on; the arrow picks the app."
+    private var value: String {
+        guard studio.soundOn else { return "Off" }
+        guard let id = studio.soundFrom else { return "Every app" }
+        return "Only \(studio.soundApps.first { $0.id == id }?.name ?? id)"
     }
 
     @ViewBuilder private func tick(_ on: Bool, _ title: String) -> some View {
@@ -692,8 +701,14 @@ final class RecordingPillController {
             .sink { [weak self] _ in
                 guard let self, self.studio.isRolling, !self.studio.takeHasScreen else { return }
                 self.studio.shareProblem = nil
-                self.state.askingToShare = true
+                if self.studio.askBeforeSharing { SharePicker.show(.shareNow, studio: self.studio) } else { self.studio.shareScreen() }
             })
+        // One shared window: the stage covers it and the bubble sits in its corner, following it.
+        watches.append(studio.$sharedArea
+            .dropFirst()
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] area in DispatchQueue.main.async { self?.follow(area: area) } })
         // Sharing the screen mid-take brings the bubble in, if the face goes in the video.
         watches.append(studio.$takeHasScreen
             .dropFirst()
@@ -769,10 +784,28 @@ final class RecordingPillController {
     }
 
     /// Bottom right of the recorded screen, where a face cam usually sits, until it is dragged.
+    /// Sharing one window, bottom right of that window.
     private func placeBubble() {
+        if let area = studio.sharedArea {
+            bubble.setFrameOrigin(NSPoint(x: area.maxX - bubble.frame.width - 12, y: area.minY + 12))
+            return
+        }
         guard !bubblePlaced, let visible = (studio.displayID.flatMap(DisplayChoice.screen(for:)) ?? NSScreen.main)?.visibleFrame else { return }
         bubble.setFrameOrigin(NSPoint(x: visible.maxX - bubble.frame.width - 24, y: visible.minY + 24))
         bubblePlaced = true
+    }
+
+    /// The shared window moved, or sharing went back to the whole screen.
+    private func follow(area: CGRect?) {
+        guard panel.isVisible else { return }
+        if let area {
+            stage.cover(area)
+            placeBubble()
+        } else if let screen = studio.displayID.flatMap(DisplayChoice.screen(for:)) ?? NSScreen.main {
+            stage.cover(screen)
+        }
+        // Her camera across the window for Me follows the window too.
+        if stage.fillsScreen { stage.grow(from: bubbleLook(), cameraAspect: studio.feed.aspect, animated: false) }
     }
 
     private func follow(_ phase: Studio.Phase) {

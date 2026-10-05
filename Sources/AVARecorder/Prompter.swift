@@ -8,13 +8,16 @@ struct PrompterView: View {
 
     var body: some View {
         GeometryReader { g in
-            let base = max(22, min(g.size.height * 0.19, 54)) * studio.prompterSize
+            // The strip is already taller for bigger text, so the size only lifts the cap.
+            let base = max(22, min(g.size.height * 0.19, 54 * studio.prompterSize))
             ZStack {
                 RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Palette.glass)
                 RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.white.opacity(0.07))
                 VStack(alignment: .leading, spacing: 0) {
                     stage(base: base)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .clipped()
+                        .padding(.bottom, 10)
                     rail
                 }
                 .padding(.horizontal, 30)
@@ -40,20 +43,26 @@ struct PrompterView: View {
             line(dot: .off, text: "End of script. Look at the lens, then stop.", size: base * 0.75, opacity: 0.7)
         } else if let card = studio.currentCard ?? (studio.isRolling ? nil : studio.script.cards.first) {
             let waiting = !studio.isRolling
+            let current = line(dot: waiting ? .off : .ok, text: card.text, size: card.prose ? base * 0.86 : base, opacity: waiting ? 0.55 : 1,
+                               spoken: card.prose && studio.following && !waiting ? studio.spokenWords : 0)
+                .id("card-\(studio.cardIndex)-\(waiting)")
+                .transition(.asymmetric(insertion: .offset(y: 14).combined(with: .opacity), removal: .opacity))
+            // The current line gets the room first (shrinking to fit if it must); the next line waits
+            // underneath only when a whole line of it fits in what is left.
             VStack(alignment: .leading, spacing: 0) {
-                line(dot: waiting ? .off : .ok, text: card.text, size: card.prose ? base * 0.86 : base, opacity: waiting ? 0.55 : 1,
-                     spoken: card.prose && studio.following && !waiting ? studio.spokenWords : 0)
-                    .id("card-\(studio.cardIndex)-\(waiting)")
-                    .transition(.asymmetric(insertion: .offset(y: 14).combined(with: .opacity), removal: .opacity))
+                current.layoutPriority(1)
                 if let next = waiting ? nil : studio.nextCard {
-                    Text(next.text)
-                        .font(.system(size: base * 0.5, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.3))
-                        .lineLimit(1)
-                        .padding(.leading, base * 0.62)
-                        .padding(.top, base * 0.32)
-                        .id("next-\(studio.cardIndex)")
-                        .transition(.opacity)
+                    ViewThatFits(in: .vertical) {
+                        Text(next.text)
+                            .font(.system(size: base * 0.5, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.3))
+                            .lineLimit(1)
+                            .padding(.leading, base * 0.62)
+                            .padding(.top, base * 0.32)
+                        Color.clear.frame(height: 0)
+                    }
+                    .id("next-\(studio.cardIndex)")
+                    .transition(.opacity)
                 }
             }
         } else {
@@ -182,9 +191,11 @@ private struct ScrollingScript: View {
             }
         }
         .clipped()
-        .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.1),
-                                     .init(color: .black, location: 0.85), .init(color: .clear, location: 1)],
+        // Fades out well before the rail, so a line on its way up never crowds it.
+        .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.08),
+                                     .init(color: .black, location: 0.62), .init(color: .clear, location: 0.92)],
                              startPoint: .top, endPoint: .bottom))
+        .padding(.bottom, base * 0.2)
     }
 
     /// Where the word being read sits, from the top of the script.
@@ -208,6 +219,7 @@ final class PrompterController {
     private let panel: PrompterPanel
     private let studio: Studio
     private var watch: AnyCancellable?
+    private var sizeWatch: AnyCancellable?
 
     init(studio: Studio) {
         self.studio = studio
@@ -235,6 +247,11 @@ final class PrompterController {
                 default: self?.panel.orderOut(nil)
                 }
             }
+        // Bigger words need a taller strip, or they would only shrink back to fit.
+        sizeWatch = studio.$prompterSize
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] size in self?.fit(size) }
     }
 
     func show() {
@@ -244,12 +261,20 @@ final class PrompterController {
         panel.orderFrontRegardless()
     }
 
+    /// The strip's height for this text size, keeping its top edge where it is.
+    private func fit(_ size: Double) {
+        let height = (230 * size).rounded()
+        let old = panel.frame
+        guard abs(old.height - height) > 1 else { return }
+        panel.setFrame(NSRect(x: old.minX, y: old.maxY - height, width: old.width, height: height), display: true)
+    }
+
     /// Top centre of the prompter screen, the edge nearest a camera on a tripod behind it.
     private func placeAtTop() {
         guard let screen = studio.prompterScreen else { return }
         let visible = screen.visibleFrame
         let width = min(920, visible.width - 80)
-        let height: CGFloat = 230
+        let height = (230 * studio.prompterSize).rounded()
         panel.setFrame(NSRect(x: visible.midX - width / 2, y: visible.maxY - height - 16, width: width, height: height), display: true)
     }
 

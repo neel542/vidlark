@@ -16,7 +16,9 @@ Built by AVA INC for our own channel. You are welcome to build your own copy and
 - **Live view.** Watch the shoot from another laptop or phone in a browser, with no login: every camera, the screen, the mic level and the checks.
 - **Recordings page.** Every take with a picture, search, filters, rename, save a copy and delete. Click a take to watch it in the app, camera or screen.
 - **Me | Screen, one click.** Click Me and your camera grows out of the face circle to fill the screen; click Screen and it shrinks back. The screen recording captures that, so the finished `video.mp4` needs no cutting.
-- **Camera first, share the screen when ready.** A take can start with only the camera, and the screen joins when you press Share in the face box, with or without the Mac's sound.
+- **Share the entire screen or one window,** picked from pictures like Google Meet, and make it the default. A take can also start with only the camera and share when ready.
+- **Mac sound, any moment.** Switch what the Mac plays into the video or out of it during the take, from every app or only one (a video in Chrome).
+- **A prompter that scrolls by itself** at a chosen speed, or follows your voice or a key, with adjustable text size.
 - **A transcript tick box,** for quick videos that do not need a transcript.
 - **Checks before you start.** Camera, mic, screen, disk space, battery and macOS camera effects, each with a plain fix when something is wrong.
 - **Camera watchdog.** If the camera file stops growing during a take, the take stops at once and says so, instead of filming on without a camera.

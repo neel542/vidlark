@@ -8,7 +8,7 @@
 ## Each filming day
 
 1. Put the iPhone on the tripod with the rear camera facing the presenter, screen locked, in landscape. Plug it into the Mac with a USB-C cable (it charges during the take and is steadier than wireless). It shows up as a camera on its own, through Continuity Camera, which only works when the Mac user and the iPhone are signed in to the same Apple ID. Plug the mic receiver into the Mac.
-2. Open AVA Recorder. It fills the monitor. The **Sources** list shows what gets recorded, each with a lamp: click a row to change it, or **+ Add** for another camera or the screen. If something needs fixing, one note under the list says what and has the button that fixes it. Everything else is in **Settings** (the gear, or Command-Comma), where each option says in one sentence what it does. The old rows, for reference:
+2. Open AVA Recorder. It fills the monitor. The **Sources** list shows what gets recorded, each with a lamp: click a row to change it, or **+ Add** for another camera or the screen. If something needs fixing, one note under the list says what and has the button that fixes it. Everything else is in **Settings** (the gear, or Command-Comma), where each option says in one sentence what it does. If the picture says **Camera resting to save power**, click it: the camera and mic switch off while the app sits unused in the background, and wake in about a second. The old rows, for reference:
    - Camera (its menu also has **Touch up the face**, which opens macOS Video Effects: switch on Studio Light once and it stays on)
    - Mic (say a few words so the meter moves)
    - Record (the screen that gets recorded from the start, or **Camera first, share the screen when ready**. Its menu also has **Include the Mac's sound**, for a video or a click played on the Mac)
@@ -22,7 +22,9 @@
    - The minus button shrinks the box to a small pill, and the face button brings it back.
    - The square button stops the recording.
    - **Me | Screen** says what the video shows. Click **Me** and her camera grows out of the face circle to fill the whole screen; click **Screen** and it shrinks back into the circle. The motion shows the click worked. The screen recording includes it, so the finished `video.mp4` is exactly what was on the screen, and nothing has to be cut by hand.
-   - In a camera-first take, the first click on **Screen** asks first ("Share your screen?"), with a tick box for the Mac's sound. From then on the screen is recorded until the take stops, and Me and Screen switch at once.
+   - In a camera-first take, the first click on **Screen** opens **What to share**, like Google Meet's: the **Entire screen** or **A window** (for example one Chrome window), picked from pictures. Tick **Share this every time, without asking** to make it the default (change it later in Settings, In the video). From then on the screen or window is recorded until the take stops, and Me and Screen switch at once.
+   - Sharing one window, only that window goes into the video, even if something covers it; the face circle and Me stay inside it and follow it if it moves.
+   - **Mac sound** (under Me | Screen, while the screen is recorded): click it and pick **Off**, **Every app** or **Only** one app, like Chrome playing a video, so notifications stay out. Change it at any moment of the take.
    - The face button puts the face in the video, in the shape picked in the **In video** row. Only one face shows at a time: while the face is in the video, this box shrinks to just the time, the level and the buttons. The box never appears in the recording, and neither does any pop-up banner.
    - If the camera stops sending pictures, the take stops within about 6 seconds and says so, so nobody films on without a camera.
 5. If she stumbles, she says **"retake"** and repeats the line. The edit finds it from the transcript.
