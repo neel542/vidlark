@@ -102,7 +102,7 @@ enum Snapshots {
             let selection = SettingsSelection()
             selection.current = page
             // Taller than the real window, which scrolls, so each whole page is in the picture.
-            write(SettingsView(studio: s, selection: selection).preferredColorScheme(.dark), size: CGSize(width: 920, height: 1000),
+            write(SettingsView(studio: s, selection: selection).preferredColorScheme(.dark), size: CGSize(width: 920, height: page == .cameraGuide ? 1900 : 1000),
                   to: dir.appendingPathComponent("settings-\(page.rawValue).png"))
         }
 

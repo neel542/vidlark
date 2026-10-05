@@ -5,7 +5,10 @@ import SwiftUI
 // it does. The main panel keeps only the camera picture, the sources and the record key.
 
 enum SettingsPage: String, CaseIterable, Identifiable {
-    case video, quality, after, effects, prompter, live, mac
+    case video, quality, after, effects, prompter, live, mac, cameraGuide
+
+    /// The settings themselves; the guides sit under them in the sidebar.
+    static var settings: [SettingsPage] { allCases.filter { $0 != .cameraGuide } }
 
     var id: String { rawValue }
 
@@ -18,6 +21,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .prompter: "Prompter and remote"
         case .live: "Live view"
         case .mac: "This Mac"
+        case .cameraGuide: "Connect a camera"
         }
     }
 
@@ -30,6 +34,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .prompter: "text.alignleft"
         case .live: "dot.radiowaves.left.and.right"
         case .mac: "laptopcomputer"
+        case .cameraGuide: "video.badge.plus"
         }
     }
 
@@ -42,6 +47,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .prompter: "The prompter shows the script one line at a time. A key, your voice or a Bluetooth remote moves it on."
         case .live: "Watch the shoot from another laptop or a phone, in a web browser. There is no login: the secret link is the key, so only share it with people you trust."
         case .mac: "Space and power for a long take."
+        case .cameraGuide: "Any camera this Mac can see can be a source: your iPhone, a USB webcam or a real camera. Cameras connect by cable, or by Wi-Fi the way an iPhone does. Bluetooth is too slow for video."
         }
     }
 }
@@ -106,10 +112,18 @@ struct SettingsView: View {
                 .foregroundStyle(Palette.ink)
                 .padding(.horizontal, 10)
                 .padding(.bottom, 14)
-            ForEach(SettingsPage.allCases) { item in
+            ForEach(SettingsPage.settings) { item in
                 SidebarItem(page: item, selected: item == selection.current, alert: alert(on: item)) {
                     selection.current = item
                 }
+            }
+            Text("Guides")
+                .engraved()
+                .padding(.horizontal, 10)
+                .padding(.top, 22)
+                .padding(.bottom, 6)
+            SidebarItem(page: .cameraGuide, selected: selection.current == .cameraGuide, alert: false) {
+                selection.current = .cameraGuide
             }
             Spacer()
         }
@@ -152,6 +166,7 @@ struct SettingsView: View {
                 case .prompter: PrompterSettings(studio: studio)
                 case .live: LiveSettings(studio: studio)
                 case .mac: MacSettings(studio: studio)
+                case .cameraGuide: CameraGuide(studio: studio)
                 }
             }
             .padding(.top, 24)
@@ -363,6 +378,143 @@ private struct MacSettings: View {
                             text: studio.power.pluggedIn ? "Plugged in" : "Battery\(studio.power.percent.map { " \($0)%" } ?? "")")
             }
         }
+    }
+}
+
+// MARK: - Guides
+
+/// How to connect a camera, for someone who has never done it: what this Mac sees right now,
+/// then each way in, in numbered steps, then how to add it and what to do when it does not show.
+private struct CameraGuide: View {
+    @ObservedObject var studio: Studio
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            seen
+            Method(symbol: "iphone", title: "Your iPhone",
+                   why: "The sharpest picture most people already own. Nothing to buy or install.", steps: [
+                "Use an iPhone XR or newer, with iOS 16 or later.",
+                "Sign in to the same Apple Account on the iPhone and on this Mac, and turn on Wi-Fi and Bluetooth on both.",
+                "On the iPhone, open Settings, General, AirPlay & Continuity (AirPlay & Handoff on older iPhones), and switch on Continuity Camera.",
+                "Put the iPhone in a stand or on a tripod, sideways, with its back cameras facing you, and lock its screen.",
+                "For a long take, plug it into the Mac with its cable. It charges, and the picture stays steady.",
+                "In a few seconds it shows up here, with a name like \"the presenter's iPhone Camera\".",
+            ])
+            Method(symbol: "web.camera", title: "A USB webcam",
+                   why: "Like a Logitech webcam. Plug it in and it works.", steps: [
+                "Plug it into the Mac. A webcam with the old, wide USB plug needs a small USB\u{2011}C adapter.",
+                "In a few seconds it shows up here. Most webcams need no software.",
+                "If it does not, plug it straight into the Mac rather than a hub, or try another cable.",
+            ])
+            Method(symbol: "camera", title: "A real camera",
+                   why: "A DSLR, mirrorless camera or camcorder gives the best picture. There are two ways in:", steps: [
+                "Try a plain USB cable first, with the maker's free webcam app. Canon, Fujifilm, Nikon and Sony all have one, and some newer cameras need no app at all.",
+                "If that does not work, use an HDMI to USB capture card, like the Elgato Cam Link. Camera to card with an HDMI cable, card into the Mac. Turn off the information on the camera's screen (often called clean HDMI).",
+            ], after: "Either way, turn off auto power off, and run the camera from a wall plug with a mains adapter shaped like its battery (a dummy battery), as a battery may not last a whole take.")
+            Method(symbol: "plus", title: "Then add it",
+                   why: "Once it shows in the list at the top of this page:", steps: [
+                "On the main panel, press + Add and pick it under Another camera. It records its own file next to the main camera, lined up by sound.",
+                "To film with it as the main camera instead, click the Camera row and pick it there.",
+            ])
+            Method(symbol: "wrench.and.screwdriver", title: "If it does not show up", why: "Try these in order:", steps: [
+                "Unplug it and plug it back in, or try another cable. Some USB\u{2011}C cables only charge.",
+                "For an iPhone: keep it near the Mac and locked, turn off its Personal Hotspot, and try its cable.",
+                "Quit other apps that may be using it, like FaceTime, Zoom or Photo Booth.",
+                "Open System Settings, Privacy & Security, Camera, and check AVA Recorder is switched on.",
+                "Restart the Mac.",
+            ])
+        }
+        .frame(maxWidth: 620, alignment: .leading)
+    }
+
+    /// The cameras this Mac sees right now. It updates the moment one is plugged in.
+    private var seen: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Cameras this Mac sees now").engraved()
+            if studio.cameras.isEmpty {
+                Readout(lamp: .warn, text: "None yet. Connect one below and it appears here.")
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(studio.cameras, id: \.uniqueID) { device in
+                        Readout(lamp: .ok, text: device.localizedName + role(device))
+                    }
+                }
+            }
+        }
+    }
+
+    private func role(_ device: AVCaptureDevice) -> String {
+        if device.uniqueID == studio.cameraID { return " · main camera" }
+        if studio.extraCameraIDs.contains(device.uniqueID) { return " · also recording" }
+        return ""
+    }
+}
+
+/// One way to connect a camera: what it is, why you would, then numbered steps.
+private struct Method: View {
+    var symbol: String
+    var title: String
+    var why: String
+    var steps: [String]
+    /// A tip that holds for every step, shown after them without a number.
+    var after: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Palette.raised)
+                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Palette.hairline))
+                    .frame(width: 30, height: 30)
+                    .overlay {
+                        Image(systemName: symbol)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Palette.ink)
+                    }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Palette.ink)
+                    Text(why)
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Palette.dim)
+                        .lineSpacing(1.5)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            if !steps.isEmpty {
+                VStack(alignment: .leading, spacing: 9) {
+                    ForEach(Array(steps.enumerated()), id: \.offset) { i, step in
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Text("\(i + 1)")
+                                .font(.system(size: 11, weight: .semibold))
+                                .monospacedDigit()
+                                .foregroundStyle(Palette.dim)
+                                .frame(width: 18, height: 18)
+                                .background(Circle().fill(Palette.raised))
+                            Text(step)
+                                .font(.system(size: 12.5))
+                                .foregroundStyle(Palette.ink.opacity(0.9))
+                                .lineSpacing(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .padding(.leading, 42)
+            }
+            if let after {
+                Text(after)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Palette.dim)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 42)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.face))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Palette.hairline))
     }
 }
 

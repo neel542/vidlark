@@ -253,6 +253,8 @@ struct AddSourceButton: View {
                             Button(device.localizedName) { studio.toggleExtra(device.uniqueID) }
                         }
                     }
+                    Divider()
+                    Button("How to connect a camera…") { SettingsWindow.show(.cameraGuide) }
                 } label: { face }
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)

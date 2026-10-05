@@ -39,7 +39,7 @@ The **Recordings** button at the top right of the panel (or Command-Shift-R) sho
 
 ## More than one camera
 
-Plug in the second camera, open the **Camera** row's menu and pick **Also record** with its name. It gets its own row and its own file (`camera-2.mov`, then `camera-3.mov`), with the same mic in it so the finisher can line it up. The main camera stays the one in `camera.mov`, and the face box always uses it.
+Connect the second camera first: an iPhone, a USB webcam, or a real camera through an HDMI to USB capture card (Bluetooth cannot carry video). **Settings, Connect a camera** (also **+ Add, How to connect a camera…**) walks through each one and lists the cameras the Mac sees. Then press **+ Add** and pick it under **Another camera**. It gets its own row and its own file (`camera-2.mov`, then `camera-3.mov`), with the same mic in it so the finisher can line it up. The main camera stays the one in `camera.mov`, and the face box always uses it.
 
 ## Watching from another laptop or phone
 

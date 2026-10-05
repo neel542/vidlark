@@ -20,6 +20,7 @@ Built by AVA INC for our own channel. You are welcome to build your own copy and
 - **Mac sound, any moment.** Switch what the Mac plays into the video or out of it during the take, from every app or only one (a video in Chrome).
 - **A prompter that scrolls by itself** at a chosen speed, or follows your voice or a key, with adjustable text size.
 - **A transcript tick box,** for quick videos that do not need a transcript.
+- **A guide to connecting cameras,** in Settings: iPhone, USB webcam or a real camera, with the cameras the Mac sees right now.
 - **Checks before you start.** Camera, mic, screen, disk space, battery and macOS camera effects, each with a plain fix when something is wrong.
 - **Camera watchdog.** If the camera file stops growing during a take, the take stops at once and says so, instead of filming on without a camera.
 - **Finishing.** After every take, `ava-finish` lines up the files by their sound, makes `video.mp4` and writes `words.json`, `chapters.txt`, `retakes.json` and `report.md`, all on the Mac.
