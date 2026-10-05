@@ -142,6 +142,26 @@ final class Studio: ObservableObject {
     @Published private(set) var spokenWords = 0
     @Published private(set) var hearing = false
 
+    // Prompter
+    /// How big the prompter's words are, from 0.8 (small) to 1.6 (extra large).
+    @Published var prompterSize = UserDefaults.standard.object(forKey: "prompterSize") as? Double ?? 1 {
+        didSet { if !Snapshots.active { UserDefaults.standard.set(prompterSize, forKey: "prompterSize") } }
+    }
+    /// The script scrolls up by itself at `scrollWordsPerMinute`, like a classic teleprompter.
+    @Published var autoScroll = UserDefaults.standard.bool(forKey: "autoScroll") {
+        didSet { if !Snapshots.active { UserDefaults.standard.set(autoScroll, forKey: "autoScroll") } }
+    }
+    @Published var scrollWordsPerMinute = UserDefaults.standard.object(forKey: "scrollWordsPerMinute") as? Int ?? 140 {
+        didSet { if !Snapshots.active { UserDefaults.standard.set(scrollWordsPerMinute, forKey: "scrollWordsPerMinute") } }
+    }
+    /// Shows the prompter strip on screen during takes. Off by default (on hold since 4 Oct).
+    @Published var showPrompter = UserDefaults.standard.bool(forKey: "showPrompter") {
+        didSet { if !Snapshots.active { UserDefaults.standard.set(showPrompter, forKey: "showPrompter") } }
+    }
+    /// Where the scrolling script was, in words, at `scrollAt`. Moves on at the scroll speed from there.
+    @Published private(set) var scrollFrom: Double = 0
+    @Published private(set) var scrollAt: Date?
+
     let camera = CameraRecorder()
     /// Copies of the camera picture for every preview on screen. See CameraFeed for why.
     let feed = CameraFeed()
@@ -866,6 +886,8 @@ final class Studio: ObservableObject {
         guard phase == .starting, let folder else { return }
         t0 = time
         goAt = nil
+        scrollAt = nil
+        scrollFrom = 0
         phase = .recording
         cameraWritten = (0, time)
         lastWatch = time
@@ -915,7 +937,42 @@ final class Studio: ObservableObject {
             elapsed = 0
             Beeps.go()
             showCard(0)
+            if autoScroll { scrollFrom = 0; scrollAt = Date() }
         }
+    }
+
+    // MARK: Scrolling by itself
+
+    /// Where each line starts, in words from the top of the script.
+    var cardStarts: [Int] {
+        var total = 0
+        return script.cards.map { card in defer { total += card.words }; return total }
+    }
+
+    /// How far the scrolling script has got, in words, at `date`.
+    func scrolledWords(at date: Date) -> Double {
+        guard let scrollAt else { return scrollFrom }
+        return scrollFrom + max(0, date.timeIntervalSince(scrollAt)) * Double(scrollWordsPerMinute) / 60
+    }
+
+    /// Moves the current line along as the script scrolls past it.
+    private func followScroll() {
+        guard autoScroll, scrollAt != nil, countdown == nil, !ended, !script.cards.isEmpty else { return }
+        let words = scrolledWords(at: Date())
+        let starts = cardStarts
+        let total = starts.last.map { $0 + (script.cards.last?.words ?? 0) } ?? 0
+        if words >= Double(total) { endScript(by: "scroll"); return }
+        let index = (starts.lastIndex { Double($0) <= words }) ?? 0
+        if index > cardIndex { showCard(index, by: "scroll") }
+    }
+
+    /// After a key or remote press, the scroll carries on from the start of the line it moved to.
+    private func rescroll() {
+        guard autoScroll, scrollAt != nil else { return }
+        let starts = cardStarts
+        scrollFrom = ended ? Double(starts.last.map { $0 + (script.cards.last?.words ?? 0) } ?? 0)
+                           : Double(starts.indices.contains(cardIndex) ? starts[cardIndex] : 0)
+        scrollAt = Date()
     }
 
     private func tick() {
@@ -925,6 +982,7 @@ final class Studio: ObservableObject {
             lastWatch = now
             watchCamera(now)
         }
+        followScroll()
         cardElapsed = countdown == nil ? now - cardStart : 0
         if listener != nil {
             if let move = follower?.tick(at: now, loudAt: lastLoud) { voiceMove(to: move) }
@@ -957,11 +1015,13 @@ final class Studio: ObservableObject {
         } else if !ended {
             endScript(by: "key")
         }
+        rescroll()
     }
 
     func back() {
         guard phase == .recording, countdown == nil else { return }
         if ended { showCard(cardIndex, by: "key") } else if cardIndex > 0 { showCard(cardIndex - 1, by: "key") }
+        rescroll()
     }
 
     private func endScript(by: String) {

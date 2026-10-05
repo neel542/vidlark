@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// What the presenter reads. One line at a time, large, with the next line waiting faintly beneath it.
@@ -7,7 +8,7 @@ struct PrompterView: View {
 
     var body: some View {
         GeometryReader { g in
-            let base = max(22, min(g.size.height * 0.19, 54))
+            let base = max(22, min(g.size.height * 0.19, 54)) * studio.prompterSize
             ZStack {
                 RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Palette.glass)
                 RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.white.opacity(0.07))
@@ -33,6 +34,8 @@ struct PrompterView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .id("count-\(n)")
                 .transition(.opacity)
+        } else if studio.autoScroll && studio.isRolling && studio.scrollAt != nil && !studio.ended {
+            ScrollingScript(studio: studio, base: base)
         } else if studio.ended {
             line(dot: .off, text: "End of script. Look at the lens, then stop.", size: base * 0.75, opacity: 0.7)
         } else if let card = studio.currentCard ?? (studio.isRolling ? nil : studio.script.cards.first) {
@@ -144,6 +147,55 @@ struct PrompterView: View {
     }
 }
 
+/// The whole script moving up at a steady pace, like a classic teleprompter. The words being read
+/// sit at the green mark near the top; what comes next waits underneath.
+private struct ScrollingScript: View {
+    @ObservedObject var studio: Studio
+    var base: CGFloat
+    @State private var frames: [Int: CGRect] = [:]
+
+    var body: some View {
+        GeometryReader { g in
+            let mark = min(g.size.height * 0.22, base * 1.4)
+            TimelineView(.animation) { context in
+                let y = position(studio.scrolledWords(at: context.date))
+                VStack(alignment: .leading, spacing: base * 0.55) {
+                    ForEach(Array(studio.script.cards.enumerated()), id: \.offset) { i, card in
+                        Text(card.text)
+                            .font(.system(size: card.prose ? base * 0.86 : base, weight: .semibold))
+                            .foregroundStyle(Palette.ink.opacity(i < studio.cardIndex ? 0.3 : i == studio.cardIndex ? 1 : 0.62))
+                            .lineSpacing(base * 0.16)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("script")) } action: { frames[i] = $0 }
+                    }
+                }
+                .padding(.leading, base * 0.5)
+                .coordinateSpace(.named("script"))
+                .frame(width: g.size.width, alignment: .leading)
+                .offset(y: mark - y)
+            }
+            .overlay(alignment: .topLeading) {
+                // The reading mark.
+                Capsule().fill(Palette.signal)
+                    .frame(width: 3, height: base * 0.9)
+                    .offset(y: mark - base * 0.45)
+            }
+        }
+        .clipped()
+        .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.1),
+                                     .init(color: .black, location: 0.85), .init(color: .clear, location: 1)],
+                             startPoint: .top, endPoint: .bottom))
+    }
+
+    /// Where the word being read sits, from the top of the script.
+    private func position(_ words: Double) -> CGFloat {
+        let starts = studio.cardStarts
+        guard let i = starts.lastIndex(where: { Double($0) <= words }), let frame = frames[i] else { return 0 }
+        let share = min(1, (words - Double(starts[i])) / Double(max(1, studio.script.cards[i].words)))
+        return frame.minY + frame.height * share
+    }
+}
+
 /// A floating strip that stays above PowerPoint, never takes focus and is never recorded
 /// (the whole app is excluded from the screen capture).
 final class PrompterPanel: NSPanel {
@@ -155,6 +207,7 @@ final class PrompterPanel: NSPanel {
 final class PrompterController {
     private let panel: PrompterPanel
     private let studio: Studio
+    private var watch: AnyCancellable?
 
     init(studio: Studio) {
         self.studio = studio
@@ -173,9 +226,19 @@ final class PrompterController {
         panel.contentView = NSHostingView(rootView: PrompterView(studio: studio))
         panel.setFrameAutosaveName("Prompter")
         studio.onDisplaysChanged = { [weak self] in self?.placeIfLost() }
+        // On screen during a take only, and only when Settings says to show it.
+        watch = studio.$phase.combineLatest(studio.$showPrompter)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] phase, show in
+                switch phase {
+                case .starting, .recording: if show { self?.show() } else { self?.panel.orderOut(nil) }
+                default: self?.panel.orderOut(nil)
+                }
+            }
     }
 
     func show() {
+        guard !panel.isVisible else { return }
         if !panel.setFrameUsingName("Prompter") { placeAtTop() }
         placeIfLost()
         panel.orderFrontRegardless()

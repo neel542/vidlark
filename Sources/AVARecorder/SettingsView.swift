@@ -283,9 +283,22 @@ private struct PrompterSettings: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             SettingsGroup {
-                SettingRow("Moves to the next line",
-                           "With my voice, it listens and moves on as you finish each line. The key and the remote always work too.") {
-                    Segments(choices: [("With my voice", true), ("Key only", false)], selected: studio.followVoice) { studio.followVoice = $0 }
+                SettingRow("Show the prompter during takes",
+                           "A strip with the script, at the top of the screen that is not recorded. Drag it next to the camera.") {
+                    Switch(on: studio.showPrompter) { studio.showPrompter = $0 }
+                }
+                SettingRow("How it moves on",
+                           "My voice: it listens and moves on as you finish each line. Key: only when you press it. By itself: the script scrolls up at a steady speed. The key and the remote always work too.") {
+                    Segments(choices: [("My voice", Pace.voice), ("Key", .key), ("By itself", .scroll)], selected: pace) { set($0) }
+                }
+                if studio.autoScroll {
+                    SettingRow("Scrolling speed",
+                               "Medium is about 140 words a minute, a calm talking pace. The key under Esc skips ahead; Shift and the key goes back.") {
+                        Segments(choices: [("Slow", 110), ("Medium", 140), ("Fast", 170)], selected: studio.scrollWordsPerMinute) { studio.scrollWordsPerMinute = $0 }
+                    }
+                }
+                SettingRow("Text size", "Bigger is easier to read from further away; fewer words fit.") {
+                    Segments(choices: [("Small", 0.8), ("Medium", 1.0), ("Large", 1.3), ("Extra large", 1.6)], selected: studio.prompterSize) { studio.prompterSize = $0 }
                 }
                 SettingRow("Keyboard", "The key under Esc moves to the next line. Hold Shift with it to go back.") {
                     HStack(spacing: 8) {
@@ -296,6 +309,15 @@ private struct PrompterSettings: View {
             }
             RemoteSettings()
         }
+    }
+
+    private enum Pace { case voice, key, scroll }
+
+    private var pace: Pace { studio.autoScroll ? .scroll : studio.followVoice ? .voice : .key }
+
+    private func set(_ pace: Pace) {
+        studio.autoScroll = pace == .scroll
+        studio.followVoice = pace == .voice
     }
 }
 
