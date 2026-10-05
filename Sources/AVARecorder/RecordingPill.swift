@@ -413,10 +413,10 @@ struct RecordingPillView: View {
         let open = studio.recorderOpen
         return Button { studio.recorderOpen.toggle() } label: {
             HStack(spacing: 7) {
-                Image(systemName: open ? "arrow.uturn.backward" : "macwindow")
+                Image(systemName: "macwindow")
                     .font(.system(size: 11, weight: .semibold))
                     .frame(width: 16)
-                Text(open ? "Hide recorder" : "Back to recorder")
+                Text(open ? "Hide the recorder" : "Back to the recorder")
                     .font(.system(size: 12, weight: .semibold))
                     .lineLimit(1)
                 Spacer(minLength: 0)
