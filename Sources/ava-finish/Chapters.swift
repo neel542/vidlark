@@ -12,6 +12,8 @@ struct RecordingEvents {
     var screenShared: Double?
     /// Each click of Me or Screen, in camera time. The first is where the take started.
     var shows: [ShowChange] = []
+    /// Each change of the Mac's sound: on or off, and from where.
+    var sounds: [(t: Double, on: Bool, from: String)] = []
     var skippedLines = 0
 }
 
@@ -43,6 +45,8 @@ func readEvents(_ url: URL) -> RecordingEvents? {
             events.cameraFirst = (object["screen"] as? String) == ""
         case "screen-start":
             if events.screenShared == nil { events.screenShared = t }
+        case "sound":
+            events.sounds.append((t, (object["on"] as? Bool) ?? false, text("from") ?? "every app"))
         case "show":
             if let what = text("what") { events.shows.append(ShowChange(t: t, screen: what == "screen")) }
         case "card":

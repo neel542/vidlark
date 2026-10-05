@@ -169,6 +169,17 @@ func buildReport(_ r: ReportInput) -> String {
         out.append("Not checked, because there is no transcript.")
     }
 
+    if let sounds = r.events?.sounds, !sounds.isEmpty {
+        out.append("")
+        out.append("## Mac sound")
+        out.append("")
+        out.append("The second sound track of screen.mov. Off means silence there.")
+        out.append("")
+        for change in sounds {
+            out.append("- \(clock(change.t)) \(change.on ? "on, from \(change.from)" : "off")")
+        }
+    }
+
     out.append("")
     out.append("## Video")
     out.append("")

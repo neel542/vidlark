@@ -372,6 +372,10 @@ struct RecordingPillView: View {
                 .frame(minWidth: 52, alignment: .leading)
             LiveMeter(meter: studio.meter)
                 .frame(width: state.expanded && !faceInVideo ? 52 : 44)
+            // The Mac's sound, any moment of the take.
+            if studio.takeHasScreen && studio.isRolling {
+                SoundButton(studio: studio)
+            }
             // Her face in the screen part of the video, or not.
             if studio.showing == .screen && studio.takeHasScreen {
                 RoundButton(symbol: studio.faceInVideo ? "person.crop.circle.fill" : "person.crop.circle", lit: studio.faceInVideo,
@@ -491,6 +495,58 @@ private struct RoundButton: View {
         .buttonStyle(.plain)
         .onHover { hover = $0 }
         .help(help)
+    }
+}
+
+/// The Mac's sound: click to switch it on or off; the arrow beside it picks which app it comes
+/// from, so a video in Chrome can go in without notifications or music from elsewhere.
+private struct SoundButton: View {
+    @ObservedObject var studio: Studio
+
+    var body: some View {
+        let face = Image(systemName: studio.soundOn ? "speaker.wave.2.fill" : "speaker.slash.fill")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(studio.soundOn ? Palette.signal : Palette.dim)
+        Group {
+            if Snapshots.active {
+                HStack(spacing: 4) {
+                    face
+                    Image(systemName: "chevron.down").font(.system(size: 7, weight: .bold)).foregroundStyle(Palette.engraved)
+                }
+            } else {
+                Menu {
+                    Button { studio.setSound(on: false) } label: { tick(!studio.soundOn, "Mac sound off") }
+                    Section("Mac sound on, from") {
+                        Button { studio.setSoundFrom(nil) } label: { tick(studio.soundOn && studio.soundFrom == nil, "Every app") }
+                        ForEach(studio.soundApps) { app in
+                            Button { studio.setSoundFrom(app.id) } label: { tick(studio.soundOn && studio.soundFrom == app.id, "Only \(app.name)") }
+                        }
+                    }
+                } label: {
+                    face
+                } primaryAction: {
+                    studio.setSound(on: !studio.soundOn)
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.visible)
+            }
+        }
+        .fixedSize()
+        .padding(.horizontal, 9)
+        .frame(height: 30)
+        .background(Capsule().fill(Palette.raised))
+        .overlay(Capsule().strokeBorder(Palette.hairline))
+        .help(help)
+    }
+
+    private var help: String {
+        let from = studio.soundFrom.map { id in studio.soundApps.first { $0.id == id }?.name ?? id } ?? "every app"
+        return studio.soundOn ? "The Mac's sound is going in, from \(from). Click to turn it off; the arrow picks the app."
+            : "The Mac's sound is off. Click to turn it on; the arrow picks the app."
+    }
+
+    @ViewBuilder private func tick(_ on: Bool, _ title: String) -> some View {
+        if on { Label(title, systemImage: "checkmark") } else { Text(title) }
     }
 }
 

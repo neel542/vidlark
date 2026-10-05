@@ -111,6 +111,16 @@ final class Studio: ObservableObject {
     /// makes video.mp4 follow each switch with a short fade.
     enum Show: String { case camera, screen }
     @Published private(set) var showing: Show = .camera
+    /// The Mac's sound in this take: on or off, and from which app (nil is every app). It starts
+    /// each take from Settings and changes from the speaker button in the recording box.
+    @Published private(set) var soundOn = false
+    @Published private(set) var soundFrom: String?
+    /// Apps that are open, to pick the sound from.
+    @Published private(set) var soundApps: [SoundApp] = []
+    struct SoundApp: Identifiable, Equatable {
+        var id: String
+        var name: String
+    }
     /// Bumped when the remote asks for the screen in a camera-first take: the face box asks first.
     @Published private(set) var shareRequest = 0
     private var remoteWatch: [AnyCancellable] = []
@@ -241,6 +251,11 @@ final class Studio: ObservableObject {
                 .receive(on: RunLoop.main)
                 .sink { [weak self] in DispatchQueue.main.async { self?.updateRemote() } },
         ]
+        for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
+            NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { if self?.isRolling == true { self?.refreshSoundApps() } }
+            }
+        }
         // Access granted in System Settings only shows once the app looks again.
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { RemoteControl.shared.refreshTrust() }
@@ -676,9 +691,10 @@ final class Studio: ObservableObject {
                 screen.onError = { [weak self] error in
                     Task { @MainActor in self?.screenFailed(error) }
                 }
-                try await screen.start(filter: filter, pixelSize: choice.pixelSize,
-                                       micID: micAllowed ? micID : nil, systemAudio: screenAudio,
+                try await screen.start(filter: filter, display: try target(content), pixelSize: choice.pixelSize,
+                                       micID: micAllowed ? micID : nil,
                                        to: folder.appendingPathComponent("screen.mov"))
+                await startSound()
                 }
 
                 camera.onStarted = { [weak self] time in
@@ -714,10 +730,16 @@ final class Studio: ObservableObject {
     /// of this app's windows asked for by `showInRecording` (the face bubble).
     private var shownWindowIDs: [CGWindowID] = []
 
-    private func makeFilter(_ content: SCShareableContent) throws -> SCContentFilter {
+    /// The screen being recorded, as ScreenCaptureKit knows it.
+    private func target(_ content: SCShareableContent) throws -> SCDisplay {
         guard let target = content.displays.first(where: { $0.displayID == displayID }) ?? content.displays.first else {
             throw RecorderError("No screen to record.")
         }
+        return target
+    }
+
+    private func makeFilter(_ content: SCShareableContent) throws -> SCContentFilter {
+        let target = try target(content)
         let hidden = Set([Bundle.main.bundleIdentifier ?? "inc.ava.recorder", "com.apple.notificationcenterui"])
         let excluded = content.applications.filter { hidden.contains($0.bundleIdentifier) }
         let shown = content.windows.filter { shownWindowIDs.contains($0.windowID) }
@@ -756,11 +778,12 @@ final class Studio: ObservableObject {
                     Task { @MainActor in self?.screenFailed(error) }
                 }
                 log?.write(["type": "screen-start", "screen": "screen.mov", "screenName": choice.name, "macSound": screenAudio])
-                try await screen.start(filter: filter, pixelSize: choice.pixelSize,
-                                       micID: micAllowed ? micID : nil, systemAudio: screenAudio,
+                try await screen.start(filter: filter, display: try target(content), pixelSize: choice.pixelSize,
+                                       micID: micAllowed ? micID : nil,
                                        to: folder.appendingPathComponent("screen.mov"))
                 guard phase == .recording else { return }
                 takeHasScreen = true
+                await startSound()
                 // Sharing is a click on Screen. screen.mov first holds a moment of her camera across
                 // the screen, so the finished video can change from camera.mov to it without a
                 // jump; then her camera shrinks into the bubble.
@@ -781,6 +804,64 @@ final class Studio: ObservableObject {
         log?.write(["type": "show", "what": what.rawValue])
     }
 
+    // MARK: The Mac's sound
+
+    /// The screen has started recording: its sound starts as Settings says, from the app picked last
+    /// time if it is open.
+    private func startSound() async {
+        refreshSoundApps()
+        soundOn = screenAudio
+        let remembered = UserDefaults.standard.string(forKey: "soundFrom")
+        soundFrom = soundApps.contains { $0.id == remembered } ? remembered : nil
+        await applySound()
+    }
+
+    /// On or off, from the speaker button. Any moment of the take; nothing else stops.
+    func setSound(on: Bool) {
+        guard isRolling, takeHasScreen, on != soundOn else { return }
+        soundOn = on
+        Task { await applySound() }
+    }
+
+    /// Only this app's sound (or every app's, with nil), switched on.
+    func setSoundFrom(_ id: String?) {
+        guard isRolling, takeHasScreen else { return }
+        soundOn = true
+        soundFrom = id
+        if !Snapshots.active { UserDefaults.standard.set(id, forKey: "soundFrom") }
+        Task { await applySound() }
+    }
+
+    private func applySound() async {
+        var app: SCRunningApplication?
+        if let soundFrom, let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false) {
+            app = content.applications.first { ScreenRecorder.key($0) == soundFrom }
+        }
+        do {
+            try await screen.setSound(on: soundOn, app: app)
+        } catch {
+            log?.write(["type": "screen-error", "message": "sound: \(error.localizedDescription)"])
+        }
+        logSound()
+    }
+
+    private func logSound(at time: CFTimeInterval = CACurrentMediaTime()) {
+        let from = soundFrom.map { id in soundApps.first { $0.id == id }?.name ?? id } ?? "every app"
+        log?.write(["type": "sound", "on": soundOn, "from": from], at: time)
+    }
+
+    /// Open apps a person would play sound from, by name.
+    func refreshSoundApps() {
+        let mine = Bundle.main.bundleIdentifier
+        soundApps = NSWorkspace.shared.runningApplications
+            .filter { $0.activationPolicy == .regular && $0.bundleIdentifier != mine }
+            .compactMap { app in
+                guard let name = app.localizedName else { return nil }
+                return SoundApp(id: app.bundleIdentifier ?? name, name: name)
+            }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
     private func rolling(from time: CFTimeInterval) {
         guard phase == .starting, let folder else { return }
         t0 = time
@@ -798,6 +879,7 @@ final class Studio: ObservableObject {
                    at: time)
         showing = takeHasScreen ? .screen : .camera
         log?.write(["type": "show", "what": showing.rawValue], at: time)
+        if takeHasScreen { logSound(at: time) }
 
         if let i = queue.firstIndex(where: { $0.id == currentID }) {
             queue[i].recordings += 1
@@ -1206,6 +1288,20 @@ extension Studio {
                 Task { @MainActor in
                     try? await Task.sleep(nanoseconds: UInt64(at * 1_000_000_000))
                     if what == .screen && !takeHasScreen { shareScreen() } else { show(what) }
+                }
+            }
+            // AVA_SOUND=2:on,5:from:afplay,8:off switches the Mac's sound at those seconds into the take.
+            for item in (ProcessInfo.processInfo.environment["AVA_SOUND"] ?? "").split(separator: ",") {
+                let parts = item.split(separator: ":", maxSplits: 2).map(String.init)
+                guard parts.count >= 2, let at = Double(parts[0]) else { continue }
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: UInt64(at * 1_000_000_000))
+                    switch parts[1] {
+                    case "on": setSound(on: true)
+                    case "off": setSound(on: false)
+                    case "from": setSoundFrom(parts.count > 2 ? parts[2] : nil)
+                    default: break
+                    }
                 }
             }
             // AVA_SHARE_AT=<seconds>: a camera-first take shares the screen that far in.

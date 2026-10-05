@@ -431,12 +431,12 @@ enum ScreenCameraTest {
                     try? await Task.sleep(nanoseconds: 1_000_000_000)
                     recorder.startRecording(to: camURL)
                 } else if c.screenFirst {
-                    try? await screen.start(filter: c.filter, pixelSize: c.size, micID: c.mic ? mic.uniqueID : nil, to: scrURL)
+                    try? await screen.start(filter: c.filter, display: display, pixelSize: c.size, micID: c.mic ? mic.uniqueID : nil, to: scrURL)
                     recorder.startRecording(to: camURL)
                 } else {
                     recorder.startRecording(to: camURL)
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    try? await screen.start(filter: c.filter, pixelSize: c.size, micID: c.mic ? mic.uniqueID : nil, to: scrURL)
+                    try? await screen.start(filter: c.filter, display: display, pixelSize: c.size, micID: c.mic ? mic.uniqueID : nil, to: scrURL)
                 }
                 if c.update {
                     try? await Task.sleep(nanoseconds: 700_000_000)

@@ -388,15 +388,23 @@ final class CameraFeed: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
 
 /// The content screen plus the same mic, into screen.mov. The shared mic is what lets the
 /// finisher line the two files up exactly. The app's own windows and Notification Center are
-/// cut out of the picture. With `systemAudio`, what the Mac plays goes in as a second sound track
-/// (the mic stays the first, which the finisher reads).
+/// cut out of the picture. What the Mac plays goes in as a second sound track (the mic stays the
+/// first, which the finisher reads): silence while the sound is off, every app's sound, or one app's
+/// from a small stream of its own. It can change at any moment of the take.
 final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
     private var stream: SCStream?
     private var writer: AVAssetWriter?
     private var videoIn: AVAssetWriterInput?
     private var audioIn: AVAssetWriterInput?
     private var systemIn: AVAssetWriterInput?
-    private var wantsSystemAudio = false
+    /// The Mac's sound: whether it goes in, and from which app (nil is every app). Queue only.
+    private var soundOn = false
+    private var soundFrom: String?
+    /// Where the Mac's sound track has got to, so a change of source never goes back in time. Queue only.
+    private var soundEnd = CMTime.invalid
+    /// One app's sound, when only that app is wanted.
+    private var appStream: SCStream?
+    private var display: SCDisplay?
     private let queue = DispatchQueue(label: "ava.screen")
     private var started = false
     private var wantsAudio = false
@@ -410,10 +418,12 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
     /// Every complete screen frame, for the live view. Called on the stream queue.
     var onFrame: ((CVPixelBuffer) -> Void)?
 
-    func start(filter: SCContentFilter, pixelSize: CGSize, micID: String?, systemAudio: Bool = false, to url: URL) async throws {
+    func start(filter: SCContentFilter, display: SCDisplay, pixelSize: CGSize, micID: String?, to url: URL) async throws {
         self.url = url
+        self.display = display
         started = false
         audioFormat = nil
+        queue.sync { soundEnd = .invalid }
         size = (Int(pixelSize.width) & ~1, Int(pixelSize.height) & ~1)
 
         let config = SCStreamConfiguration()
@@ -424,14 +434,12 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
         config.colorSpaceName = CGColorSpace.sRGB
         config.showsCursor = true
         config.queueDepth = 8
-        config.capturesAudio = systemAudio
-        if systemAudio {
-            // The app's own sounds (the countdown beeps) stay out.
-            config.excludesCurrentProcessAudio = true
-            config.sampleRate = 48_000
-            config.channelCount = 2
-        }
-        wantsSystemAudio = systemAudio
+        // The Mac's sound is always listened to, so it can be switched on at any moment; while it is
+        // off, silence is written instead. The app's own sounds (the countdown beeps) stay out.
+        config.capturesAudio = true
+        config.excludesCurrentProcessAudio = true
+        config.sampleRate = 48_000
+        config.channelCount = 2
         wantsAudio = micID != nil
         if let micID {
             config.captureMicrophone = true
@@ -441,7 +449,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
         let s = SCStream(filter: filter, configuration: config, delegate: self)
         try s.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
         if wantsAudio { try s.addStreamOutput(self, type: .microphone, sampleHandlerQueue: queue) }
-        if systemAudio { try s.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue) }
+        try s.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue)
         stream = s
         streamStart = CACurrentMediaTime()
         try await s.startCapture()
@@ -450,6 +458,8 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
     func stop() async {
         if let s = stream { try? await s.stopCapture() }
         stream = nil
+        if let a = appStream { try? await a.stopCapture() }
+        appStream = nil
         await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
             queue.async { [self] in
                 guard let w = writer, w.status == .writing else {
@@ -482,6 +492,11 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
         guard sampleBuffer.isValid else { return }
+        // The one-app sound stream only brings sound; its tiny picture is thrown away.
+        if stream !== self.stream {
+            if type == .audio { takeSound(sampleBuffer, fromOneApp: true) }
+            return
+        }
         switch type {
         case .screen:
             guard let info = (CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false)
@@ -499,7 +514,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
             if audioFormat == nil { audioFormat = sampleBuffer.formatDescription }
             if started, let a = audioIn, a.isReadyForMoreMediaData { a.append(sampleBuffer) }
         case .audio:
-            if started, let s = systemIn, s.isReadyForMoreMediaData { s.append(sampleBuffer) }
+            takeSound(sampleBuffer, fromOneApp: false)
         default:
             break
         }
@@ -511,7 +526,70 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
     }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {
-        onError?(error)
+        // The one-app sound stream stops when that app quits; the take carries on.
+        if stream === self.stream { onError?(error) }
+    }
+
+    /// Turns the Mac's sound on or off, and picks where it comes from: `app` alone, or every app.
+    func setSound(on: Bool, app: SCRunningApplication?) async throws {
+        let from = app.map(Self.key)
+        let changed = queue.sync { () -> Bool in
+            soundOn = on
+            defer { soundFrom = from }
+            return soundFrom != from
+        }
+        guard changed else { return }
+        if let old = appStream {
+            appStream = nil
+            try? await old.stopCapture()
+        }
+        guard let app, let display else { return }
+        let config = SCStreamConfiguration()
+        config.width = 2
+        config.height = 2
+        config.minimumFrameInterval = CMTime(value: 1, timescale: 1)
+        config.queueDepth = 3
+        config.capturesAudio = true
+        config.excludesCurrentProcessAudio = true
+        config.sampleRate = 48_000
+        config.channelCount = 2
+        let s = SCStream(filter: SCContentFilter(display: display, including: [app], exceptingWindows: []),
+                         configuration: config, delegate: self)
+        try s.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
+        try s.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue)
+        appStream = s
+        try await s.startCapture()
+    }
+
+    /// How an app is told apart: its bundle id, or its name when it has none.
+    static func key(_ app: SCRunningApplication) -> String {
+        app.bundleIdentifier.isEmpty ? app.applicationName : app.bundleIdentifier
+    }
+
+    /// Queue only. Writes the Mac's sound from the chosen source, or silence in its place while off.
+    private func takeSound(_ buffer: CMSampleBuffer, fromOneApp: Bool) {
+        guard started, let input = systemIn, fromOneApp == (soundFrom != nil) else { return }
+        let time = buffer.presentationTimeStamp
+        if soundEnd.isValid, CMTimeCompare(time, soundEnd) < 0 { return }
+        guard input.isReadyForMoreMediaData, let out = soundOn ? buffer : Self.silence(like: buffer) else { return }
+        if input.append(out) { soundEnd = CMTimeAdd(time, buffer.duration) }
+    }
+
+    /// A buffer of silence with the same format, length and time.
+    private static func silence(like buffer: CMSampleBuffer) -> CMSampleBuffer? {
+        guard let format = buffer.formatDescription, let data = buffer.dataBuffer else { return nil }
+        let length = CMBlockBufferGetDataLength(data)
+        var block: CMBlockBuffer?
+        guard CMBlockBufferCreateWithMemoryBlock(allocator: nil, memoryBlock: nil, blockLength: length, blockAllocator: nil,
+                                                 customBlockSource: nil, offsetToData: 0, dataLength: length,
+                                                 flags: kCMBlockBufferAssureMemoryNowFlag, blockBufferOut: &block) == noErr,
+              let block, CMBlockBufferFillDataBytes(with: 0, blockBuffer: block, offsetIntoDestination: 0, dataLength: length) == noErr
+        else { return nil }
+        var out: CMSampleBuffer?
+        CMAudioSampleBufferCreateReadyWithPacketDescriptions(allocator: nil, dataBuffer: block, formatDescription: format,
+                                                             sampleCount: buffer.numSamples, presentationTimeStamp: buffer.presentationTimeStamp,
+                                                             packetDescriptions: nil, sampleBufferOut: &out)
+        return out
     }
 
     private func openWriter(at time: CMTime) -> Bool {
@@ -558,7 +636,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate {
 
             // The Mac's sound, after the mic so the mic stays the first sound track.
             systemIn = nil
-            if wantsSystemAudio {
+            do {
                 var layout = AudioChannelLayout()
                 layout.mChannelLayoutTag = kAudioChannelLayoutTag_Stereo
                 let s = AVAssetWriterInput(mediaType: .audio, outputSettings: [
