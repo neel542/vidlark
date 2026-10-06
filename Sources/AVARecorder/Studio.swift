@@ -197,6 +197,10 @@ final class Studio: ObservableObject {
 
     /// A self test changes what is shared and heard for its own take only, never the saved choices.
     static let selfTesting = CommandLine.arguments.contains("--self-test")
+    /// `--self-test` with AVA_QUIET=1 runs out of sight while someone uses the Mac: no windows,
+    /// no Dock icon, no beeps. Launch it with `open -g` so it never comes to the front.
+    nonisolated static let quietTest = CommandLine.arguments.contains("--self-test")
+        && ProcessInfo.processInfo.environment["AVA_QUIET"] != nil
 
     /// Where the Mac's sound comes from at the start of a take: one app's name, or nil for every app.
     var soundFromName: String? { Snapshots.active ? stagedSoundName : UserDefaults.standard.string(forKey: "soundFromName") }
@@ -287,6 +291,8 @@ final class Studio: ObservableObject {
     /// Camera rest: whether the session is stopped, since when nobody has needed it, and since
     /// when the app has been in the background.
     private var cameraAsleep = false
+    /// Keeps the camera awake regardless, while a self-test waits for its phones.
+    private var holdAwake = false
     private var unneededSince: CFTimeInterval?
     private var inactiveSince: CFTimeInterval?
     private var ticker: Timer?
@@ -1732,14 +1738,15 @@ extension Studio {
                 PhoneLink.shared.start()
                 let links = numbers.compactMap { PhoneLink.shared.link($0) }.joined(separator: "\n")
                 try? links.write(to: Library.root.appendingPathComponent(".selftest-phone.txt"), atomically: true, encoding: .utf8)
-                // In touch is enough: a phone that came while the camera rested waits resting, and the
-                // take wakes it, as it would for Neel.
+                // The camera stays awake meanwhile: a quiet test has no window to be seen in, and a
+                // resting phone sends no pictures.
+                holdAwake = true
                 var waited = 0.0
-                func allSending() -> Bool { numbers.allSatisfy { PhoneLink.shared.state($0).connected || PhoneLink.shared.state($0).present } }
+                func allSending() -> Bool { numbers.allSatisfy { PhoneLink.shared.state($0).connected } }
                 while !allSending() && waited < 60 {
                     try? await Task.sleep(nanoseconds: 500_000_000); waited += 0.5
                 }
-                guard allSending() else { report(["ok": false, "stage": "phone", "reason": "no word from a phone's page"]); return }
+                guard allSending() else { report(["ok": false, "stage": "phone", "reason": "no pictures from a phone's page"]); return }
                 phoneStates = Dictionary(uniqueKeysWithValues: numbers.map { ($0, PhoneLink.shared.state($0)) })
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
@@ -1757,6 +1764,7 @@ extension Studio {
                 shareTarget = .window(app: parts[0], appName: parts[0], title: parts.count > 1 ? parts[1] : "")
             }
             start(withScreen: withScreen)
+            holdAwake = false
             var waited = 0.0
             while phase != .recording && waited < 15 {
                 if case .failed(let why) = phase { report(["ok": false, "stage": "start", "reason": why]); return }
@@ -1959,7 +1967,7 @@ extension Studio {
         // the moment it connects.
         let looking = (feed.anySeen && now - (inactiveSince ?? now) < 60) || PhoneCodeWindow.isOpen
         let watched = liveTaps.keys.contains(where: liveFrames.watching) || liveAudio.listening
-        if isBusy || looking || watched {
+        if isBusy || looking || watched || holdAwake {
             unneededSince = nil
             if cameraAsleep { sleepCamera(false) }
         } else {

@@ -248,11 +248,7 @@ async function post(body) {
 function handle(j) {
   if (j.replaced) { stop(); veil("Another phone took over", "Another phone or tab opened this same code, so AVA uses that one now. Tap Start camera to take it back."); return; }
   if (j.key) forceKey = true;
-  if (j.rest !== resting) {
-    resting = j.rest; forceKey = true;
-    // Out with any picture the encoder still holds, so none turns up late, after the rest.
-    if (resting && encoder && encoder.state === "configured") encoder.flush().catch(() => {});
-  }
+  if (j.rest !== resting) { resting = j.rest; forceKey = true; }
   recording = j.recording;
   show();
 }

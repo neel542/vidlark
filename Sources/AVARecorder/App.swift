@@ -90,6 +90,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+        if Studio.quietTest {
+            // Out of sight: no Dock icon, and the panel never shows.
+            NSApp.setActivationPolicy(.accessory)
+            for delay in [0.0, 0.3, 1.0] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    for window in NSApp.windows where window.isVisible {
+                        window.alphaValue = 0
+                        window.ignoresMouseEvents = true
+                        window.orderOut(nil)
+                    }
+                }
+            }
+        }
         if let i = args.firstIndex(of: "--self-test"), i + 1 < args.count, let seconds = Double(args[i + 1]) {
             // `--record-main` points the test at the screen that shows pop-up banners.
             if args.contains("--record-main"),

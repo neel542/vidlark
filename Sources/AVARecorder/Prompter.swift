@@ -255,7 +255,7 @@ final class PrompterController {
     }
 
     func show() {
-        guard !panel.isVisible else { return }
+        guard !panel.isVisible, !Studio.quietTest else { return }
         if !panel.setFrameUsingName("Prompter") { placeAtTop() }
         placeIfLost()
         panel.orderFrontRegardless()

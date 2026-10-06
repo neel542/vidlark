@@ -10,7 +10,7 @@ enum Beeps {
     static func go() { play(start) }
 
     private static func play(_ sound: NSSound?) {
-        guard !Snapshots.active, let sound else { return }
+        guard !Snapshots.active, !Studio.quietTest, let sound else { return }
         sound.stop()
         sound.play()
     }

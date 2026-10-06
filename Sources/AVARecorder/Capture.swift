@@ -496,8 +496,6 @@ final class PhoneTake {
     private var waitingAudio: [CMSampleBuffer] = []
     /// About ten seconds of either; past that the oldest goes.
     private static let mostWaiting = (video: 300, audio: 480)
-    /// When the take asked for its first picture, on the Mac's clock.
-    private let asked = CMClockGetTime(CMClockGetHostTimeClock())
     var micFormat: CMFormatDescription?
 
     init(url: URL) {
@@ -515,12 +513,7 @@ final class PhoneTake {
         let key = Self.isKey(sample)
         guard let format = CMSampleBufferGetFormatDescription(sample) else { return }
         if writer == nil {
-            // A whole picture from well before the take was asked for (one an encoder held back
-            // while the phone rested) would open the file seconds early, with a gap after it. Only
-            // for the first two seconds, so a phone whose clock is off can never keep it shut.
-            let waited = (CMClockGetTime(CMClockGetHostTimeClock()) - asked).seconds
-            let early = waited < 2 && CMTimeCompare(time, asked - CMTime(seconds: 1, preferredTimescale: 600)) < 0
-            guard key, !early, let micFormat else { askForKey(); return }
+            guard key, let micFormat else { askForKey(); return }
             guard open(video: format, audio: micFormat, at: time) else { return }
             started(time.seconds)
         }
