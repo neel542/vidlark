@@ -109,6 +109,15 @@ enum Snapshots {
                   to: dir.appendingPathComponent("settings-\(page.rawValue).png"))
         }
 
+        // The iPhone over Wi-Fi window, waiting and connected.
+        for (name, state) in [("waiting", PhoneState(serving: true)),
+                              ("connected", PhoneState(serving: true, present: true, connected: true, width: 1920, height: 1080, fps: 30))] {
+            let s = Studio()
+            s.stagePhone(state)
+            write(PhoneCodeView(studio: s).preferredColorScheme(.dark), size: CGSize(width: 740, height: 440),
+                  to: dir.appendingPathComponent("phone-code-\(name).png"))
+        }
+
         prompter("waiting") { $0.stage(phase: .idle, camera: "x", mic: "x", level: -30, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
         prompter("countdown") { $0.stage(phase: .recording, camera: "x", mic: "x", level: -30, elapsed: 1, cardIndex: 0, cardElapsed: 0, countdown: 2, screenAllowed: true, script: script) }
         prompter("hook") { $0.stage(phase: .recording, camera: "x", mic: "x", level: -30, elapsed: 8, cardIndex: 0, cardElapsed: 6, countdown: nil, screenAllowed: true, script: script) }

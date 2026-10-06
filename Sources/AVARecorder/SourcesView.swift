@@ -45,15 +45,22 @@ struct SourcesPanel: View {
 
     private var cameraRow: some View {
         let resting = studio.cameraResting && studio.cameraAllowed && studio.cameraName != nil
-        let lamp: LampState = !studio.cameraAllowed ? .fail : studio.cameraName == nil ? .warn : resting ? .off : .ok
+        let phoneWaiting = studio.usingPhone && !Snapshots.active && !studio.phoneReady
+        let lamp: LampState = !studio.cameraAllowed ? .fail : studio.cameraName == nil || phoneWaiting ? .warn : resting ? .off : .ok
         var detail = studio.cameraAllowed ? (studio.cameraName ?? "None connected") : "Not allowed yet"
         if resting {
             detail += " · Resting"
+        } else if phoneWaiting {
+            detail += " · Waiting for the iPhone"
         } else {
             if let format = studio.cameraFormat, studio.cameraName != nil { detail += " · \(format.name)" }
-            if studio.touchUpOn && studio.cameraName != nil { detail += " · Studio Light" }
+            if studio.touchUpOn && studio.cameraName != nil && !studio.usingPhone { detail += " · Studio Light" }
         }
+        // The iPhone over Wi-Fi works with any Apple Account: last in the list, as the way in when
+        // the iPhone does not show up by itself.
         let choices = studio.cameras.map { d in MenuChoice(title: d.localizedName, selected: d.uniqueID == studio.cameraID) { studio.cameraID = d.uniqueID } }
+            + [MenuChoice(title: studio.usingPhone ? "\(PhoneLink.name): show the code…" : "\(PhoneLink.name) (scan a code)…",
+                          selected: studio.usingPhone) { studio.usePhone() }]
         // Quality straight from the camera's menu, without opening Settings.
         let more = CameraQuality.allCases.map { q in
             MenuChoice(title: "Quality: \(q.title)", selected: studio.cameraQuality == q) { studio.cameraQuality = q }

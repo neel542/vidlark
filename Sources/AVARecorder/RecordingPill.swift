@@ -18,7 +18,7 @@ import Vision
 /// her face nears the edge), the frame glides once to centre her again. The zoom changes only
 /// when she has clearly come closer or moved back, and stays that way.
 /// It looks 10 times a second while she moves (or is not found) and 4 times while she is still.
-final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleBufferDelegate {
+final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleBufferDelegate, FrameTaking {
     /// Normalised to the camera picture, origin bottom left (Vision's convention).
     @Published private(set) var crop = CGRect(x: 0.21875, y: 0, width: 0.5625, height: 1)
     @Published private(set) var found = false
@@ -126,6 +126,10 @@ final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSam
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        take(sampleBuffer)
+    }
+
+    func take(_ sampleBuffer: CMSampleBuffer) {
         guard active else { return }
         let now = CACurrentMediaTime()
         guard now - last >= interval(at: now) - 0.01, let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }

@@ -400,8 +400,15 @@ private struct CameraGuide: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             seen
-            Method(symbol: "iphone", title: "Your iPhone",
-                   why: "The sharpest picture most people already own. Nothing to buy or install.", steps: [
+            Method(symbol: "qrcode", title: "Your iPhone, over Wi-Fi",
+                   why: "The quickest way in, with any Apple Account. No app and no cable: the iPhone only needs the same Wi-Fi as this Mac.", steps: [
+                "Press Show the code below, or pick \(PhoneLink.name) in the Camera row's menu.",
+                "Point the iPhone's Camera app at the code and tap the link. The first time, Safari says \u{201C}This Connection Is Not Private\u{201D}: tap Show Details, then \u{201C}visit this website\u{201D}, then Visit Website.",
+                "Tap Start camera, then Allow. Turn the iPhone sideways in its stand, back camera facing you, and keep the page open.",
+            ], after: "It records up to 1080p at 30 frames a second, timed to the Mac's mic. Keep the iPhone plugged in for a long take.",
+                   action: studio.isBusy ? nil : ("Show the code", { studio.usePhone() }))
+            Method(symbol: "iphone", title: "Your iPhone, linked by Apple",
+                   why: "Apple's own link: the sharpest picture, at up to 4K. It needs the iPhone and this Mac on the same Apple Account.", steps: [
                 "Use an iPhone XR or newer, with iOS 16 or later.",
                 "Sign in to the same Apple Account on the iPhone and on this Mac, and turn on Wi-Fi and Bluetooth on both.",
                 "On the iPhone, open Settings, General, AirPlay & Continuity (AirPlay & Handoff on older iPhones), and switch on Continuity Camera.",
@@ -467,6 +474,8 @@ private struct Method: View {
     var steps: [String]
     /// A tip that holds for every step, shown after them without a number.
     var after: String?
+    /// One button that starts this way in, at the foot of the panel.
+    var action: (title: String, run: () -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -518,6 +527,11 @@ private struct Method: View {
                     .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.leading, 42)
+            }
+            if let action {
+                SmallButton(title: action.title, primary: true) { action.run() }
+                    .padding(.leading, 42)
+                    .padding(.top, 2)
             }
         }
         .padding(18)

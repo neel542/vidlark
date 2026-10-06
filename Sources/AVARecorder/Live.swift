@@ -74,7 +74,7 @@ final class LiveFrames: @unchecked Sendable {
 }
 
 /// A copy of one camera's picture for the page. Its connection is switched off unless someone watches.
-final class LiveTap: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
+final class LiveTap: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, FrameTaking {
     let output = AVCaptureVideoDataOutput()
     let name: String
     /// The camera this tap is attached to. Frames are switched on and off through it.
@@ -99,6 +99,10 @@ final class LiveTap: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        take(sampleBuffer)
+    }
+
+    func take(_ sampleBuffer: CMSampleBuffer) {
         guard frames.watching(name) else {
             if !asleep { asleep = true; camera?.setFrames(output, on: false) }
             return

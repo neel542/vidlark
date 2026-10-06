@@ -124,6 +124,19 @@ final class CameraRecorder: NSObject {
     private var settled: CFTimeInterval = 0
     /// True while the camera rests: the session is stopped and the camera light is off. Camera queue only.
     private var resting = false
+    /// The iPhone over Wi-Fi, while it is the camera. Its pictures come from `PhoneLink` instead of
+    /// the session, which then holds only the mic. Camera queue only.
+    private var phone: PhoneLink?
+    /// camera.mov from the iPhone's pictures and the mic. Phone queue only.
+    private var phoneTake: PhoneTake?
+    /// The mic's sound format, for the iPhone take's file. Phone queue only.
+    private var micFormat: CMFormatDescription?
+    private let phoneQueue = DispatchQueue(label: "ava.camera.phone")
+    /// The frame outputs that get the iPhone's decoded pictures, and whether the mic goes to the
+    /// iPhone take. Under `phoneLock`.
+    private var phoneTargets: [PhoneTarget] = []
+    private var phoneOn = false
+    private let phoneLock = NSLock()
 
     var onLevel: ((Float, Float) -> Void)?
     /// The format the camera ended up recording in, after each `use`. Called on the camera queue.
@@ -137,8 +150,9 @@ final class CameraRecorder: NSObject {
         levelTap.setSampleBufferDelegate(self, queue: tapQueue)
     }
 
-    func use(camera: AVCaptureDevice?, mic: AVCaptureDevice?, quality: CameraQuality = .best, smooth: Bool = false) {
+    func use(camera: AVCaptureDevice?, mic: AVCaptureDevice?, quality: CameraQuality = .best, smooth: Bool = false, phone: PhoneLink? = nil) {
         queue.async { [self] in
+            usePhone(phone)
             session.beginConfiguration()
             if let v = videoInput { session.removeInput(v); videoInput = nil }
             if let a = audioInput { session.removeInput(a); audioInput = nil }
@@ -152,7 +166,12 @@ final class CameraRecorder: NSObject {
             if !session.outputs.contains(levelTap), session.canAddOutput(levelTap) { session.addOutput(levelTap) }
             session.commitConfiguration()
 
-            onFormat?(camera.flatMap { Self.useFormat($0, quality: quality, fps: smooth ? 60 : 30) })
+            if let phone {
+                let state = phone.state
+                onFormat?(state.width > 0 ? CameraFormat(width: state.width, height: state.height, fps: 30) : nil)
+            } else {
+                onFormat?(camera.flatMap { Self.useFormat($0, quality: quality, fps: smooth ? 60 : 30) })
+            }
             if let connection = movie.connection(with: .video) {
                 movie.setOutputSettings([AVVideoCodecKey: AVVideoCodecType.hevc], for: connection)
             }
@@ -168,6 +187,7 @@ final class CameraRecorder: NSObject {
             if on {
                 guard !taking, !movie.isRecording else { return }
                 resting = true
+                phone?.rest(true)
                 if session.isRunning { session.stopRunning() }
             } else {
                 wake()
@@ -179,6 +199,7 @@ final class CameraRecorder: NSObject {
     private func wake() {
         guard resting else { return }
         resting = false
+        phone?.rest(false)
         if !session.isRunning, !session.inputs.isEmpty {
             session.startRunning()
             settled = max(settled, CACurrentMediaTime() + 1)
@@ -226,6 +247,17 @@ final class CameraRecorder: NSObject {
         queue.async { [self] in
             wake()
             frameOutputsOnForTake()
+            if let phone {
+                // The file opens on the iPhone's next whole picture, which it is asked for now.
+                phoneQueue.async { [self] in
+                    let take = PhoneTake(url: url)
+                    take.micFormat = micFormat
+                    phoneTake = take
+                }
+                phone.askForKeyPicture()
+                phone.setRecording(true)
+                return
+            }
             // Give a just-changed session half a second to settle before the file opens.
             let wait = max(0, settled - CACurrentMediaTime())
             queue.asyncAfter(deadline: .now() + wait) { [self] in movie.startRecording(to: url, recordingDelegate: self) }
@@ -256,12 +288,19 @@ final class CameraRecorder: NSObject {
             guard let i = frameOutputs.firstIndex(where: { $0.output === output }) else { return }
             frameOutputs[i].wanted = on
             if !taking { output.connection(with: .video)?.isEnabled = on }
+            refreshPhoneTargets()
         }
     }
 
     /// How many seconds the open movie file holds, or nil when no file is open.
     func written(_ reply: @escaping (Double?) -> Void) {
-        queue.async { [self] in reply(movie.isRecording ? movie.recordedDuration.seconds : nil) }
+        queue.async { [self] in
+            if phone != nil {
+                phoneQueue.async { [self] in reply(phoneTake?.seconds) }
+            } else {
+                reply(movie.isRecording ? movie.recordedDuration.seconds : nil)
+            }
+        }
     }
 
     /// Camera queue only. Switching a connection on means the file waits until `settled`.
@@ -273,12 +312,14 @@ final class CameraRecorder: NSObject {
                 settled = CACurrentMediaTime() + 0.5
             }
         }
+        refreshPhoneTargets()
     }
 
     /// Camera queue only. The take is over, so outputs go back to what they asked for.
     private func takeEnded() {
         taking = false
         frameOutputs.forEach { $0.output.connection(with: .video)?.isEnabled = $0.wanted }
+        refreshPhoneTargets()
     }
 
     /// Lets go of the camera and mic, for an extra camera that is no longer wanted.
@@ -295,6 +336,16 @@ final class CameraRecorder: NSObject {
 
     func stopRecording() {
         queue.async { [self] in
+            if let phone {
+                phone.setRecording(false)
+                phoneQueue.async { [self] in
+                    let take = phoneTake
+                    phoneTake = nil
+                    let done: (Error?) -> Void = { error in self.queue.async { self.takeEnded(); self.onFinished?(error) } }
+                    if let take { take.finish(done) } else { done(nil) }
+                }
+                return
+            }
             if movie.isRecording { movie.stopRecording() } else { takeEnded(); onFinished?(nil) }
         }
     }
@@ -309,6 +360,7 @@ final class CameraRecorder: NSObject {
             session.commitConfiguration()
             frameOutputs.append((output, framesOn))
             if !taking { output.connection(with: .video)?.isEnabled = framesOn }
+            refreshPhoneTargets()
         }
     }
 
@@ -326,6 +378,186 @@ final class CameraRecorder: NSObject {
         guard let device = videoInput?.device else { return nil }
         let d = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
         return CGSize(width: Int(d.width), height: Int(d.height))
+    }
+}
+
+// MARK: - The iPhone over Wi-Fi as the camera
+
+/// A frame output that can also be handed pictures that did not come from a capture session.
+protocol FrameTaking: AnyObject {
+    func take(_ sampleBuffer: CMSampleBuffer)
+}
+
+/// One frame output fed with the iPhone's pictures, on its own queue. A picture is skipped while
+/// the one before it is still being handled, as a capture output drops late frames.
+private final class PhoneTarget: @unchecked Sendable {
+    let taker: FrameTaking
+    let queue: DispatchQueue
+    private let lock = NSLock()
+    private var busy = false
+
+    init(taker: FrameTaking, queue: DispatchQueue) {
+        self.taker = taker
+        self.queue = queue
+    }
+
+    func give(_ sample: CMSampleBuffer) {
+        guard lock.withLock({ () -> Bool in defer { busy = true }; return !busy }) else { return }
+        queue.async { [self] in
+            taker.take(sample)
+            lock.withLock { busy = false }
+        }
+    }
+}
+
+extension CameraRecorder {
+    /// Camera queue only. Switches the iPhone in as the camera, or out again.
+    fileprivate func usePhone(_ link: PhoneLink?) {
+        guard link !== phone else { return }
+        phone?.deliver(compressed: nil, decoded: nil, sized: nil)
+        phone = link
+        phoneLock.withLock { phoneOn = link != nil }
+        guard let link else { return }
+        link.deliver(
+            compressed: { [weak self] sample in
+                guard let self else { return }
+                self.phoneQueue.async { self.phoneTake?.video(sample, askForKey: { link.askForKeyPicture() }, started: { time in self.onStarted?(time) }) }
+            },
+            decoded: { [weak self] sample in
+                guard let self else { return }
+                for target in self.phoneLock.withLock({ self.phoneTargets }) { target.give(sample) }
+            },
+            sized: { [weak self] width, height in
+                guard let self else { return }
+                self.queue.async { self.onFormat?(CameraFormat(width: width, height: height, fps: 30)) }
+            })
+        link.rest(resting)
+        link.start()
+        refreshPhoneTargets()
+    }
+
+    /// Camera queue only. The outputs that want pictures now, as during a take every one does.
+    fileprivate func refreshPhoneTargets() {
+        let targets: [PhoneTarget] = phone == nil ? [] : frameOutputs.compactMap { item in
+            guard item.wanted || taking, let output = item.output as? AVCaptureVideoDataOutput,
+                  let taker = output.sampleBufferDelegate as? FrameTaking, let queue = output.sampleBufferCallbackQueue else { return nil }
+            return PhoneTarget(taker: taker, queue: queue)
+        }
+        phoneLock.withLock { phoneTargets = targets }
+    }
+}
+
+/// camera.mov from the iPhone: its H.264 pictures exactly as they came, and the Mac's mic in AAC,
+/// both timed on the Mac's clock. It starts on a whole picture and keeps 2 second fragments, so a
+/// crash keeps the take. Phone queue only.
+final class PhoneTake {
+    private let url: URL
+    private var writer: AVAssetWriter?
+    private var videoIn: AVAssetWriterInput?
+    private var audioIn: AVAssetWriterInput?
+    private var videoFormat: CMFormatDescription?
+    private var start: CMTime = .invalid
+    private var last: CMTime = .invalid
+    /// A picture could not be written, so the next ones wait for a whole picture.
+    private var broken = false
+    var micFormat: CMFormatDescription?
+
+    init(url: URL) {
+        self.url = url
+    }
+
+    /// Seconds of pictures written, or nil before the file has opened.
+    var seconds: Double? {
+        guard start.isValid, last.isValid else { return nil }
+        return (last - start).seconds
+    }
+
+    func video(_ sample: CMSampleBuffer, askForKey: () -> Void, started: (CFTimeInterval) -> Void) {
+        let time = CMSampleBufferGetPresentationTimeStamp(sample)
+        let key = Self.isKey(sample)
+        guard let format = CMSampleBufferGetFormatDescription(sample) else { return }
+        if writer == nil {
+            guard key, let micFormat else { askForKey(); return }
+            guard open(video: format, audio: micFormat, at: time) else { return }
+            started(time.seconds)
+        }
+        guard let videoIn, let videoFormat else { return }
+        // A different picture shape cannot go into the same file; it waits for the next take.
+        guard CMFormatDescriptionEqual(format, otherFormatDescription: videoFormat) else { return }
+        guard !last.isValid || CMTimeCompare(time, last) > 0 else { return }
+        if broken {
+            guard key else { return }
+            broken = false
+        }
+        if videoIn.isReadyForMoreMediaData, videoIn.append(sample) {
+            last = time
+        } else {
+            broken = true
+            askForKey()
+        }
+    }
+
+    func audio(_ sample: CMSampleBuffer) {
+        if micFormat == nil { micFormat = CMSampleBufferGetFormatDescription(sample) }
+        guard let audioIn, start.isValid, CMTimeCompare(CMSampleBufferGetPresentationTimeStamp(sample), start) >= 0,
+              audioIn.isReadyForMoreMediaData else { return }
+        audioIn.append(sample)
+    }
+
+    private func open(video: CMFormatDescription, audio: CMFormatDescription, at time: CMTime) -> Bool {
+        do {
+            try? FileManager.default.removeItem(at: url)
+            let w = try AVAssetWriter(outputURL: url, fileType: .mov)
+            w.movieFragmentInterval = CMTime(seconds: 2, preferredTimescale: 600)
+            // As the iPhone made them: no second compression.
+            let v = AVAssetWriterInput(mediaType: .video, outputSettings: nil, sourceFormatHint: video)
+            v.expectsMediaDataInRealTime = true
+            guard w.canAdd(v) else { return false }
+            w.add(v)
+            if let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(audio)?.pointee {
+                let channels = min(max(Int(asbd.mChannelsPerFrame), 1), 2)
+                var settings: [String: Any] = [
+                    AVFormatIDKey: kAudioFormatMPEG4AAC,
+                    AVSampleRateKey: min(asbd.mSampleRate, 48_000),
+                    AVNumberOfChannelsKey: channels,
+                    AVEncoderBitRateKey: channels == 1 ? 128_000 : 192_000,
+                ]
+                if channels == 2 {
+                    var layout = AudioChannelLayout()
+                    layout.mChannelLayoutTag = kAudioChannelLayoutTag_Stereo
+                    settings[AVChannelLayoutKey] = Data(bytes: &layout, count: MemoryLayout<AudioChannelLayout>.size)
+                }
+                let a = AVAssetWriterInput(mediaType: .audio, outputSettings: settings, sourceFormatHint: audio)
+                a.expectsMediaDataInRealTime = true
+                if w.canAdd(a) { w.add(a); audioIn = a }
+            }
+            guard w.startWriting() else { return false }
+            w.startSession(atSourceTime: time)
+            writer = w
+            videoIn = v
+            videoFormat = video
+            start = time
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    func finish(_ done: @escaping (Error?) -> Void) {
+        guard let writer, writer.status == .writing else {
+            done(writer == nil ? RecorderError("The iPhone sent no pictures, so camera.mov was not made. Check the iPhone page is open.") : writer?.error)
+            return
+        }
+        videoIn?.markAsFinished()
+        audioIn?.markAsFinished()
+        if last.isValid { writer.endSession(atSourceTime: last + CMTime(value: 1, timescale: 30)) }
+        writer.finishWriting { done(writer.status == .completed ? nil : writer.error) }
+    }
+
+    private static func isKey(_ sample: CMSampleBuffer) -> Bool {
+        guard let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: false) as? [[CFString: Any]],
+              let first = attachments.first else { return true }
+        return (first[kCMSampleAttachmentKey_NotSync] as? Bool) != true
     }
 }
 
@@ -351,6 +583,12 @@ extension CameraRecorder: AVCaptureAudioDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         onAudio?(sampleBuffer)
         onLiveAudio?(sampleBuffer)
+        if phoneLock.withLock({ phoneOn }) {
+            phoneQueue.async { [self] in
+                micFormat = CMSampleBufferGetFormatDescription(sampleBuffer)
+                phoneTake?.audio(sampleBuffer)
+            }
+        }
         let now = CACurrentMediaTime()
         guard now - lastLevel > 0.066 else { return }
         lastLevel = now
@@ -383,7 +621,7 @@ enum FrameDrops {
 /// hiding or showing one at the start of a take changed the session and camera.mov stopped within
 /// a second. On 4 Oct every test take lost its picture that way, and none did with no preview layers.
 /// These layers only get copies of frames, so nothing on screen can touch the session.
-final class CameraFeed: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
+final class CameraFeed: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, FrameTaking {
     let output = AVCaptureVideoDataOutput()
     private let queue = DispatchQueue(label: "ava.preview")
     private let lock = NSLock()
@@ -454,6 +692,10 @@ final class CameraFeed: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        take(sampleBuffer)
+    }
+
+    func take(_ sampleBuffer: CMSampleBuffer) {
         if let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) {
             let size = CGSize(width: CVPixelBufferGetWidth(pixels), height: CVPixelBufferGetHeight(pixels))
             lock.withLock { frameSize = size }

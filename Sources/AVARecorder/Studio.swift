@@ -125,6 +125,12 @@ final class Studio: ObservableObject {
     }
     /// What the main camera is recording right now.
     @Published private(set) var cameraFormat: CameraFormat?
+    /// The iPhone over Wi-Fi, while it is the camera or its code is showing.
+    @Published private(set) var phoneState = PhoneState()
+    /// The iPhone over Wi-Fi is the camera.
+    var usingPhone: Bool { cameraID == PhoneLink.cameraID }
+    /// It is the camera and it is in touch: sending pictures, or resting with the rest of the camera.
+    var phoneReady: Bool { phoneState.connected || (phoneState.present && cameraResting) }
     /// macOS camera effects that change the picture for every app. Only the person at the Mac can
     /// switch them, in Video Effects.
     @Published private(set) var portraitOn = false
@@ -450,6 +456,10 @@ final class Studio: ObservableObject {
 
     private func runChecks() {
         power = Preflight.power()
+        if usingPhone || PhoneCodeWindow.isOpen {
+            let state = PhoneLink.shared.state
+            if state != phoneState { phoneState = state }
+        }
         // Low Power Mode came or went: light mode follows, between takes only.
         if lightWanted != light { applyInputs() }
         // Asking macOS for free space is surprisingly costly, so once a minute is enough.
@@ -470,7 +480,9 @@ final class Studio: ObservableObject {
     private func refreshDevices(preferredCamera: String?, preferredMic: String?) {
         cameras = Devices.cameras()
         mics = Devices.mics()
-        let cam = cameras.first(where: { $0.uniqueID == preferredCamera })?.uniqueID ?? cameras.first?.uniqueID
+        // The iPhone over Wi-Fi is never in the system's list, so it stays picked until changed.
+        let cam = preferredCamera == PhoneLink.cameraID ? preferredCamera
+            : cameras.first(where: { $0.uniqueID == preferredCamera })?.uniqueID ?? cameras.first?.uniqueID
         let mic = mics.first(where: { $0.uniqueID == preferredMic })?.uniqueID ?? mics.first?.uniqueID
         if cam != cameraID { cameraID = cam }
         if mic != micID { micID = mic }
@@ -490,13 +502,13 @@ final class Studio: ObservableObject {
 
     private func applyInputs() {
         guard !isBusy, !Snapshots.active else { return }
-        let cam = cameraAllowed ? cameras.first { $0.uniqueID == cameraID } : nil
+        let cam = cameraAllowed && !usingPhone ? cameras.first { $0.uniqueID == cameraID } : nil
         let mic = micAllowed ? mics.first { $0.uniqueID == micID } : nil
         light = lightWanted
         // Light mode keeps the camera at 1080p and 30 frames a second: 4K or 60 is 2 to 4 times
         // the pixels for the Mac to encode while it also records the screen.
         let quality: CameraQuality = light && cameraQuality != .hd ? .fullHD : cameraQuality
-        camera.use(camera: cam, mic: mic, quality: quality, smooth: smoothMotion && !light)
+        camera.use(camera: cam, mic: mic, quality: quality, smooth: smoothMotion && !light, phone: usingPhone ? PhoneLink.shared : nil)
 
         // Each extra camera writes its own file with the same mic, so the finisher can line it up by sound.
         let wanted = cameraAllowed ? activeExtras : []
@@ -522,7 +534,7 @@ final class Studio: ObservableObject {
     }
 
     private func remember() {
-        guard !Snapshots.active else { return }
+        guard !Snapshots.active, !Studio.selfTesting else { return }
         let d = UserDefaults.standard
         d.set(cameraID, forKey: "camera")
         d.set(micID, forKey: "mic")
@@ -563,7 +575,9 @@ final class Studio: ObservableObject {
     }
 
     var currentItem: VideoItem? { queue.first { $0.id == currentID } }
-    var cameraName: String? { staged?.camera ?? cameras.first { $0.uniqueID == cameraID }?.localizedName }
+    var cameraName: String? {
+        staged?.camera ?? (usingPhone ? PhoneLink.name : cameras.first { $0.uniqueID == cameraID }?.localizedName)
+    }
     var micName: String? { staged?.mic ?? mics.first { $0.uniqueID == micID }?.localizedName }
     var display: DisplayChoice? { displays.first { $0.id == displayID } }
 
@@ -600,6 +614,9 @@ final class Studio: ObservableObject {
         var out: [Check] = []
         if !cameraAllowed {
             out.append(Check(id: "camera", state: .fail, value: "Not allowed", problem: "Allow the camera in System Settings, Privacy."))
+        } else if usingPhone, !Snapshots.active {
+            out.append(Check(id: "camera", state: phoneReady ? .ok : .warn, value: PhoneLink.name,
+                             problem: phoneReady ? nil : "Open AVA's link on the iPhone and tap Start camera. The code is in Sources, Camera."))
         } else if let name = cameraName {
             out.append(Check(id: "camera", state: .ok, value: touchUpOn ? "\(name) · touched up" : name))
         } else {
@@ -673,7 +690,7 @@ final class Studio: ObservableObject {
     /// The one thing that needs fixing before a take, in plain words, with what fixes it. Nil when
     /// everything is ready. The panel shows only this, never a wall of rows.
     struct Attention: Equatable {
-        enum Fix: Equatable { case privacy(String), screenAccess, battery }
+        enum Fix: Equatable { case privacy(String), screenAccess, battery, phoneCode }
         var level: LampState
         var text: String
         var fix: Fix?
@@ -700,6 +717,11 @@ final class Studio: ObservableObject {
         if cameraName == nil {
             return Attention(level: .warn, text: "No camera connected. Plug one in, or bring the iPhone close to the Mac.")
         }
+        if usingPhone, !Snapshots.active, !phoneReady {
+            return Attention(level: .warn,
+                             text: phoneState.failure ?? "The iPhone is not sending its picture yet. Scan the code with it, then tap Start camera.",
+                             fix: .phoneCode, fixTitle: "Show the code", learnMore: .cameraGuide)
+        }
         if let freeGB, freeGB < 20 {
             return Attention(level: freeGB < 5 ? .fail : .warn,
                              text: "Only \(Int(freeGB)) GB free. A 15 minute take needs about 3 GB.", learnMore: .mac)
@@ -724,7 +746,16 @@ final class Studio: ObservableObject {
         case .screenAccess: askForScreenAccess()
         case .battery:
             if let url = URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension") { NSWorkspace.shared.open(url) }
+        case .phoneCode: PhoneCodeWindow.show(studio: self)
         }
+    }
+
+    /// The iPhone over Wi-Fi as the camera: its link starts, and the code shows for the iPhone to scan.
+    func usePhone() {
+        guard !isBusy else { return }
+        PhoneLink.shared.start()
+        if !usingPhone { cameraID = PhoneLink.cameraID }
+        PhoneCodeWindow.show(studio: self)
     }
 
     /// How a microphone connects, so "AirPods" and "the mic receiver" are easy to tell apart.
@@ -753,6 +784,7 @@ final class Studio: ObservableObject {
         default: return false
         }
         guard micAllowed, micID != nil else { return false }
+        if usingPhone, !Snapshots.active, !phoneReady { return false }
         return !recordScreen || (screenAllowed && display != nil)
     }
 
@@ -1623,6 +1655,20 @@ extension Studio {
             guard canStart || (micAllowed && micID != nil) else {
                 report(["ok": false, "stage": "preflight", "cgPreflight": preflight, "screenProbe": probe ?? "ok"]); return
             }
+            // AVA_CAMERA=phone films with the iPhone over Wi-Fi: it waits up to a minute for a page
+            // to send pictures, and writes the link it serves to .selftest-phone.txt for the test.
+            if ProcessInfo.processInfo.environment["AVA_CAMERA"] == "phone" {
+                cameraID = PhoneLink.cameraID
+                PhoneLink.shared.start()
+                try? (PhoneLink.shared.link ?? "").write(to: Library.root.appendingPathComponent(".selftest-phone.txt"), atomically: true, encoding: .utf8)
+                var waited = 0.0
+                while !PhoneLink.shared.state.connected && waited < 60 {
+                    try? await Task.sleep(nanoseconds: 500_000_000); waited += 0.5
+                }
+                guard PhoneLink.shared.state.connected else { report(["ok": false, "stage": "phone", "reason": "no pictures from the iPhone page"]); return }
+                phoneState = PhoneLink.shared.state
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+            }
             // AVA_REST_FIRST=1 puts the camera to rest first, so the take has to wake it.
             if ProcessInfo.processInfo.environment["AVA_REST_FIRST"] != nil {
                 sleepCamera(true)
@@ -1784,6 +1830,10 @@ extension Studio {
 
     func stageResting() {
         cameraResting = true
+    }
+
+    func stagePhone(_ state: PhoneState) {
+        phoneState = state
     }
 
     func stageVoice(spoken: Int, hearing: Bool) {
