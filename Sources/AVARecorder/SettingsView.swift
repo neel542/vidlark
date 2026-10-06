@@ -377,6 +377,9 @@ private struct MacSettings: View {
                 StatusValue(lamp: studio.power.pluggedIn ? .ok : .warn,
                             text: studio.power.pluggedIn ? "Plugged in" : "Battery\(studio.power.percent.map { " \($0)%" } ?? "")")
             }
+            SettingRow("Low Power Mode", "Slows the Mac to save battery, and the camera then freezes once the screen is shared. Keep it off while filming: System Settings, Battery.") {
+                StatusValue(lamp: studio.power.lowPower ? .warn : .ok, text: studio.power.lowPower ? "On" : "Off")
+            }
         }
     }
 }

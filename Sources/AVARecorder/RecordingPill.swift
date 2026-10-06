@@ -109,6 +109,10 @@ final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSam
         time < busyUntil ? 0.1 : 0.25
     }
 
+    func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        FrameDrops.note("face", sampleBuffer)
+    }
+
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard active else { return }
         let now = CACurrentMediaTime()

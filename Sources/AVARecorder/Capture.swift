@@ -350,6 +350,20 @@ extension CameraRecorder: AVCaptureAudioDataOutputSampleBufferDelegate {
 
 // MARK: - Previews
 
+/// Frames the camera dropped before they reached an output, by output and reason, for the self
+/// test. "OutOfBuffers" means something held on to the camera's frames too long.
+enum FrameDrops {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var counts: [String: Int] = [:]
+
+    static func note(_ output: String, _ buffer: CMSampleBuffer) {
+        let reason = (CMGetAttachment(buffer, key: kCMSampleBufferAttachmentKey_DroppedFrameReason, attachmentModeOut: nil) as? String) ?? "unknown"
+        lock.withLock { counts["\(output): \(reason)", default: 0] += 1 }
+    }
+
+    static var report: [String: Int] { lock.withLock { counts } }
+}
+
 /// The camera picture for every preview on screen (panel, face box, bubble), from one frame output.
 /// Previews used to be AVCaptureVideoPreviewLayers, which belong to the camera session: a window
 /// hiding or showing one at the start of a take changed the session and camera.mov stopped within
@@ -419,6 +433,10 @@ final class CameraFeed: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     /// Runs `action` once, on the preview queue, when the next frame arrives (the camera has woken).
     func whenNextFrame(_ action: @escaping () -> Void) {
         lock.withLock { nextFrame = action }
+    }
+
+    func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        FrameDrops.note("preview", sampleBuffer)
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {

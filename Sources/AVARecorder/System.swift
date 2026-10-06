@@ -50,6 +50,9 @@ final class PrompterKeys {
 struct PowerState: Equatable {
     var pluggedIn: Bool
     var percent: Int?
+    /// Low Power Mode slows the Mac down. On 5 Oct every take made on battery with it on had the
+    /// camera freezing for up to 2.3 seconds once the screen was shared; on the charger, none did.
+    var lowPower = false
 }
 
 enum Preflight {
@@ -68,7 +71,8 @@ enum Preflight {
                 }
             }
         }
-        return PowerState(pluggedIn: source == kIOPMACPowerKey, percent: percent)
+        return PowerState(pluggedIn: source == kIOPMACPowerKey, percent: percent,
+                          lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled)
     }
 
     static func freeGigabytes() -> Double? {

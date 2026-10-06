@@ -590,13 +590,17 @@ final class Studio: ObservableObject {
 
         // Disk space and power share a row: both are about the Mac lasting the whole take.
         let spaceState: LampState = freeGB.map { $0 < 5 ? .fail : $0 < 20 ? .warn : .ok } ?? .ok
-        let powerText = power.pluggedIn ? "plugged in" : "on battery" + (power.percent.map { " \($0)%" } ?? "")
+        let powerText = (power.pluggedIn ? "plugged in" : "on battery" + (power.percent.map { " \($0)%" } ?? ""))
+            + (power.lowPower ? ", Low Power Mode" : "")
         let macText = [freeGB.map { "\(Int($0)) GB free" }, powerText].compactMap { $0 }.joined(separator: " · ")
+        let macProblem: String? = spaceState == .fail ? "Free up space. A 15 minute video needs about 3 GB."
+            : power.lowPower ? "Low Power Mode is on, so the camera freezes once the screen is shared. Plug in the charger, or turn it off in System Settings, Battery."
+            : spaceState == .warn ? "Free up space. A 15 minute video needs about 3 GB."
+            : power.pluggedIn ? nil : "Plug in the charger before a long take."
         out.append(Check(id: "mac",
-                         state: spaceState == .fail ? .fail : (spaceState == .warn || !power.pluggedIn) ? .warn : .ok,
+                         state: spaceState == .fail ? .fail : (spaceState == .warn || !power.pluggedIn || power.lowPower) ? .warn : .ok,
                          value: macText.prefix(1).uppercased() + macText.dropFirst(),
-                         problem: spaceState != .ok ? "Free up space. A 15 minute video needs about 3 GB."
-                             : power.pluggedIn ? nil : "Plug in the charger before a long take."))
+                         problem: macProblem))
         out.append(liveCheck)
         return out
     }
@@ -620,7 +624,7 @@ final class Studio: ObservableObject {
     /// The one thing that needs fixing before a take, in plain words, with what fixes it. Nil when
     /// everything is ready. The panel shows only this, never a wall of rows.
     struct Attention: Equatable {
-        enum Fix: Equatable { case privacy(String), screenAccess, videoEffects }
+        enum Fix: Equatable { case privacy(String), screenAccess, videoEffects, battery }
         var level: LampState
         var text: String
         var fix: Fix?
@@ -652,6 +656,11 @@ final class Studio: ObservableObject {
                              text: "Only \(Int(freeGB)) GB free. A 15 minute take needs about 3 GB.", learnMore: .mac)
         }
         if let liveFailure { return Attention(level: .fail, text: liveFailure, learnMore: .live) }
+        if power.lowPower {
+            return Attention(level: .warn,
+                             text: "Low Power Mode is on, so the camera freezes once the screen is shared. Plug in the charger, or turn Low Power Mode off.",
+                             fix: .battery, fixTitle: "Open Battery settings", learnMore: .mac)
+        }
         if reactionsOn || gesturesOn {
             return Attention(level: .warn,
                              text: "macOS Reactions are on. A thumbs-up can fill your video with balloons, and they use battery.",
@@ -670,6 +679,8 @@ final class Studio: ObservableObject {
             if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)") { NSWorkspace.shared.open(url) }
         case .screenAccess: askForScreenAccess()
         case .videoEffects: openVideoEffects()
+        case .battery:
+            if let url = URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension") { NSWorkspace.shared.open(url) }
         }
     }
 
@@ -1517,6 +1528,7 @@ extension Studio {
             all["checks"] = checks.map { "\($0.id): \($0.value)\($0.problem.map { " (\($0))" } ?? "")" }
             let previews = feed.report
             all["previews"] = ["framesShown": previews.frames, "states": previews.states]
+            all["drops"] = FrameDrops.report
             if let data = try? JSONSerialization.data(withJSONObject: all, options: [.prettyPrinted, .sortedKeys]) {
                 try? data.write(to: out)
             }
