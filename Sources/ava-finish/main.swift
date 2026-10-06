@@ -60,8 +60,11 @@ while argIndex < argv.count {
 guard let folderArg else { fail(usage) }
 
 let folder = URL(fileURLWithPath: folderArg).standardizedFileURL
-// video.mp4 is made whenever there is a screen to switch to.
-let videoWanted = videoAllowed && FileManager.default.fileExists(atPath: folder.appendingPathComponent("screen.mov").path)
+// video.mp4 is made whenever there is a screen to switch to, or another mic was picked for its sound.
+let earlyEvents = readEvents(folder.appendingPathComponent("events.jsonl"))
+let pickedMic = earlyEvents?.videoMic.flatMap { FileManager.default.fileExists(atPath: folder.appendingPathComponent($0).path) ? $0 : nil }
+let hasScreen = FileManager.default.fileExists(atPath: folder.appendingPathComponent("screen.mov").path)
+let videoWanted = videoAllowed && (hasScreen || pickedMic != nil)
 let totalSteps = (transcribeWanted ? 6 : 4) - (chaptersWanted ? 0 : 1) + (videoWanted ? 1 : 0)
 var stepNumber = 0
 func step(_ words: String) {
@@ -188,12 +191,58 @@ do {
         extraCameras.append(entry)
     }
 
+    // Extra mics: each lines up with camera.mov by sound when its sound matches the main mic's well,
+    // and otherwise (a phone far from the main mic, a mic muted most of the take) by the Mac's clock,
+    // from when its file began.
+    var extraMics: [ExtraMicSync] = []
+    for n in 2...9 {
+        let name = "mic-\(n).m4a"
+        let path = file(name).path
+        guard FileManager.default.fileExists(atPath: path) else { continue }
+        let byClock = events?.micStarts[name].map {
+            SyncResult(offset: $0, method: "clock", confidence: 0, note: "its sound did not match the main mic's closely enough, so it is lined up by the Mac's clock")
+        }
+        var entry = ExtraMicSync(file: name, name: events?.micNames[name], duration: nil,
+                                 sync: byClock ?? SyncResult(offset: 0, method: "none", confidence: 0, note: "\(name) could not be read"))
+        if let info = try? probeMedia(ffprobe, path) {
+            entry.duration = info.duration
+            let wav = work.appendingPathComponent("mic\(n)-16k.wav")
+            do {
+                try extractAudio(ffmpeg: ffmpeg, input: path, outputs: [(wav.path, 16000)], maxSeconds: 130)
+                if let found = try? measureSync(cameraWav: camera16k, screenWav: wav), found.method == "audio",
+                   found.confidence >= 0.6 || byClock == nil {
+                    entry.sync = found
+                }
+            } catch {}
+        }
+        extraMics.append(entry)
+    }
+    // A mic lined up by sound shows how far the clock's word is from the truth on this Mac (the
+    // camera's first frame is noted a moment off). That correction goes to the ones lined up by clock.
+    let gaps = extraMics.compactMap { mic -> Double? in
+        guard mic.sync.method == "audio", mic.sync.confidence >= 0.8, let at = events?.micStarts[mic.file] else { return nil }
+        return mic.sync.offset - at
+    }.sorted()
+    if !gaps.isEmpty, abs(gaps[gaps.count / 2]) < 0.5 {
+        let correction = gaps[gaps.count / 2]
+        for i in extraMics.indices where extraMics[i].sync.method == "clock" {
+            let s = extraMics[i].sync
+            extraMics[i].sync = SyncResult(offset: s.offset + correction, method: s.method, confidence: s.confidence, note: s.note)
+        }
+    }
+
     var syncJSON = "{\"screenOffsetSec\":\(jsonNumber(sync.offset, places: 4)),\"method\":\(jsonString(sync.method)),\"confidence\":\(jsonNumber(sync.confidence))"
     if !extraCameras.isEmpty {
         let items = extraCameras.map {
             "{\"file\":\(jsonString($0.file)),\"offsetSec\":\(jsonNumber($0.sync.offset, places: 4)),\"method\":\(jsonString($0.sync.method)),\"confidence\":\(jsonNumber($0.sync.confidence))}"
         }
         syncJSON += ",\"cameras\":[\(items.joined(separator: ","))]"
+    }
+    if !extraMics.isEmpty {
+        let items = extraMics.map {
+            "{\"file\":\(jsonString($0.file)),\"offsetSec\":\(jsonNumber($0.sync.offset, places: 4)),\"method\":\(jsonString($0.sync.method)),\"confidence\":\(jsonNumber($0.sync.confidence))}"
+        }
+        syncJSON += ",\"mics\":[\(items.joined(separator: ","))]"
     }
     try writeText(syncJSON + "}\n", to: file("sync.json"))
 
@@ -246,12 +295,27 @@ do {
     // 6. The finished video, following each click of Me or Screen
     var composed: ComposeResult?
     var composeProblem: String?
+    // The sound of the video: the mic picked before the take, when it could be lined up.
+    var videoSound: (url: URL, offset: Double)?
+    var videoSoundNote: String?
+    if let pickedMic {
+        if let mic = extraMics.first(where: { $0.file == pickedMic }), mic.sync.method != "none" {
+            videoSound = (file(pickedMic), mic.sync.offset)
+        } else {
+            videoSoundNote = "\(pickedMic) could not be lined up with the camera, so the video has the main mic's sound"
+        }
+    }
     if videoWanted {
         step("Making the video")
         let offset = sync.offset, late = events?.cameraFirst == true
         let cameraURL = file("camera.mov"), screenURL = file("screen.mov"), out = file("video.mp4")
+        let sound = videoSound
         do {
-            composed = try waitFor { try await composeVideo(camera: cameraURL, screen: screenURL, screenOffset: offset, sharedLate: late, out: out) }
+            if hasScreen {
+                composed = try waitFor { try await composeVideo(camera: cameraURL, screen: screenURL, screenOffset: offset, sharedLate: late, sound: sound, out: out) }
+            } else if let sound {
+                composed = try waitFor { try await cameraWithSound(camera: cameraURL, sound: sound, out: out) }
+            }
         } catch let error as FinishError {
             composeProblem = error.message
         } catch {
@@ -268,7 +332,8 @@ do {
     let report = buildReport(ReportInput(
         folder: folder, title: title, wall: events?.wall,
         cameraDuration: cameraDuration, screenDuration: screenDuration, screenNote: screenNote,
-        sync: sync, extraCameras: extraCameras, transcript: transcript, retakes: retakes,
+        sync: sync, extraCameras: extraCameras, extraMics: extraMics, videoMic: videoSound == nil ? nil : pickedMic,
+        videoSoundNote: videoSoundNote, transcript: transcript, retakes: retakes,
         chapters: chapters, chapterSource: chapterSource, candidateChapters: candidates, chaptersWanted: chaptersWanted,
         events: events, video: composed, videoProblem: composeProblem, videoWanted: videoWanted))
     try writeText(report, to: file("report.md"))

@@ -102,6 +102,15 @@ struct ExtraCameraSync {
     var sync: SyncResult
 }
 
+/// An extra mic file (mic-2.m4a and on), lined up the same way. Its method is "audio" when its
+/// sound matched the main mic's, or "clock" when it was lined up by when the file began.
+struct ExtraMicSync {
+    var file: String
+    var name: String?
+    var duration: Double?
+    var sync: SyncResult
+}
+
 // RMS loudness of consecutive frames, returned as Double for the correlation sums.
 func loudnessEnvelope(_ samples: [Float], frameLength: Int) -> [Double] {
     let frames = samples.count / frameLength

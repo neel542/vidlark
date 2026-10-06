@@ -5,7 +5,40 @@ import Foundation
 /// batches over the one secure connection. The picture is Wide (1920 x 1080) or Tall (1080 x 1920),
 /// picked on the phone and kept however the phone turns. Nothing to install: Safari on iOS 16.4 or
 /// newer, or Chrome on Android.
+///
+/// The same page is a microphone when AVA asks for the phone's sound: 16-bit samples, timed on the
+/// Mac's clock like the pictures. A phone used only for its sound shows no viewfinder at all. The
+/// Mute switch is shared with the Mac: either side can flip it, and while it is on the phone's mic
+/// is off altogether. Between takes a phone filming another angle stands by: its picture stays on
+/// its screen for framing, and nothing is made or sent until a take starts.
 enum PhonePage {
+    /// The page, opening as a camera, a microphone or both. AVA can change that later.
+    static func page(camera: Bool, mic: Bool) -> String {
+        html.replacingOccurrences(of: "/*ROLE*/{ camera: true, sound: false }", with: "{ camera: \(camera), sound: \(mic) }")
+    }
+
+    /// Turns the mic's sound into 16-bit batches of 2048 samples, each with its place in the stream.
+    static let micWorklet = #"""
+class AvaMic extends AudioWorkletProcessor {
+  constructor() { super(); this.size = 2048; this.buf = new Int16Array(this.size); this.n = 0; this.first = 0; }
+  process(inputs) {
+    const ch = inputs[0] && inputs[0][0];
+    if (!ch || !ch.length) return true;
+    for (let i = 0; i < ch.length; i++) {
+      if (this.n === 0) this.first = currentFrame + i;
+      const v = Math.max(-1, Math.min(1, ch[i]));
+      this.buf[this.n++] = v < 0 ? v * 32768 : v * 32767;
+      if (this.n === this.size) {
+        this.port.postMessage({ first: this.first, samples: this.buf }, [this.buf.buffer]);
+        this.buf = new Int16Array(this.size); this.n = 0;
+      }
+    }
+    return true;
+  }
+}
+registerProcessor("ava-mic", AvaMic);
+"""#
+
     static let html = #"""
 <!doctype html>
 <html lang="en">
@@ -74,15 +107,18 @@ body.full .bar.top { top: 0; padding-top: max(12px, env(safe-area-inset-top)); p
 body.full .bar.bottom { bottom: 0; justify-content: space-between; padding-bottom: max(14px, env(safe-area-inset-bottom)); padding-top: 28px;
   background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.6)); }
 body.full .hint { bottom: calc(84px + env(safe-area-inset-bottom)); }
-.bar .who { flex: 1; font-size: 13px; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+.bar .who { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bar .who small { margin-left: 6px; color: var(--dim); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
 .bar .state { color: var(--ink); text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+.bar .end { display: flex; gap: 10px; }
 .round { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 44px; min-width: 44px; padding: 0 14px;
   border: 1px solid rgba(255,255,255,.14); border-radius: 22px; background: rgba(14,17,16,.62); color: var(--ink);
   font-size: 15px; font-weight: 500; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
-  transition: background-color .2s var(--ease), transform .2s var(--ease); }
+  transition: background-color .2s var(--ease), transform .2s var(--ease), color .2s var(--ease); }
 .round.icon { padding: 0; }
 .round:active { transform: scale(.96); background: rgba(27,32,30,.8); }
+.round[aria-pressed="true"] { color: var(--amber); border-color: rgba(232,179,75,.42); }
+@media (max-width: 400px) { #exit span { display: none; } #exit { padding: 0; } }
 
 /* The shape: one choice of two, picked before the camera starts and locked while AVA records. */
 .shape { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border: 1px solid var(--hair); border-radius: 14px; background: var(--face); }
@@ -104,19 +140,55 @@ body.full .hint { bottom: calc(84px + env(safe-area-inset-bottom)); }
 .mini button:disabled:not([aria-pressed="true"]) { opacity: .4; }
 .locked { margin: 0; color: var(--engraved); font-size: 13px; }
 
+/* The level: segments over the top 60 dB, green, then amber, then red, as on the Mac. */
+.meter { display: flex; gap: 2px; height: 5px; }
+.meter i { flex: 1; border-radius: 1px; background: var(--signal); opacity: .13; transition: opacity .08s linear; }
+.meter i.amber { background: var(--amber); }
+.meter i.red { background: var(--red); }
+.meter i.on { opacity: 1; }
+
+/* Sound under the viewfinder, while AVA records this phone's sound too. */
+.soundline { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 4px 4px 14px; border: 1px solid var(--hair); border-radius: 12px; background: var(--face); }
+.soundline > svg { width: 18px; height: 18px; color: var(--engraved); }
+.soundline.live > svg { color: var(--signal); }
+.soundline.off > svg { color: var(--amber); }
+.soundline > span { flex: none; font-size: 13px; color: var(--dim); }
+.soundline .meter { flex: 1; min-width: 40px; }
+.soundline .gap { flex: 1; }
+.soundline .small { padding: 8px 12px; }
+body:not(.mic-only) #tools [data-mute] { display: none !important; }
+
+/* A phone used only for its sound: no viewfinder, a well that breathes with the voice. */
+.card { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 28px 20px 24px; text-align: center;
+  background: var(--well); border: 1px solid var(--hair); border-radius: 12px; }
+.mic { --level: 0; position: relative; display: flex; align-items: center; justify-content: center; width: 96px; height: 96px; border-radius: 50%;
+  background: var(--raised); border: 1px solid var(--hair); color: var(--engraved);
+  box-shadow: 0 0 0 calc(var(--level) * 14px) rgba(61,204,128,.16), 0 6px 18px rgba(0,0,0,.45);
+  transition: color .2s var(--ease), box-shadow .1s linear; }
+.mic svg { width: 36px; height: 36px; stroke-width: 1.6; }
+.card.live .mic { color: var(--signal); }
+.card.muted .mic { color: var(--amber); box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+.card .meter { width: min(260px, 100%); }
+.card b { font-size: 17px; font-weight: 600; text-wrap: balance; }
+.card span { max-width: 34ch; color: var(--dim); font-size: 13px; text-wrap: balance; }
+.veil b, .veil span { text-wrap: balance; }
+
 .go { width: 100%; padding: 16px; border: 0; border-radius: 14px; background: var(--signal); color: #06130C; font-size: 17px; font-weight: 600; }
 .go:active { filter: brightness(.92); }
 .go:disabled { opacity: .5; }
-.tools { display: flex; gap: 10px; align-items: center; }
+.tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .small { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid var(--hair); border-radius: 10px;
-  background: var(--face); color: var(--ink); font-size: 15px; font-weight: 500; }
+  background: var(--face); color: var(--ink); font-size: 15px; font-weight: 500; transition: color .2s var(--ease), border-color .2s var(--ease); }
 .small svg { width: 18px; height: 18px; }
 .small:active { background: var(--raised); }
-.facts { flex: 1; text-align: right; color: var(--engraved); font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.small[aria-pressed="true"] { color: var(--amber); border-color: rgba(232,179,75,.42); }
+.facts { flex: 1; text-align: right; white-space: nowrap; color: var(--engraved); font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
 ol { margin: 0; padding-left: 20px; color: var(--dim); font-size: 15px; }
 ol li { margin: 5px 0; }
 .note { margin: 0; color: var(--amber); font-size: 15px; }
-@media (prefers-reduced-motion: reduce) { .lamp.rec { animation: none; } .round, .shape button { transition: none; } }
+body.mic-only .view, body.mic-only .shape, body.mic-only .locked, body.mic-only [data-flip], body.mic-only #full, body.mic-only .camera-tip { display: none !important; }
+body:not(.mic-only) .card, body:not(.mic-only) .mic-tip { display: none !important; }
+@media (prefers-reduced-motion: reduce) { .lamp.rec { animation: none; } .round, .shape button, .mic, .small { transition: none; } }
 </style>
 </head>
 <body>
@@ -126,9 +198,11 @@ ol li { margin: 5px 0; }
   <symbol id="i-flip" viewBox="0 0 24 24"><path d="M4.5 11a7.5 7.5 0 0 1 13-4.2L19.5 9"/><path d="M19.5 4.5V9H15"/><path d="M19.5 13a7.5 7.5 0 0 1-13 4.2L4.5 15"/><path d="M4.5 19.5V15H9"/></symbol>
   <symbol id="i-out" viewBox="0 0 24 24"><path d="M9 4v5H4"/><path d="M15 4v5h5"/><path d="M9 20v-5H4"/><path d="M15 20v-5h5"/></symbol>
   <symbol id="i-in" viewBox="0 0 24 24"><path d="M4 9V4h5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/><path d="M20 15v5h-5"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M15 9.5V6a3 3 0 0 0-5.6-1.5"/><path d="M9 9v2a3 3 0 0 0 4.6 2.5"/><path d="M5.5 11a6.5 6.5 0 0 0 10.6 5"/><path d="M18.4 12.6a6.5 6.5 0 0 0 .1-1.6"/><path d="M12 17.5V21"/><path d="M4 4l16 16"/></symbol>
 </svg>
 <main>
-  <header><i class="lamp" data-lamp></i><h1>AVA camera<small data-phone></small></h1><span class="state" data-state>Not started</span></header>
+  <header><i class="lamp" data-lamp></i><h1><span data-title>AVA camera</span><small data-phone></small></h1><span class="state" data-state>Not started</span></header>
   <div class="view" id="view">
     <div class="frame">
       <video id="v" playsinline muted autoplay></video>
@@ -136,7 +210,7 @@ ol li { margin: 5px 0; }
     <div class="veil" id="veil"><b id="veilTitle">This phone becomes a camera for AVA</b><span id="veilText">Pick the shape, then tap Start camera. The picture goes to AVA Recorder on the Mac, over your Wi-Fi.</span></div>
     <div class="hint" id="hint" hidden><i class="lamp warn"></i><div><b id="hintTitle"></b><span id="hintText"></span></div></div>
     <div class="bar top">
-      <i class="lamp" data-lamp></i><span class="who">AVA camera<small data-phone></small></span><span class="state" data-state></span>
+      <i class="lamp" data-lamp></i><span class="who"><span data-title>AVA camera</span><small data-phone></small></span><span class="state" data-state></span>
     </div>
     <div class="bar bottom">
       <button class="round icon" data-flip aria-label="Use the other camera"><svg><use href="#i-flip"/></svg></button>
@@ -144,8 +218,21 @@ ol li { margin: 5px 0; }
         <button data-shape="wide" aria-pressed="true"><svg><use href="#i-wide"/></svg>16:9</button>
         <button data-shape="tall" aria-pressed="false"><svg><use href="#i-tall"/></svg>9:16</button>
       </div>
-      <button class="round" id="exit"><svg><use href="#i-out"/></svg>Exit</button>
+      <div class="end">
+        <button class="round icon" data-mute aria-pressed="false" aria-label="Mute this phone's mic"><svg><use href="#i-mic" data-muteicon/></svg></button>
+        <button class="round" id="exit" aria-label="Exit full screen"><svg><use href="#i-out"/></svg><span>Exit</span></button>
+      </div>
     </div>
+  </div>
+  <div class="card" id="card">
+    <div class="mic" id="micwell"><svg><use href="#i-mic" data-muteicon/></svg></div>
+    <div class="meter" data-meter aria-hidden="true"></div>
+    <b id="cardTitle">This phone becomes a microphone for AVA</b>
+    <span id="cardText">Tap Start microphone. Its sound goes to AVA Recorder on the Mac, over your Wi-Fi.</span>
+  </div>
+  <div class="soundline" id="soundline" hidden>
+    <svg><use href="#i-mic" data-muteicon/></svg><span id="soundword">Sound on</span><div class="meter" id="linemeter" data-meter aria-hidden="true"></div><i class="gap" id="linegap"></i>
+    <button class="small" data-mute aria-pressed="false"><span data-muteword>Mute</span></button>
   </div>
   <p class="note" id="note" hidden></p>
   <div class="shape" role="group" aria-label="Picture shape">
@@ -157,11 +244,14 @@ ol li { margin: 5px 0; }
   <div class="tools" id="tools" hidden>
     <button class="small" data-flip><svg><use href="#i-flip"/></svg><span data-flipword>Front camera</span></button>
     <button class="small" id="full"><svg><use href="#i-in"/></svg>Full screen</button>
+    <button class="small" data-mute aria-pressed="false"><svg><use href="#i-mic" data-muteicon/></svg><span data-muteword>Mute</span></button>
     <span class="facts" id="facts"></span>
   </div>
   <ol id="tips">
-    <li>Wide is for YouTube, Tall for Shorts. The picture keeps that shape however the phone turns.</li>
+    <li class="camera-tip">Wide is for YouTube, Tall for Shorts. The picture keeps that shape however the phone turns.</li>
+    <li class="mic-tip">Keep the phone close to the person talking, about a hand's width from the mouth.</li>
     <li>Keep this page open. The screen stays on by itself.</li>
+    <li class="mic-tip">Mute turns this phone's mic off completely. It can be switched here or on the Mac.</li>
     <li>For a long take, plug the phone in to charge.</li>
   </ol>
 </main>
@@ -175,17 +265,24 @@ const phone = numbered ? parts[1] : "1";
 const sid = Math.random().toString(36).slice(2) + Date.now().toString(36);
 const $ = id => document.getElementById(id);
 const all = sel => document.querySelectorAll(sel);
+// What AVA wants this phone for when the page opens; every reply can change it.
+const ROLE = /*ROLE*/{ camera: true, sound: false };
 let shape = "wide";
 try { if (localStorage.getItem("ava-shape") === "tall") shape = "tall"; } catch (e) {}
 let W = 1920, H = 1080;
 let stream = null, encoder = null, canvas = null, ctx = null, config = null, wakeLock = null;
 let running = false, facing = "environment", resting = false, recording = false, full = false;
+let wantCamera = ROLE.camera, soundUsed = ROLE.sound, micWanted = false, sending = true, opening = false;
 let offset = null, clock = [], failures = 0, lastPost = 0;
 let queue = [], queued = 0, forceKey = true, needKey = false, frames = 0, formatRec = null, formatKey = "";
 let sentCount = 0, sentSince = performance.now(), fps = 0;
+// The mic. The mute switch is shared with the Mac: a flip here is sent until the Mac's reply shows it.
+let actx = null, micStream = null, micSource = null, micNode = null, micSink = null, micModule = false, micStarting = false;
+let micState = "off", muted = false, mutedBy = "phone", pendingMute = null, level = -160, levelShown = 0;
+try { muted = localStorage.getItem("ava-muted") === "1"; } catch (e) {}
 
 all("[data-phone]").forEach(e => e.textContent = "Phone " + phone);
-document.title = "AVA camera · Phone " + phone;
+all(".meter").forEach(m => { for (let i = 0; i < 24; i++) { const s = document.createElement("i"); if (i >= 21) s.className = "red"; else if (i >= 18) s.className = "amber"; m.appendChild(s); } });
 
 function setState(text, lamp) {
   all("[data-state]").forEach(e => e.textContent = text);
@@ -195,19 +292,58 @@ function veil(title, text) {
   if (title === null) { $("veil").hidden = true; return; }
   $("veil").hidden = false; $("veilTitle").textContent = title; $("veilText").textContent = text || "";
 }
+function card(title, text) { $("cardTitle").textContent = title; $("cardText").textContent = text; }
 function note(text) { $("note").hidden = !text; $("note").textContent = text || ""; }
 
 // The phone is turned the other way from the shape: the picture keeps its shape and films the middle.
 function turned() {
   const v = $("v");
-  return running && v.videoWidth > 0 && (v.videoWidth > v.videoHeight) !== (shape === "wide");
+  return running && stream && v.videoWidth > 0 && (v.videoWidth > v.videoHeight) !== (shape === "wide");
+}
+
+function syncRole() {
+  document.body.classList.toggle("mic-only", !wantCamera);
+  const title = wantCamera ? "AVA camera" : "AVA microphone";
+  all("[data-title]").forEach(e => e.textContent = title);
+  document.title = title + " · Phone " + phone;
+  $("go").textContent = wantCamera ? "Start camera" : "Start microphone";
+}
+
+// What the mute switch says, in the words of whoever flipped it last.
+function muteWords() { return mutedBy === "mac" ? "Muted from the Mac" : "Muted on this phone"; }
+
+function syncSound() {
+  all("[data-mute]").forEach(b => {
+    b.setAttribute("aria-pressed", String(muted));
+    if (b.classList.contains("icon")) b.setAttribute("aria-label", muted ? "Unmute this phone's mic" : "Mute this phone's mic");
+  });
+  all("[data-muteword]").forEach(e => e.textContent = muted ? "Unmute" : "Mute");
+  all("[data-muteicon]").forEach(u => u.setAttribute("href", muted ? "#i-mute" : "#i-mic"));
+  const live = micState === "on" && !muted;
+  // The sound line under the viewfinder: the mic's state, its level while it sends, and the
+  // switch, which is there even while AVA does not use this phone's sound.
+  const line = $("soundline");
+  line.hidden = !(running && wantCamera);
+  line.classList.toggle("off", muted || micState === "denied");
+  line.classList.toggle("live", live);
+  $("linemeter").hidden = !live; $("linegap").hidden = live;
+  $("soundword").textContent = muted ? muteWords() : micState === "denied" ? "Mic not allowed"
+    : micState === "asking" ? "Tap Allow" : live ? "Sound on" : resting ? "Resting" : soundUsed ? "Starting the mic" : "Mic not in use";
+  $("card").classList.toggle("live", live);
+  $("card").classList.toggle("muted", muted);
+  if (!live) showLevel(-160);
 }
 
 function show() {
-  syncShape();
+  syncShape(); syncRole(); syncSound();
   $("hint").hidden = true;
   if (!running) return;
-  if (resting) { setState("Resting", ""); veil("AVA is resting the camera", "It wakes by itself when someone looks at AVA on the Mac."); return; }
+  if (resting) {
+    setState("Resting", "");
+    if (wantCamera) veil("AVA is resting the camera", "It wakes by itself when someone looks at AVA on the Mac.");
+    else card("AVA is resting the microphone", "It wakes by itself when someone looks at AVA on the Mac.");
+    return;
+  }
   veil(null);
   if (turned()) {
     $("hint").hidden = false;
@@ -216,25 +352,47 @@ function show() {
       ? "AVA keeps the picture 16:9 and films the middle until you do. If it is already sideways, switch rotation lock off."
       : "AVA keeps the picture 9:16 and films the middle until you do. If it is already upright, switch rotation lock off.";
   }
+  if (!wantCamera) {
+    if (muted) card(muteWords(), "The phone's mic is off. Tap Unmute, here or on the Mac, to send its sound again.");
+    else if (micState === "denied") card("The mic was not allowed", "On an iPhone: Settings, Apps, Safari, Microphone, Allow. On Android: tap the icon left of the address, then Permissions, Microphone, Allow. Then reload this page.");
+    else if (micState === "asking") card("Tap Allow", "The phone asks once whether AVA may use its microphone.");
+    else if (micState === "on") card(recording ? "Recording" : "Sending sound to AVA", "Keep the phone close to the person talking.");
+    else card("Waiting for AVA", "The sound starts as soon as AVA asks for it.");
+  }
+  // Standing by is Ready: the picture shows here, and goes to AVA once a take starts.
   if (failures > 2) setState("Cannot reach the Mac", "warn");
   else if (recording) setState("Recording", "rec");
-  else setState("Sending to AVA", "ok");
-  $("facts").textContent = fps ? `${Math.min(W, H)}p · ${fps} fps` : "";
+  else if (wantCamera) setState(sending ? "Sending to AVA" : "Ready", "ok");
+  else setState(micState === "on" ? "Sending to AVA" : "Ready", "ok");
+  const facts = [];
+  if (wantCamera) facts.push(sending && fps ? `${Math.min(W, H)}p · ${fps} fps` : sending ? `${Math.min(W, H)}p` : "Standing by");
+  $("facts").textContent = facts.join(" · ");
 }
 
 function syncShape() {
   document.body.classList.toggle("tall", shape === "tall");
   all("[data-shape]").forEach(b => { b.setAttribute("aria-pressed", String(b.dataset.shape === shape)); b.disabled = recording; });
-  $("locked").hidden = !recording;
+  $("locked").hidden = !recording || !wantCamera;
   all("[data-flipword]").forEach(e => e.textContent = facing === "user" ? "Back camera" : "Front camera");
 }
 
+// The level, as segments lit over the top 60 dB, and the mic well's glow in mic-only mode.
+function showLevel(db) {
+  const lit = Math.round(Math.min(1, Math.max(0, (db + 60) / 60)) * 24);
+  if (lit === levelShown) return;
+  levelShown = lit;
+  all(".meter").forEach(m => Array.from(m.children).forEach((s, i) => s.classList.toggle("on", i < lit)));
+  $("micwell").style.setProperty("--level", (lit / 24).toFixed(2));
+}
+
 // One batch to the Mac. The reply carries the Mac's clock: the quickest round trips of the last
-// forty give the gap between the two clocks, so every picture is timed as the Mac sees it.
+// forty give the gap between the two clocks, so every picture and sound is timed as the Mac sees it.
 async function post(body) {
   const t1 = performance.now();
-  const r = await fetch(base + "send", { method: "POST", body, cache: "no-store",
-    headers: { "Content-Type": "application/octet-stream", "X-Session": sid } });
+  const headers = { "Content-Type": "application/octet-stream", "X-Session": sid, "X-Has": [stream ? "camera" : "", micStream ? "mic" : ""].filter(Boolean).join(","),
+    "X-Mic": muted ? "muted" : micState, "X-Shape": shape, "X-Muted": muted ? "1" : "0" };
+  if (pendingMute !== null) headers["X-Mute-Set"] = pendingMute ? "1" : "0";
+  const r = await fetch(base + "send", { method: "POST", body, cache: "no-store", headers });
   const t4 = performance.now();
   lastPost = t4;
   if (!r.ok) throw new Error("The Mac answered " + r.status);
@@ -246,10 +404,21 @@ async function post(body) {
 }
 
 function handle(j) {
-  if (j.replaced) { stop(); veil("Another phone took over", "Another phone or tab opened this same code, so AVA uses that one now. Tap Start camera to take it back."); return; }
+  if (j.replaced) { stop(); veil("Another phone took over", "Another phone or tab opened this same code, so AVA uses that one now. Tap Start to take it back."); card("Another phone took over", "Another phone or tab opened this same code. Tap Start microphone to take it back."); return; }
   if (j.key) forceKey = true;
   if (j.rest !== resting) { resting = j.rest; forceKey = true; }
   recording = j.recording;
+  if (j.send !== undefined) { const was = sending; sending = j.send; if (sending && !was) forceKey = true; }
+  // The mute switch: the Mac's word stands, except for a flip here it has not heard yet.
+  if (j.muted !== undefined) {
+    if (pendingMute !== null && j.muted === pendingMute) pendingMute = null;
+    if (pendingMute === null && j.muted !== muted) setMuted(j.muted, false);
+    mutedBy = j.mutedBy || mutedBy;
+  }
+  if (j.camera !== undefined && j.camera !== wantCamera) { wantCamera = j.camera; syncCamera(); }
+  soundUsed = !!j.sound;
+  micWanted = !!j.mic;
+  syncMic();
   show();
 }
 
@@ -257,8 +426,8 @@ async function pump() {
   while (running) {
     const now = performance.now();
     if (!queue.length) {
-      // Nothing to send: a quiet hello now and then keeps the clock right and hears when to wake.
-      if (now - lastPost > 500) { try { handle(await post(new Uint8Array(0))); failures = 0; } catch (e) { failures++; show(); await pause(400); } }
+      // Nothing to send: a quiet hello now and then keeps the clock right and hears what AVA wants.
+      if (now - lastPost > 500 || pendingMute !== null) { try { handle(await post(new Uint8Array(0))); failures = 0; } catch (e) { failures++; show(); await pause(400); } }
       else await pause(15);
       continue;
     }
@@ -268,11 +437,12 @@ async function pump() {
     for (const b of batch) { body.set(new Uint8Array(b), at); at += b.byteLength; }
     try {
       handle(await post(body)); failures = 0;
-      sentCount += batch.length;
+      // Pictures only: the sound goes in the same batches.
+      for (const b of batch) if (new Uint8Array(b, 0, 1)[0] === 2) sentCount++;
       if (now - sentSince > 2000) { fps = Math.round(sentCount * 1000 / (now - sentSince)); sentCount = 0; sentSince = now; }
     } catch (e) {
       failures++; show();
-      // A Wi-Fi hiccup: keep what is waiting, up to about 4 seconds of pictures, and try again.
+      // A Wi-Fi hiccup: keep what is waiting, up to about 4 seconds, and try again.
       queue = batch.concat(queue);
       queued = queue.reduce((n, b) => n + b.byteLength, 0);
       if (queued > 4000000) { queue = formatRec ? [formatRec] : []; queued = 0; needKey = true; forceKey = true; }
@@ -294,6 +464,15 @@ function pictureRecord(chunk, macMs) {
   const b = new ArrayBuffer(14 + chunk.byteLength), v = new DataView(b);
   v.setUint8(0, 2); v.setUint8(1, chunk.type === "key" ? 1 : 0); v.setFloat64(2, macMs, true); v.setUint32(10, chunk.byteLength, true);
   chunk.copyTo(new Uint8Array(b, 14));
+  return b;
+}
+
+// Sound (3): the sample rate, the first sample's place in the stream, the Mac time it was heard,
+// the number of samples, then the samples, 16-bit. Little endian throughout.
+function soundRecord(rate, first, macMs, samples) {
+  const b = new ArrayBuffer(25 + samples.byteLength), v = new DataView(b);
+  v.setUint8(0, 3); v.setUint32(1, rate, true); v.setFloat64(5, first, true); v.setFloat64(13, macMs, true); v.setUint32(21, samples.length, true);
+  new Uint8Array(b, 25).set(new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength));
   return b;
 }
 
@@ -324,10 +503,11 @@ async function makeEncoder() {
 }
 
 function frame(now, meta) {
-  if (!running) return;
+  if (!running || !stream) return;
   const v = $("v");
   v.requestVideoFrameCallback(frame);
-  if (resting || offset === null || document.hidden || !v.videoWidth) return;
+  // Standing by, the picture stays on this screen and nothing is made or sent.
+  if (resting || !sending || offset === null || document.hidden || !v.videoWidth) return;
   if (!encoder || encoder.state !== "configured" || encoder.encodeQueueSize > 3) return;
   // Fill the chosen shape, trimming whatever does not fit: turning the phone never changes it.
   const s = Math.max(W / v.videoWidth, H / v.videoHeight), dw = v.videoWidth * s, dh = v.videoHeight * s;
@@ -347,7 +527,7 @@ async function setShape(next) {
   try { localStorage.setItem("ava-shape", shape); } catch (e) {}
   [W, H] = sizeFor(shape);
   lockTurning();
-  if (running) {
+  if (running && stream) {
     // A new size is a new encoder; what was waiting at the old size is dropped, and the new
     // format goes first with a whole picture.
     const old = encoder; encoder = null;
@@ -362,6 +542,7 @@ async function setShape(next) {
 // Full screen fills the phone with the picture. Where the browser allows it (Android, iPad) the
 // browser's own bars go too and the screen stops turning; an iPhone keeps Safari's bars.
 function enterFull() {
+  if (!wantCamera) return;
   full = true;
   document.body.classList.add("full");
   const el = document.documentElement;
@@ -392,6 +573,113 @@ async function camera() {
   forceKey = true;
 }
 
+// The camera and its encoder, opened when AVA wants this phone's picture and closed when it does not.
+async function openCamera() {
+  if (opening || stream) return;
+  if (typeof VideoEncoder === "undefined" || typeof VideoFrame === "undefined") { note("This browser is too old to film for AVA. On an iPhone, update to iOS 16.4 or newer. On Android, update Chrome, or open this link in Chrome."); return; }
+  opening = true;
+  try { await camera(); }
+  catch (e) {
+    opening = false;
+    note(e.name === "NotAllowedError" ? "The camera was not allowed. Tap Start camera and choose Allow. If it does not ask: on an iPhone, Settings, Apps, Safari, Camera, Allow; on Android, tap the icon left of the address, then Permissions, Camera, Allow." : "The camera did not start: " + e.message);
+    throw e;
+  }
+  [W, H] = sizeFor(shape);
+  canvas = document.createElement("canvas"); canvas.width = W; canvas.height = H;
+  ctx = canvas.getContext("2d", { alpha: false });
+  try { await makeEncoder(); }
+  catch (e) { opening = false; closeCamera(); note("This phone cannot make the video AVA needs. Update its system and browser; on Android, use Chrome."); throw e; }
+  frames = 0; needKey = false; forceKey = true; formatKey = ""; formatRec = null;
+  opening = false;
+  $("v").requestVideoFrameCallback(frame);
+}
+
+function closeCamera() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null;
+  $("v").classList.remove("on");
+  try { if (encoder && encoder.state !== "closed") encoder.close(); } catch (e) {}
+  encoder = null;
+  exitFull();
+}
+
+// AVA changed its mind about this phone's picture while it runs.
+function syncCamera() {
+  if (!running) return;
+  if (wantCamera && !stream) openCamera().catch(() => {});
+  if (!wantCamera && stream) closeCamera();
+}
+
+// The mic is on only while AVA asks for this phone's sound, the page runs, nothing rests and the
+// shared switch is not muted. Muted, its track is stopped, so the phone's mic is off altogether.
+function syncMic() {
+  const want = running && micWanted && !muted && !resting;
+  if (want && !micStream && !micStarting) startMic();
+  if (!want && micStream) stopMic();
+  if (!want && !micStream && micState === "on") micState = "off";
+}
+
+async function startMic() {
+  micStarting = true;
+  try {
+    if (!actx) throw new Error("This browser cannot record sound.");
+    if (actx.state !== "running") await actx.resume().catch(() => {});
+    if (!micModule) { await actx.audioWorklet.addModule(base + "mic.js"); micModule = true; }
+    micState = "asking"; show();
+    const got = await navigator.mediaDevices.getUserMedia({ video: false,
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } });
+    // Muted or no longer wanted while the phone asked: let go at once.
+    if (!(running && micWanted && !muted && !resting)) { got.getTracks().forEach(t => t.stop()); micState = "off"; return; }
+    micStream = got;
+    micSource = actx.createMediaStreamSource(got);
+    micNode = new AudioWorkletNode(actx, "ava-mic");
+    micNode.port.onmessage = e => heardMic(e.data);
+    micSink = actx.createGain(); micSink.gain.value = 0;
+    micSource.connect(micNode); micNode.connect(micSink); micSink.connect(actx.destination);
+    micState = "on";
+  } catch (e) {
+    micState = e && e.name === "NotAllowedError" ? "denied" : "off";
+    if (micState !== "denied") note("The mic did not start: " + (e && e.message ? e.message : e));
+  } finally {
+    micStarting = false;
+    show();
+  }
+}
+
+function stopMic() {
+  try { if (micSource) micSource.disconnect(); if (micNode) { micNode.port.onmessage = null; micNode.disconnect(); } if (micSink) micSink.disconnect(); } catch (e) {}
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+  micStream = null; micSource = null; micNode = null; micSink = null;
+  micState = "off";
+  showLevel(-160);
+}
+
+// The Mac's time of a moment on the sound's own clock.
+function perfAt(seconds) {
+  try { const ts = actx.getOutputTimestamp(); if (ts && ts.performanceTime) return ts.performanceTime + (seconds - ts.contextTime) * 1000; } catch (e) {}
+  return performance.now() - (actx.currentTime - seconds) * 1000;
+}
+
+function heardMic(data) {
+  if (!micStream || offset === null || !running) return;
+  const rate = actx.sampleRate;
+  const rec = soundRecord(rate, data.first, perfAt(data.first / rate) + offset, data.samples);
+  queue.push(rec); queued += rec.byteLength;
+  let peak = 0;
+  for (let i = 0; i < data.samples.length; i += 4) { const a = Math.abs(data.samples[i]); if (a > peak) peak = a; }
+  level = peak > 0 ? 20 * Math.log10(peak / 32768) : -160;
+  showLevel(level);
+}
+
+// The shared switch, flipped on this phone. Muting takes the mic off at once, before the Mac hears.
+function setMuted(on, fromHere) {
+  muted = on;
+  if (fromHere) { mutedBy = "phone"; pendingMute = on; }
+  try { localStorage.setItem("ava-muted", on ? "1" : "0"); } catch (e) {}
+  syncMic();
+  show();
+}
+
 async function awake() {
   try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {}
 }
@@ -399,48 +687,41 @@ async function awake() {
 async function start() {
   note("");
   if (!window.isSecureContext || !navigator.mediaDevices) { note("Open this page from the QR code in AVA Recorder, so it comes over AVA's secure link."); return; }
-  if (typeof VideoEncoder === "undefined" || typeof VideoFrame === "undefined") { note("This browser is too old for AVA. On an iPhone, update to iOS 16.4 or newer. On Android, update Chrome, or open this link in Chrome."); return; }
+  // Sound may only start from a tap. It is readied now, and the mic itself opens only when AVA asks.
+  try { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); actx.resume().catch(() => {}); } catch (e) { actx = null; }
   // Full screen has to be asked for straight from the tap, before the camera question.
-  enterFull();
+  if (wantCamera) enterFull();
   $("go").disabled = true; setState("Starting", "");
-  try { await camera(); }
-  catch (e) {
-    exitFull();
-    $("go").disabled = false; setState("Not started", "");
-    note(e.name === "NotAllowedError" ? "The camera was not allowed. Tap Start camera and choose Allow. If it does not ask: on an iPhone, Settings, Apps, Safari, Camera, Allow; on Android, tap the icon left of the address, then Permissions, Camera, Allow." : "The camera did not start: " + e.message);
-    return;
+  if (wantCamera) {
+    try { await openCamera(); }
+    catch (e) { exitFull(); $("go").disabled = false; setState("Not started", ""); return; }
   }
-  [W, H] = sizeFor(shape);
-  canvas = document.createElement("canvas"); canvas.width = W; canvas.height = H;
-  ctx = canvas.getContext("2d", { alpha: false });
-  try { await makeEncoder(); }
-  catch (e) { stop(); note("This phone cannot make the video AVA needs. Update its system and browser; on Android, use Chrome."); return; }
-  running = true; frames = 0; failures = 0; needKey = false; forceKey = true; queue = []; formatKey = ""; formatRec = null;
+  running = true; failures = 0; queue = [];
   $("go").hidden = true; $("go").disabled = false; $("tools").hidden = false; $("tips").hidden = true;
   awake();
   try { handle(await post(new Uint8Array(0))); } catch (e) { failures = 3; }
   show();
   pump();
-  $("v").requestVideoFrameCallback(frame);
 }
 
 function stop() {
   running = false; recording = false;
-  if (stream) stream.getTracks().forEach(t => t.stop());
-  stream = null;
-  $("v").classList.remove("on");
-  try { if (encoder && encoder.state !== "closed") encoder.close(); } catch (e) {}
-  encoder = null;
+  closeCamera();
+  stopMic();
   if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
-  exitFull();
   setState("Not started", "");
   $("go").hidden = false; $("tools").hidden = true; $("hint").hidden = true;
-  syncShape();
+  show();
 }
 
 $("go").addEventListener("click", start);
 $("full").addEventListener("click", enterFull);
 $("exit").addEventListener("click", exitFull);
+all("[data-mute]").forEach(b => b.addEventListener("click", () => {
+  // A tap is also the moment sound may start on an iPhone.
+  if (actx && actx.state !== "running") actx.resume().catch(() => {});
+  setMuted(!muted, true);
+}));
 all("[data-shape]").forEach(b => b.addEventListener("click", () => setShape(b.dataset.shape)));
 all("[data-flip]").forEach(b => b.addEventListener("click", async () => {
   facing = facing === "user" ? "environment" : "user";
@@ -448,11 +729,14 @@ all("[data-flip]").forEach(b => b.addEventListener("click", async () => {
   try { await camera(); } catch (e) { note("That camera did not start: " + e.message); }
 }));
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden && running) { awake(); forceKey = true; }
+  if (!document.hidden && running) { awake(); forceKey = true; if (actx && actx.state !== "running") actx.resume().catch(() => {}); }
   show();
 });
 $("v").addEventListener("resize", show);
+syncRole();
+syncSound();
 syncShape();
+if (!wantCamera) card("This phone becomes a microphone for AVA", "Tap Start microphone. Its sound goes to AVA Recorder on the Mac, over your Wi-Fi.");
 </script>
 </body>
 </html>

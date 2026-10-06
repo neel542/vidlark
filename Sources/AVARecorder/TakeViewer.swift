@@ -2,7 +2,8 @@ import AVKit
 import SwiftUI
 
 // Watching a take without leaving the app. Click a card on the Recordings page and its video plays
-// here: the camera, the screen or an extra camera, switched at the same moment of the take.
+// here: the camera, the screen or an extra camera, switched at the same moment of the take. With
+// more than one mic, Sound plays any mic's file under the picture, lined up, to hear which is best.
 
 /// One file of a take that can be watched, and where it sits in the take.
 struct TakeSource: Identifiable, Equatable {
@@ -49,7 +50,7 @@ struct TakeSource: Identifiable, Equatable {
     }
 
     /// The "start" line of events.jsonl: which cameras filmed the take.
-    private static func startLine(_ folder: URL) -> [String: Any] {
+    static func startLine(_ folder: URL) -> [String: Any] {
         guard let text = try? String(contentsOf: folder.appendingPathComponent("events.jsonl"), encoding: .utf8),
               let line = text.split(separator: "\n").first(where: { $0.contains("\"start\"") }),
               let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any] else { return [:] }
@@ -68,19 +69,75 @@ struct TakeSource: Identifiable, Equatable {
     }
 }
 
+/// One mic of a take: the main one (camera.mov's sound) or an extra one's file, and where it sits.
+struct TakeSound: Identifiable, Equatable {
+    var id: String
+    var title: String
+    var url: URL
+    /// camera time = this file's time + offset, as in sync.json. Zero for the main mic.
+    var offset: Double
+    /// What recorded it ("MacBook Air Microphone", "Phone 1").
+    var name: String?
+    var main: Bool { id == "main" }
+
+    /// The main mic, then each extra mic file with its name, once there is more than one; and which
+    /// one the video's sound came from.
+    static func all(in take: TakeInfo) -> (sounds: [TakeSound], inVideo: String) {
+        let folder = take.folder
+        let fm = FileManager.default
+        let started = TakeSource.startLine(folder)
+        if Snapshots.active, take.hasCamera {
+            return ([TakeSound(id: "main", title: "Main mic", url: folder, offset: 0, name: "Wireless Mic Rx"),
+                     TakeSound(id: "mic-2.m4a", title: "Phone 1", url: folder, offset: 0, name: "Phone 1")], "main")
+        }
+        let sync = (try? Data(contentsOf: folder.appendingPathComponent("sync.json")))
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+        let offsets = ((sync["mics"] as? [[String: Any]]) ?? []).reduce(into: [String: Double]()) { out, entry in
+            if let file = entry["file"] as? String { out[file] = (entry["offsetSec"] as? NSNumber)?.doubleValue }
+        }
+        let names = ((started["extraMics"] as? [[String: Any]]) ?? []).reduce(into: [String: String]()) { out, entry in
+            if let file = entry["file"] as? String, let name = entry["name"] as? String { out[file] = name }
+        }
+        var extras: [TakeSound] = []
+        for n in 2...9 {
+            let file = "mic-\(n).m4a"
+            guard fm.fileExists(atPath: folder.appendingPathComponent(file).path) else { continue }
+            let name = names[file]
+            extras.append(TakeSound(id: file, title: name ?? "Mic \(n)", url: folder.appendingPathComponent(file), offset: offsets[file] ?? 0, name: name))
+        }
+        guard !extras.isEmpty, fm.fileExists(atPath: folder.appendingPathComponent("camera.mov").path) else { return ([], "main") }
+        let main = TakeSound(id: "main", title: "Main mic", url: folder.appendingPathComponent("camera.mov"), offset: 0,
+                             name: started["micName"] as? String)
+        let picked = (started["videoMic"] as? String).flatMap { file in extras.contains { $0.id == file } ? file : nil }
+        // The video's sound is the picked mic only where it was lined up and video.mp4 made with it.
+        return ([main] + extras, picked != nil && offsets[picked!] != nil ? picked! : "main")
+    }
+}
+
 /// The player and which file it shows.
 @MainActor
 final class TakePlayer: ObservableObject {
     let player = AVPlayer()
     @Published private(set) var sources: [TakeSource] = []
     @Published private(set) var current: TakeSource?
+    /// The mics there are to listen to (none with only the main one), and which one plays.
+    @Published private(set) var sounds: [TakeSound] = []
+    @Published private(set) var sound: TakeSound?
+    /// Which mic video.mp4's sound came from.
+    private(set) var inVideo = "main"
+    /// The files a mixed picture and sound are read from, kept while it plays.
+    private var kept: [AVAsset] = []
+    private var building: Task<Void, Never>?
 
     func load(_ take: TakeInfo) {
         sources = TakeSource.all(in: take)
+        let found = TakeSound.all(in: take)
+        sounds = found.sounds
+        inVideo = found.inVideo
+        sound = sounds.first { $0.id == inVideo } ?? sounds.first
         guard let first = sources.first, !Snapshots.active else { current = sources.first; return }
         current = first
-        player.replaceCurrentItem(with: AVPlayerItem(url: first.url))
-        player.play()
+        play(at: 0, playing: true)
     }
 
     /// Shows another file at the same moment of the take, playing or paused as before.
@@ -89,14 +146,68 @@ final class TakePlayer: ObservableObject {
         let previous = current
         current = source
         guard !Snapshots.active else { return }
-        let playing = player.rate > 0
-        let takeTime = player.currentTime().seconds.isFinite ? player.currentTime().seconds + (previous?.offset ?? 0) : 0
-        let item = AVPlayerItem(url: source.url)
-        player.replaceCurrentItem(with: item)
+        play(at: takeTime(from: previous), playing: player.rate > 0)
+    }
+
+    /// Plays another mic under the same picture, at the same moment.
+    func listen(_ next: TakeSound) {
+        guard next != sound else { return }
+        let time = takeTime(from: current)
+        sound = next
+        guard !Snapshots.active else { return }
+        play(at: time, playing: player.rate > 0)
+    }
+
+    /// Where the player is, in camera time.
+    private func takeTime(from source: TakeSource?) -> Double {
+        player.currentTime().seconds.isFinite ? player.currentTime().seconds + (source?.offset ?? 0) : 0
+    }
+
+    /// The current picture with the current sound, from `takeTime` in camera time. A file plays as
+    /// it is when its own sound is the one wanted; otherwise the picked mic is laid under it.
+    private func play(at takeTime: Double, playing: Bool) {
+        guard let source = current else { return }
+        building?.cancel()
         // A screen shared mid-take has nothing before the share, so it starts at its own beginning.
-        let target = max(0, takeTime - source.offset)
-        player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
-        if playing { player.play() }
+        let target = CMTime(seconds: max(0, takeTime - source.offset), preferredTimescale: 600)
+        let own = source.id == "video" ? inVideo : "main"
+        guard let sound, sound.id != own else {
+            kept = []
+            player.replaceCurrentItem(with: AVPlayerItem(url: source.url))
+            player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
+            if playing { player.play() }
+            return
+        }
+        building = Task { @MainActor in
+            let pictureAsset = AVURLAsset(url: source.url), soundAsset = AVURLAsset(url: sound.url)
+            kept = [pictureAsset, soundAsset]
+            guard let item = await Self.mix(pictureAsset, picture: source, soundAsset, sound: sound), !Task.isCancelled else { return }
+            player.replaceCurrentItem(with: item)
+            await player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
+            if playing { player.play() }
+        }
+    }
+
+    /// The picture's file with another mic's sound under it: mic time u plays at picture time
+    /// u + mic offset - picture offset. Nil when either cannot be read.
+    private static func mix(_ pictureAsset: AVURLAsset, picture: TakeSource, _ soundAsset: AVURLAsset, sound: TakeSound) async -> AVPlayerItem? {
+        guard let videos = try? await pictureAsset.loadTracks(withMediaType: .video), !videos.isEmpty,
+              let voice = try? await soundAsset.loadTracks(withMediaType: .audio).first,
+              let voiceRange = try? await voice.load(.timeRange) else { return nil }
+        let composition = AVMutableComposition()
+        for video in videos {
+            guard let range = try? await video.load(.timeRange),
+                  let track = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
+            try? track.insertTimeRange(range, of: video, at: range.start)
+            track.preferredTransform = (try? await video.load(.preferredTransform)) ?? .identity
+        }
+        let shift = sound.offset - picture.offset
+        let from = CMTimeMaximum(voiceRange.start, CMTime(seconds: max(0, -shift), preferredTimescale: 48_000))
+        if voiceRange.end > from, let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
+            let at = CMTime(seconds: max(0, ((from.seconds + shift) * 48_000).rounded() / 48_000), preferredTimescale: 48_000)
+            try? track.insertTimeRange(CMTimeRange(start: from, end: voiceRange.end), of: voice, at: at)
+        }
+        return AVPlayerItem(asset: composition)
     }
 
     func stop() {
@@ -185,14 +296,17 @@ struct TakeViewer: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 18) {
-            if let current = model.current {
-                FooterLink(title: "Open in QuickTime Player", symbol: "play.rectangle") { openInQuickTime(current.url) }
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 18) {
+                if let current = model.current {
+                    FooterLink(title: "Open in QuickTime Player", symbol: "play.rectangle") { openInQuickTime(current.url) }
+                }
+                FooterLink(title: "Show in Finder", symbol: "folder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([model.current?.url ?? take.folder])
+                }
+                Spacer(minLength: 0)
+                if model.sounds.count > 1 { SoundSwitch(model: model) }
             }
-            FooterLink(title: "Show in Finder", symbol: "folder") {
-                NSWorkspace.shared.activateFileViewerSelecting([model.current?.url ?? take.folder])
-            }
-            Spacer(minLength: 0)
             if let current = model.current, current.id == "screen", current.offset > 3 {
                 Text("The screen was shared \(timecode(current.offset)) into the take.")
                     .font(.system(size: 12))
@@ -245,6 +359,57 @@ private struct SourceSwitch: View {
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Palette.face))
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Palette.hairline))
         .animation(.easeOut(duration: 0.2), value: model.current?.id)
+    }
+}
+
+/// Sound: which mic plays under the picture, lined up with it. The one in the video is marked.
+private struct SoundSwitch: View {
+    @ObservedObject var model: TakePlayer
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "mic.fill")
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(Palette.engraved)
+                .accessibilityHidden(true)
+            HStack(spacing: 2) {
+                ForEach(model.sounds) { sound in
+                    let on = sound.id == model.sound?.id
+                    Button { model.listen(sound) } label: {
+                        HStack(spacing: 5) {
+                            Text(sound.title).lineLimit(1)
+                            if sound.id == model.inVideo {
+                                Circle().fill(Palette.signal).frame(width: 5, height: 5).accessibilityHidden(true)
+                            }
+                        }
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(on ? Palette.ink : Palette.dim)
+                        .padding(.horizontal, 12)
+                        .frame(height: 26)
+                        .background {
+                            if on {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(Palette.raised)
+                                    .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Palette.hairline))
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(help(sound))
+                    .accessibilityLabel(sound.title + (sound.id == model.inVideo ? ", the video's sound" : ""))
+                }
+            }
+            .padding(2)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Palette.face))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Palette.hairline))
+        }
+        .animation(.easeOut(duration: 0.2), value: model.sound?.id)
+    }
+
+    private func help(_ sound: TakeSound) -> String {
+        let who = sound.name.map { "Recorded by \($0)" } ?? "Recorded by this mic"
+        return sound.id == model.inVideo ? "\(who). The video's sound." : "\(who). Listen to it under the picture."
     }
 }
 

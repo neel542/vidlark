@@ -147,6 +147,10 @@ final class CameraRecorder: NSObject {
     /// The format the camera ended up recording in, after each `use`. Called on the camera queue.
     var onFormat: ((CameraFormat?) -> Void)?
     var onStarted: ((CFTimeInterval) -> Void)?
+    /// Pictures from a phone that did not go into the last take's file, by why. Read after it closes.
+    private(set) var phoneDropped: [String: Int] = [:]
+    /// Each take's file says it started once, whichever of the delegate's two ways comes first.
+    fileprivate var startedOnce = Once()
     var onFinished: ((Error?) -> Void)?
 
     override init() {
@@ -283,6 +287,7 @@ final class CameraRecorder: NSObject {
                 phone.setRecording(true)
                 return
             }
+            startedOnce = Once()
             // Give a just-changed session half a second to settle before the file opens.
             let wait = max(0, settled - CACurrentMediaTime())
             queue.asyncAfter(deadline: .now() + wait) { [self] in movie.startRecording(to: url, recordingDelegate: self) }
@@ -331,6 +336,8 @@ final class CameraRecorder: NSObject {
     /// Camera queue only. Switching a connection on means the file waits until `settled`.
     private func frameOutputsOnForTake() {
         taking = true
+        // A phone standing by starts sending now, during the 3, 2, 1, so its file can open on time.
+        phone?.setTaking(true)
         for item in frameOutputs {
             if let connection = item.output.connection(with: .video), !connection.isEnabled {
                 connection.isEnabled = true
@@ -343,6 +350,7 @@ final class CameraRecorder: NSObject {
     /// Camera queue only. The take is over, so outputs go back to what they asked for.
     private func takeEnded() {
         taking = false
+        phone?.setTaking(false)
         frameOutputs.forEach { $0.output.connection(with: .video)?.isEnabled = $0.wanted }
         refreshPhoneTargets()
     }
@@ -367,6 +375,7 @@ final class CameraRecorder: NSObject {
                 phoneQueue.async { [self] in
                     let take = phoneTake
                     phoneTake = nil
+                    phoneDropped = take?.dropped ?? [:]
                     let done: (Error?) -> Void = { error in self.queue.async { self.takeEnded(); self.onFinished?(error) } }
                     if let take { take.finish(done) } else { done(nil) }
                 }
@@ -440,6 +449,7 @@ extension CameraRecorder {
     /// Camera queue only. Switches a phone in as the camera, or out again.
     fileprivate func usePhone(_ link: PhoneCamera?) {
         guard link !== phone else { return }
+        phone?.setTaking(false)
         phone?.stopDelivering(to: self)
         phone = link
         phoneLock.withLock { phoneOn = link != nil }
@@ -497,6 +507,8 @@ final class PhoneTake {
     /// About ten seconds of either; past that the oldest goes.
     private static let mostWaiting = (video: 300, audio: 480)
     var micFormat: CMFormatDescription?
+    /// Pictures that did not go into the file, by why, for the take's events.
+    private(set) var dropped: [String: Int] = [:]
 
     init(url: URL) {
         self.url = url
@@ -519,16 +531,17 @@ final class PhoneTake {
         }
         guard videoIn != nil, let videoFormat else { return }
         // A different picture shape cannot go into the same file; it waits for the next take.
-        guard CMFormatDescriptionEqual(format, otherFormatDescription: videoFormat) else { return }
+        guard CMFormatDescriptionEqual(format, otherFormatDescription: videoFormat) else { dropped["another format", default: 0] += 1; return }
         let newest = waitingVideo.last.map(CMSampleBufferGetPresentationTimeStamp) ?? last
-        guard !newest.isValid || CMTimeCompare(time, newest) > 0 else { return }
+        guard !newest.isValid || CMTimeCompare(time, newest) > 0 else { dropped["out of order", default: 0] += 1; return }
         if broken {
-            guard key else { return }
+            guard key else { dropped["waiting for a whole picture", default: 0] += 1; return }
             broken = false
         }
         waitingVideo.append(sample)
         if waitingVideo.count > Self.mostWaiting.video {
             // Too far behind: what waits goes, and the pictures start again on a whole one.
+            dropped["too far behind", default: 0] += waitingVideo.count
             waitingVideo.removeAll()
             broken = true
             askForKey()
@@ -552,6 +565,7 @@ final class PhoneTake {
                 if videoIn.append(next) {
                     last = CMSampleBufferGetPresentationTimeStamp(next)
                 } else {
+                    dropped["not written", default: 0] += 1 + waitingVideo.count
                     waitingVideo.removeAll()
                     broken = true
                     break
@@ -625,8 +639,20 @@ final class PhoneTake {
 }
 
 extension CameraRecorder: AVCaptureFileOutputRecordingDelegate {
+    /// The time of camera.mov's first frame, on the host clock. Everything in events.jsonl counts
+    /// from it, so a mic file lined up by the clock lands where its sound was.
+    func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo fileURL: URL, startPTS: CMTime, from connections: [AVCaptureConnection]) {
+        guard startedOnce.first() else { return }
+        onStarted?(startPTS.isValid ? startPTS.seconds : CACurrentMediaTime())
+    }
+
+    /// Older word that the file opened, without its first frame's time. The moment it arrives is
+    /// about a fifth of a second after that frame, so it is used only if the timed word never comes.
     func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo fileURL: URL, from connections: [AVCaptureConnection]) {
-        onStarted?(CACurrentMediaTime())
+        let now = CACurrentMediaTime()
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) { [self] in
+            if startedOnce.first() { onStarted?(now) }
+        }
     }
 
     func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL,

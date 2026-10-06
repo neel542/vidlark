@@ -47,6 +47,15 @@ enum Snapshots {
             $0.stagePhone(PhoneState(serving: true, present: true, connected: true, width: 1920, height: 1080, fps: 30), phone: 1)
             $0.stagePhone(PhoneState(serving: true, present: true, connected: true, width: 1080, height: 1920, fps: 30), phone: 2)
         }
+        // More microphones: a phone filming an angle also records its sound, a USB mic makes the
+        // video's sound, and a phone used only as a mic is muted on the phone.
+        panel("mics") {
+            $0.stage(phase: .idle, camera: "MacBook Air Camera", mic: "MacBook Air Microphone", level: -30, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script)
+            $0.extraCameraIDs = [PhoneLink.cameraID(1)]
+            $0.stagePhone(PhoneState(serving: true, present: true, connected: true, width: 1920, height: 1080, fps: 30, camera: true, mic: .on), phone: 1)
+            $0.stagePhone(PhoneState(serving: true, present: true, mic: .off, muted: true, mutedOnPhone: true), phone: 2)
+            $0.stageMics([(PhoneLink.micID(1), "Phone 1", -22), ("rode", "Rode Wireless GO", -18), (PhoneLink.micID(2), "Phone 2", -160)], videoMic: "rode")
+        }
         panel("not-ready") { $0.stage(phase: .idle, camera: nil, mic: "MacBook Air Microphone", level: -70, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: false, script: nil) }
         panel("done") { $0.stage(phase: .done(folder: URL(fileURLWithPath: "/tmp"), note: nil), camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -50, elapsed: 905, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
 
@@ -119,9 +128,10 @@ enum Snapshots {
         // A phone's code window, waiting and connected, and a second phone's, filming tall.
         for (name, phone, state) in [("waiting", 1, PhoneState(serving: true)),
                                      ("connected", 1, PhoneState(serving: true, present: true, connected: true, width: 1920, height: 1080, fps: 30)),
-                                     ("second", 2, PhoneState(serving: true, present: true, connected: true, width: 1080, height: 1920, fps: 30))] {
+                                     ("second", 2, PhoneState(serving: true, present: true, connected: true, width: 1080, height: 1920, fps: 30)),
+                                     ("mic", 3, PhoneState(serving: true, present: true, mic: .on))] {
             let s = Studio()
-            if phone > 1 { s.extraCameraIDs = [PhoneLink.cameraID(phone)] }
+            if name == "mic" { s.extraMicIDs = [PhoneLink.micID(phone)] } else if phone > 1 { s.extraCameraIDs = [PhoneLink.cameraID(phone)] }
             s.stagePhone(state, phone: phone)
             write(PhoneCodeView(studio: s, phone: phone).preferredColorScheme(.dark), size: CGSize(width: 740, height: 500),
                   to: dir.appendingPathComponent("phone-code-\(name).png"))

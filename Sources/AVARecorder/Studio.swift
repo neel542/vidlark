@@ -61,6 +61,20 @@ final class Studio: ObservableObject {
             applyInputs()
         }
     }
+    /// Microphones recorded next to the main one, mic-2.m4a, mic-3.m4a and on, in the order they
+    /// were added: a mic the Mac sees, by its ID, or a phone's mic (`PhoneLink.micID`).
+    @Published var extraMicIDs: [String] = UserDefaults.standard.stringArray(forKey: "extraMics") ?? [] {
+        didSet {
+            if !Snapshots.active, !Studio.selfTesting { UserDefaults.standard.set(extraMicIDs, forKey: "extraMics") }
+            if let videoMicID, !extraMicIDs.contains(videoMicID) { self.videoMicID = nil }
+            applyInputs()
+        }
+    }
+    /// The mic the finished video uses: nil for the main one, or one of `extraMicIDs`. Every mic
+    /// records either way, so it can still be changed while editing.
+    @Published var videoMicID: String? = UserDefaults.standard.string(forKey: "videoMic") {
+        didSet { if !Snapshots.active, !Studio.selfTesting { UserDefaults.standard.set(videoMicID, forKey: "videoMic") } }
+    }
     @Published var liveMode = LiveMode(rawValue: UserDefaults.standard.string(forKey: "liveMode") ?? "") ?? .off {
         didSet { applyLive() }
     }
@@ -132,11 +146,16 @@ final class Studio: ObservableObject {
     /// A phone over Wi-Fi is the main camera.
     var usingPhone: Bool { mainPhone != nil }
     func phoneState(_ number: Int) -> PhoneState { phoneStates[number] ?? PhoneState() }
-    /// Phone n is in touch: sending pictures, or resting with the rest of the camera.
+    /// Phone n is in touch: as a camera, sending pictures, standing by between takes, or resting
+    /// with the rest of the camera; as a microphone only, its page is open.
     func phoneReady(_ number: Int) -> Bool {
         let state = phoneState(number)
-        return state.connected || (state.present && cameraResting)
+        guard filmsWith(number) else { return state.present }
+        return state.connected || (state.present && (cameraResting || state.standby))
     }
+
+    /// Phone n films: the main camera or another angle, not only a microphone.
+    func filmsWith(_ number: Int) -> Bool { mainPhone == number || activeExtras.contains { $0.phone == number } }
     /// macOS camera effects that change the picture for every app. Only the person at the Mac can
     /// switch them, in Video Effects.
     @Published private(set) var portraitOn = false
@@ -273,6 +292,9 @@ final class Studio: ObservableObject {
     private let screen = ScreenRecorder()
     private var extras: [CameraRecorder] = []
     private var extraOrder: [String] = []
+    /// One recorder for each extra microphone, in `activeMics` order.
+    private(set) var micRecorders: [MicRecorder] = []
+    private var micOrder: [String] = []
     let liveFrames = LiveFrames()
     let liveAudio = LiveAudio()
     private lazy var liveServer = LiveServer(frames: liveFrames, audio: liveAudio, token: liveToken)
@@ -346,6 +368,10 @@ final class Studio: ObservableObject {
             DispatchQueue.main.async { self?.cameraFormat = format }
         }
         bootLive()
+        // A phone's mic or mute changed: the panel shows it at once, not at its next look.
+        PhoneLink.shared.onChange = { [weak self] number in
+            DispatchQueue.main.async { MainActor.assumeIsolated { self?.phoneChanged(number) } }
+        }
         camera.attach(feed.output)
         mainPreview.feed = feed
         feed.onSeenChange = { [weak self] in MainActor.assumeIsolated { self?.restCheck() } }
@@ -553,6 +579,19 @@ final class Studio: ObservableObject {
                          phone: extra.phone.map(PhoneLink.shared.camera))
         }
         camera.shareMic(with: zip(extras, wanted).filter { $0.1.isPhone }.map(\.0))
+
+        // Each extra mic records its own file, and shows its level meanwhile.
+        let mics = micAllowed ? activeMics : []
+        if mics.map(\.id) != micOrder {
+            micRecorders.forEach { $0.release() }
+            micRecorders = mics.map { mic in
+                let recorder = MicRecorder()
+                if cameraAsleep { recorder.rest(true) }
+                if let device = mic.device { recorder.use(.device(device)) } else if let n = mic.phone { recorder.use(.phone(PhoneLink.shared.camera(n))) }
+                return recorder
+            }
+            micOrder = mics.map(\.id)
+        }
     }
 
     private func remember() {
@@ -743,8 +782,10 @@ final class Studio: ObservableObject {
         }
         if let n = phoneNotReady {
             let who = phonesInUse.count > 1 ? PhoneLink.name(n) : "The phone"
+            let what = filmsWith(n) ? "is not sending its picture yet. Scan its code with the phone, then tap Start camera."
+                : "is not connected yet. Scan its code with the phone, then tap Start microphone."
             return Attention(level: .warn,
-                             text: phoneState(n).failure ?? "\(who) is not sending its picture yet. Scan its code with the phone, then tap Start camera.",
+                             text: phoneState(n).failure ?? "\(who) \(what)",
                              fix: .phoneCode(n), fixTitle: "Show the code", learnMore: .cameraGuide)
         }
         if let freeGB, freeGB < 20 {
@@ -791,7 +832,7 @@ final class Studio: ObservableObject {
     }
 
     /// How a microphone connects, so "AirPods" and "the mic receiver" are easy to tell apart.
-    static func connection(_ device: AVCaptureDevice) -> String {
+    nonisolated static func connection(_ device: AVCaptureDevice) -> String {
         switch UInt32(bitPattern: device.transportType) {
         case kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE: "Bluetooth"
         case kAudioDeviceTransportTypeUSB: "USB"
@@ -821,8 +862,11 @@ final class Studio: ObservableObject {
         var isPhone: Bool { phone != nil }
     }
 
-    /// Every phone over Wi-Fi that films in the next take, the main camera's first.
-    var phonesInUse: [Int] { (mainPhone.map { [$0] } ?? []) + activeExtras.compactMap(\.phone) }
+    /// Every phone over Wi-Fi in the next take, filming or only listening, the main camera's first.
+    var phonesInUse: [Int] {
+        var seen = Set<Int>()
+        return ((mainPhone.map { [$0] } ?? []) + activeExtras.compactMap(\.phone) + activeMics.compactMap(\.phone)).filter { seen.insert($0).inserted }
+    }
     var phoneInUse: Bool { !phonesInUse.isEmpty }
     /// The lowest phone number that is not filming yet, while another phone can join.
     var freePhone: Int? { (1...PhoneLink.most).first { !phonesInUse.contains($0) } }
@@ -841,6 +885,103 @@ final class Studio: ObservableObject {
     func toggleExtra(_ id: String) {
         guard !isBusy else { return }
         if let i = extraCameraIDs.firstIndex(of: id) { extraCameraIDs.remove(at: i) } else { extraCameraIDs.append(id) }
+    }
+
+    // MARK: More microphones
+
+    /// Extra mics that can record now, in the order they were added. Never the main mic.
+    var activeMics: [ExtraMic] {
+        if Snapshots.active, let stagedMics { return stagedMics }
+        return extraMicIDs.compactMap { id in
+            if let n = PhoneLink.number(ofMic: id) { return ExtraMic(id: id, name: PhoneLink.name(n), device: nil) }
+            guard id != micID || testSameMic, let device = mics.first(where: { $0.uniqueID == id }) else { return nil }
+            return ExtraMic(id: id, name: device.localizedName, device: device)
+        }
+    }
+
+    /// Another microphone recorded next to the main one: one the Mac sees, or a phone's.
+    struct ExtraMic: Equatable {
+        var id: String
+        var name: String
+        /// Nil for a phone's mic.
+        var device: AVCaptureDevice?
+        /// How a staged mic connects, for snapshots.
+        var stagedConnection: String?
+        /// The phone's number, for a phone's mic.
+        var phone: Int? { PhoneLink.number(ofMic: id) }
+        var isPhone: Bool { phone != nil }
+        /// "USB", "Bluetooth", "Built in", or "Over Wi-Fi" for a phone's mic.
+        var connection: String { device.map(Studio.connection) ?? stagedConnection ?? "Over Wi-Fi" }
+    }
+
+    private var stagedMics: [ExtraMic]?
+
+    /// Snapshots: extra mics with these names (a phone's by its mic ID), their levels and whether each was heard.
+    func stageMics(_ mics: [(id: String, name: String, level: Float)], videoMic: String? = nil) {
+        stagedMics = mics.map { ExtraMic(id: $0.id, name: $0.name, device: nil, stagedConnection: PhoneLink.number(ofMic: $0.id) == nil ? "USB" : nil) }
+        extraMicIDs = mics.map(\.id)
+        videoMicID = videoMic
+        for (i, mic) in mics.enumerated() {
+            let (meter, heard) = micMeter(i)
+            meter.level = mic.level
+            meter.peak = mic.level + 6
+            heard.recently = mic.level > -45
+        }
+    }
+
+    /// A self test may record the main mic a second time as an extra one, to try the extra mic path
+    /// on a Mac with only one mic.
+    private var testSameMic: Bool { Studio.selfTesting && ProcessInfo.processInfo.environment["AVA_MICS"]?.contains("same") == true }
+
+    /// Adds a mic, or takes it off again. Taking off the video's mic gives the video the main one.
+    func toggleMic(_ id: String) {
+        guard !isBusy else { return }
+        if let i = extraMicIDs.firstIndex(of: id) { extraMicIDs.remove(at: i) } else { extraMicIDs.append(id) }
+    }
+
+    /// Records phone n's sound too, or stops.
+    func togglePhoneSound(_ number: Int) { toggleMic(PhoneLink.micID(number)) }
+
+    /// + Add, a phone as a microphone: the next free phone joins for its sound only, and its code shows.
+    func addPhoneMic() {
+        guard !isBusy, let n = freePhone else { return }
+        let id = PhoneLink.micID(n)
+        if !extraMicIDs.contains(id) { extraMicIDs.append(id) }
+        showPhoneCode(n)
+    }
+
+    /// The mic the video uses: nil for the main one.
+    func useForVideo(_ id: String?) {
+        guard !isBusy else { return }
+        videoMicID = id.flatMap { extraMicIDs.contains($0) ? $0 : nil }
+    }
+
+    /// Extra mic i's level and whether it has been heard, or still ones for snapshots.
+    func micMeter(_ i: Int) -> (meter: LevelMeter, heard: MicHeard) {
+        if i < micRecorders.count { return (micRecorders[i].meter, micRecorders[i].heard) }
+        while stagedMeters.count <= i { stagedMeters.append((LevelMeter(), MicHeard())) }
+        return stagedMeters[i]
+    }
+    private var stagedMeters: [(LevelMeter, MicHeard)] = []
+
+    /// The video's mic, if it is an extra one that can record now.
+    var videoMic: ExtraMic? { activeMics.first { $0.id == videoMicID } }
+
+    /// Mutes phone n's mic from this Mac, or unmutes it. The phone shows it and can flip it back.
+    func setPhoneMuted(_ number: Int, _ on: Bool) {
+        PhoneLink.shared.camera(number).setMuted(on)
+        phoneChanged(number)
+    }
+
+    /// A phone's mic or mute changed: its row updates now, and a take notes it.
+    private func phoneChanged(_ number: Int) {
+        let state = PhoneLink.shared.state(number)
+        let before = phoneStates[number]
+        guard before != state else { return }
+        phoneStates[number] = state
+        if isRolling, let i = activeMics.firstIndex(where: { $0.phone == number }), before?.muted != state.muted {
+            log?.write(["type": "mute", "file": "mic-\(i + 2).m4a", "on": state.muted, "by": state.mutedOnPhone ? "phone" : "mac"])
+        }
     }
 
     var canStart: Bool {
@@ -962,6 +1103,9 @@ final class Studio: ObservableObject {
                         }
                     }
                     recorder.startRecording(to: folder.appendingPathComponent(file))
+                }
+                for (i, recorder) in micRecorders.enumerated() {
+                    recorder.startRecording(to: folder.appendingPathComponent("mic-\(i + 2).m4a"))
                 }
                 try? await Task.sleep(nanoseconds: 15_000_000_000)
                 if phase == .starting { cameraEndedEarly(nil) }
@@ -1245,8 +1389,18 @@ final class Studio: ObservableObject {
         log?.write(["type": "start", "wall": wall, "title": script.title.isEmpty ? (currentItem?.title ?? "Untitled") : script.title,
                     "targetMinutes": script.targetMinutes, "camera": "camera.mov", "screen": takeHasScreen ? "screen.mov" : "",
                     "cameraName": cameraName ?? "", "micName": micName ?? "", "screenName": display?.name ?? "",
-                    "extraCameras": activeExtras.prefix(extras.count).enumerated().map { ["file": "camera-\($0.offset + 2).mov", "name": $0.element.name] }],
+                    "extraCameras": activeExtras.prefix(extras.count).enumerated().map { ["file": "camera-\($0.offset + 2).mov", "name": $0.element.name] },
+                    "extraMics": activeMics.prefix(micRecorders.count).enumerated().map {
+                        ["file": "mic-\($0.offset + 2).m4a", "name": $0.element.name, "connection": $0.element.connection]
+                    },
+                    "videoMic": activeMics.prefix(micRecorders.count).firstIndex { $0.id == videoMicID }.map { "mic-\($0 + 2).m4a" } ?? ""],
                    at: time)
+        // A phone's mic muted from the start says so, as later mutes do.
+        for (i, mic) in activeMics.prefix(micRecorders.count).enumerated() {
+            if let n = mic.phone, phoneState(n).muted {
+                log?.write(["type": "mute", "file": "mic-\(i + 2).m4a", "on": true, "by": phoneState(n).mutedOnPhone ? "phone" : "mac"], at: time)
+            }
+        }
         showing = takeHasScreen ? .screen : .camera
         log?.write(["type": "show", "what": showing.rawValue], at: time)
         if takeHasScreen { logSound(at: time) }
@@ -1385,6 +1539,9 @@ final class Studio: ObservableObject {
     func stop(thenFinish: Bool = true) {
         guard phase == .recording || phase == .starting else { return }
         phase = .stopping
+        // Every mic file ends here, though the cameras take a moment longer to close.
+        let stopAt = CMClockGetTime(CMClockGetHostTimeClock())
+        micRecorders.forEach { $0.end(at: stopAt) }
         windowWatch?.invalidate()
         windowWatch = nil
         sharing_ = nil
@@ -1402,6 +1559,7 @@ final class Studio: ObservableObject {
         Task {
             let cameraError = await finishRecording(camera)
             await stopExtras()
+            await stopMics()
             while sharing { try? await Task.sleep(nanoseconds: 100_000_000) }
             await screen.stop()
             liveFrames.forget("screen")
@@ -1463,6 +1621,7 @@ final class Studio: ObservableObject {
             // A camera file still waiting to open must not open later with nobody to stop it.
             _ = await finishRecording(camera)
             await stopExtras()
+            await stopMics()
             await screen.stop()
             liveFrames.forget("screen")
             applyInputs()
@@ -1494,7 +1653,35 @@ final class Studio: ObservableObject {
     }
 
     private func stopExtras() async {
-        for recorder in extras { _ = await finishRecording(recorder) }
+        for (i, recorder) in extras.enumerated() {
+            _ = await finishRecording(recorder)
+            // A phone's pictures that could not go in say why, for working out a short file later.
+            if !recorder.phoneDropped.isEmpty {
+                log?.write(["type": "camera-dropped", "file": "camera-\(i + 2).mov", "pictures": recorder.phoneDropped])
+            }
+        }
+    }
+
+    /// Closes every extra mic's file, each in at most ten seconds, and notes any that went wrong.
+    private func stopMics() async {
+        for (i, recorder) in micRecorders.enumerated() {
+            let once = Once()
+            let (error, began): (Error?, CFTimeInterval?) = await withCheckedContinuation { done in
+                recorder.stopRecording { error, began in if once.first() { done.resume(returning: (error, began)) } }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                    if once.first() { done.resume(returning: (RecorderError("The mic file did not close."), nil)) }
+                }
+            }
+            // Where the file starts on the camera's clock (it can be a moment before camera.mov),
+            // for lining it up when its sound does not match the main mic's.
+            if let began, let log {
+                log.write(["type": "mic-start", "file": "mic-\(i + 2).m4a", "at": ((began - log.t0) * 1000).rounded() / 1000])
+            }
+            if let error {
+                let message = (error as? RecorderError)?.message ?? error.localizedDescription
+                log?.write(["type": "mic-error", "file": "mic-\(i + 2).m4a", "message": message])
+            }
+        }
     }
 
     /// Stops a recorder and waits for its file to close, at most ten seconds: a camera file that
@@ -1730,26 +1917,56 @@ extension Studio {
             // to send pictures, and writes the links it serves to .selftest-phone.txt (one a line).
             // AVA_CAMERA=phone-extra records phone 1 as another camera instead, and phones records
             // phones 1 and 2 as two more angles next to the Mac's own camera.
-            if let role = ProcessInfo.processInfo.environment["AVA_CAMERA"], role.hasPrefix("phone") {
-                let numbers = role == "phones" ? [1, 2] : [1]
-                if role == "phone" {
-                    cameraID = PhoneLink.cameraID(1)
-                } else {
-                    cameraID = cameras.first?.uniqueID
-                    extraCameraIDs = numbers.map(PhoneLink.cameraID)
-                }
+            // AVA_MICS adds microphones: "phones" records the filming phones' own sound too,
+            // "phone-only" adds one more phone for its sound only, and "same" records the main mic
+            // a second time as an extra one (the device path, on a Mac with one mic). Comma separated.
+            // AVA_VIDEO_MIC=first makes the first extra mic the video's sound.
+            let env = ProcessInfo.processInfo.environment
+            let role = env["AVA_CAMERA"] ?? ""
+            let micWords = (env["AVA_MICS"] ?? "").split(separator: ",").map(String.init)
+            let filming = role == "phones" ? [1, 2] : role.hasPrefix("phone") ? [1] : []
+            let listeningOnly = micWords.contains("phone-only") ? [filming.count + 1] : []
+            if role == "phone" {
+                cameraID = PhoneLink.cameraID(1)
+            } else if role.hasPrefix("phone") {
+                cameraID = cameras.first?.uniqueID
+                extraCameraIDs = filming.map(PhoneLink.cameraID)
+            } else if !micWords.isEmpty {
+                extraCameraIDs = []
+            }
+            if !micWords.isEmpty {
+                extraMicIDs = (micWords.contains("phones") ? filming.map(PhoneLink.micID) : []) + listeningOnly.map(PhoneLink.micID)
+                    + (micWords.contains("same") ? [micID].compactMap { $0 } : [])
+                if env["AVA_VIDEO_MIC"] == "first" { videoMicID = extraMicIDs.first }
+            }
+            let numbers = filming + listeningOnly
+            if !numbers.isEmpty {
                 PhoneLink.shared.start()
                 let links = numbers.compactMap { PhoneLink.shared.link($0) }.joined(separator: "\n")
                 try? links.write(to: Library.root.appendingPathComponent(".selftest-phone.txt"), atomically: true, encoding: .utf8)
                 // The camera stays awake meanwhile: a quiet test has no window to be seen in, and a
-                // resting phone sends no pictures.
+                // resting phone sends nothing. Filming phones count once their camera is ready, and
+                // phones whose sound is recorded once their mic is on.
                 holdAwake = true
+                let listening = Set(activeMics.compactMap(\.phone))
+                func allReady() -> Bool {
+                    numbers.allSatisfy { n in
+                        let state = PhoneLink.shared.state(n)
+                        let pictureReady = !filming.contains(n) || state.connected || state.standby
+                        return pictureReady && (!listening.contains(n) || state.mic == .on || state.muted)
+                    }
+                }
                 var waited = 0.0
-                func allSending() -> Bool { numbers.allSatisfy { PhoneLink.shared.state($0).connected } }
-                while !allSending() && waited < 60 {
+                while !allReady() && waited < 60 {
                     try? await Task.sleep(nanoseconds: 500_000_000); waited += 0.5
                 }
-                guard allSending() else { report(["ok": false, "stage": "phone", "reason": "no pictures from a phone's page"]); return }
+                guard allReady() else {
+                    let states = numbers.map { n -> String in
+                        let st = PhoneLink.shared.state(n)
+                        return "\(n): present \(st.present) camera \(st.camera) standby \(st.standby) connected \(st.connected) mic \(st.mic.rawValue)"
+                    }
+                    report(["ok": false, "stage": "phone", "reason": "a phone's page is not ready", "phones": states]); return
+                }
                 phoneStates = Dictionary(uniqueKeysWithValues: numbers.map { ($0, PhoneLink.shared.state($0)) })
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
@@ -1787,6 +2004,15 @@ extension Studio {
                 Task { @MainActor in
                     try? await Task.sleep(nanoseconds: UInt64(at * 1_000_000_000))
                     if what == .screen && !takeHasScreen { shareScreen() } else { show(what) }
+                }
+            }
+            // AVA_MUTE=6:1:on,12:1:off mutes or unmutes phone 1's mic from the Mac at those seconds.
+            for item in (ProcessInfo.processInfo.environment["AVA_MUTE"] ?? "").split(separator: ",") {
+                let parts = item.split(separator: ":")
+                guard parts.count == 3, let at = Double(parts[0]), let n = Int(parts[1]) else { continue }
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: UInt64(at * 1_000_000_000))
+                    setPhoneMuted(n, parts[2] == "on")
                 }
             }
             // AVA_SOUND=2:on,5:from:afplay,8:off switches the Mac's sound at those seconds into the take.
@@ -1938,6 +2164,12 @@ final class LevelMeter: ObservableObject {
     @Published var peak: Float = -160
 }
 
+/// Whether an extra mic has heard anything louder than a murmur in the last 8 seconds. Apart from
+/// its level so its row redraws only when this changes, not 15 times a second.
+final class MicHeard: ObservableObject {
+    @Published var recently = false
+}
+
 /// Splits the finisher's output into lines and remembers a FAIL line. Used from two threads.
 final class LineReader: @unchecked Sendable {
     private let lock = NSLock()
@@ -1998,6 +2230,7 @@ extension Studio {
         }
         camera.rest(asleep)
         extras.forEach { $0.rest(asleep) }
+        micRecorders.forEach { $0.rest(asleep) }
         // A camera that never sends a picture again (unplugged while resting) must not leave the word up.
         if !asleep {
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in

@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The window with phone n's QR code, which makes that phone a camera over Wi-Fi.
+/// The window with phone n's QR code, which makes that phone a camera or a microphone over Wi-Fi.
 enum PhoneCodeWindow {
     private static var window: NSWindow?
     /// Which phone's code is showing, if any.
@@ -32,12 +32,15 @@ enum PhoneCodeWindow {
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { _ in
             MainActor.assumeIsolated {
                 guard window === w else { return }
+                PhoneLink.shared.camera(phone).setOnScreen(false)
                 window = nil
                 showing = nil
             }
         }
         window = w
         showing = phone
+        // While its code shows, the phone keeps sending, so the window can say the picture works.
+        PhoneLink.shared.camera(phone).setOnScreen(true)
         w.makeKeyAndOrderFront(nil)
         NSApp.activate()
     }
@@ -68,7 +71,9 @@ struct PhoneCodeView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Step(n: 1, text: "Point the phone's camera at the code, then tap the link that appears.")
                     Step(n: 2, text: "The first time, the phone warns that the connection is not private. It is AVA's own link, only on your Wi-Fi. On an iPhone, tap Show Details, then \u{201C}visit this website\u{201D}, then Visit Website. On Android, tap Advanced, then Proceed.")
-                    Step(n: 3, text: "On the phone, pick Wide 16:9 or Tall 9:16, then tap Start camera and Allow. The picture keeps that shape however the phone turns.")
+                    Step(n: 3, text: listensOnly
+                         ? "On the phone, tap Start microphone, then Allow. Mute, on the phone or on this Mac, turns its mic off completely."
+                         : "On the phone, pick Wide 16:9 or Tall 9:16, then tap Start camera and Allow. The picture keeps that shape however the phone turns.")
                 }
                 .padding(.top, 22)
                 Spacer(minLength: 22)
@@ -120,10 +125,23 @@ struct PhoneCodeView: View {
         studio.phonesInUse.count > 1 || phone > 1 ? "Connect phone \(phone)" : "Connect a phone"
     }
 
+    /// The phone is only a microphone: AVA records its sound and not its picture.
+    private var listensOnly: Bool { !studio.filmsWith(phone) && studio.extraMicIDs.contains(PhoneLink.micID(phone)) }
+    private var withSound: Bool { studio.extraMicIDs.contains(PhoneLink.micID(phone)) }
+
     /// What the phone will be once it connects.
     private var role: String {
-        studio.mainPhone == phone ? "It becomes the camera AVA films with."
-            : "It films another angle, saved as its own file next to the main camera, so the angle can be picked in editing."
+        if listensOnly {
+            return "It records sound only, like a wireless mic, saved as its own file. Keep it close to the person talking."
+        }
+        return (studio.mainPhone == phone ? "It becomes the camera AVA films with."
+            : "It films another angle, saved as its own file next to the main camera, so the angle can be picked in editing.")
+            + (withSound ? " Its own sound is recorded too." : "")
+    }
+
+    /// Connected: sending its picture, or for a microphone, in touch with its mic on or muted.
+    private var connected: Bool {
+        listensOnly ? state.present && (state.mic == .on || state.muted) : state.connected
     }
 
     @ViewBuilder private var status: some View {
@@ -141,7 +159,7 @@ struct PhoneCodeView: View {
                 }
             }
             Spacer(minLength: 12)
-            if state.connected {
+            if connected {
                 SmallButton(title: "Done", primary: true) { PhoneCodeWindow.close() }
             }
         }
@@ -152,18 +170,23 @@ struct PhoneCodeView: View {
     }
 
     private var lamp: LampState {
-        state.failure != nil ? .fail : state.connected ? .ok : state.present ? .warn : .off
+        state.failure != nil ? .fail : connected ? (state.muted ? .off : .ok) : state.present ? .warn : .off
     }
 
     private var headline: String {
         if state.failure != nil { return "The phone link is not running" }
-        if state.connected { return "Connected" }
+        if connected { return state.muted && listensOnly ? "Connected, muted" : "Connected" }
         if state.present { return "The phone's page is open" }
         return "Waiting for the phone"
     }
 
     private var detail: String? {
         if let failure = state.failure { return failure }
+        if listensOnly {
+            if connected { return state.muted ? (state.mutedOnPhone ? "Muted on the phone." : "Muted from this Mac.") : "Sending its sound." }
+            if state.present { return state.mic == .asking ? "Tap Allow on the phone." : state.mic == .denied ? "The phone did not allow its mic." : "Tap Start microphone on the phone." }
+            return "Scan the code with the phone."
+        }
         if state.connected {
             let format = CameraFormat(width: state.width, height: state.height, fps: 30).name
             return "\(state.tall ? "Tall 9:16" : "Wide 16:9"), \(format), \(max(state.fps, 1)) frames a second."

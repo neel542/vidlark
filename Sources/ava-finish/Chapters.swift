@@ -14,6 +14,13 @@ struct RecordingEvents {
     var shows: [ShowChange] = []
     /// Each change of the Mac's sound: on or off, and from where.
     var sounds: [(t: Double, on: Bool, from: String)] = []
+    /// The extra mics, by file: their names, and where each file starts in camera time.
+    var micNames: [String: String] = [:]
+    var micStarts: [String: Double] = [:]
+    /// Each mute or unmute of a phone's mic, by file, in camera time.
+    var mutes: [(t: Double, file: String, on: Bool, byPhone: Bool)] = []
+    /// The mic file the video's sound comes from, or nil for the main mic.
+    var videoMic: String?
     var skippedLines = 0
 }
 
@@ -43,6 +50,16 @@ func readEvents(_ url: URL) -> RecordingEvents? {
             events.title = text("title")
             events.wall = text("wall")
             events.cameraFirst = (object["screen"] as? String) == ""
+            for mic in (object["extraMics"] as? [[String: Any]]) ?? [] {
+                if let file = mic["file"] as? String { events.micNames[file] = (mic["name"] as? String) ?? file }
+            }
+            events.videoMic = text("videoMic")
+        case "mic-start":
+            if let file = text("file"), let at = (object["at"] as? NSNumber)?.doubleValue { events.micStarts[file] = at }
+        case "mute":
+            if let file = text("file") {
+                events.mutes.append((t, file, (object["on"] as? Bool) ?? false, text("by") == "phone"))
+            }
         case "screen-start":
             if events.screenShared == nil { events.screenShared = t }
         case "sound":

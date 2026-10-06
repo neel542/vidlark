@@ -2,7 +2,7 @@ import AVFoundation
 import SwiftUI
 
 // The panel's sources, like the sources list in OBS: one row per thing being recorded, each with
-// a symbol, what it is, and a menu to change it. + adds another camera or the screen.
+// a symbol, what it is, and a menu to change it. + adds another camera or another microphone.
 
 struct SourcesPanel: View {
     @ObservedObject var studio: Studio
@@ -40,6 +40,7 @@ struct SourcesPanel: View {
             var detail = extra.name
             if let n = extra.phone {
                 menu.insert(MenuChoice(title: "Show the code again…", selected: false) { studio.showPhoneCode(n) }, at: 0)
+                menu.insert(phoneSoundChoice(n), at: 1)
                 let state = studio.phoneState(n)
                 if waiting {
                     detail += " · Waiting for the phone"
@@ -50,8 +51,24 @@ struct SourcesPanel: View {
             rows.append(AnyView(SourceRow(symbol: extra.isPhone ? "qrcode" : "video.fill", badge: "\(i + 2)", title: "Camera \(i + 2)",
                                           detail: detail, lamp: waiting ? .warn : .ok, dense: dense, menu: menu)))
         }
+        for (i, mic) in studio.activeMics.enumerated() {
+            rows.append(AnyView(extraMicRow(mic, number: i + 2, meter: studio.micMeter(i))))
+        }
         rows.append(AnyView(screenRow))
         return rows
+    }
+
+    /// A phone filming an angle can record its own sound too, as a mic of its own.
+    private func phoneSoundChoice(_ n: Int) -> MenuChoice {
+        MenuChoice(title: "Record this phone's sound too", selected: studio.extraMicIDs.contains(PhoneLink.micID(n))) { studio.togglePhoneSound(n) }
+    }
+
+    /// Whether to say which mic the video's sound comes from: only once there is more than one.
+    private var manyMics: Bool { !studio.activeMics.isEmpty }
+
+    /// Microphone 2 and on: a mic the Mac sees, or a phone's.
+    private func extraMicRow(_ mic: Studio.ExtraMic, number: Int, meter: (meter: LevelMeter, heard: MicHeard)) -> some View {
+        ExtraMicRow(studio: studio, heard: meter.heard, mic: mic, number: number, meter: meter.meter, dense: dense)
     }
 
     private var cameraRow: some View {
@@ -79,7 +96,7 @@ struct SourcesPanel: View {
         let choices = studio.cameras.map { d in MenuChoice(title: d.localizedName, selected: d.uniqueID == studio.cameraID) { studio.cameraID = d.uniqueID } }
             + phones + newPhone
         // Quality straight from the camera's menu, without opening Settings.
-        let more = CameraQuality.allCases.map { q in
+        let more = (studio.mainPhone.map { [phoneSoundChoice($0)] } ?? []) + CameraQuality.allCases.map { q in
             MenuChoice(title: "Quality: \(q.title)", selected: studio.cameraQuality == q) { studio.cameraQuality = q }
         } + [MenuChoice(title: "Studio Light and other effects…", selected: false) { SettingsWindow.show(.effects) }]
         return SourceRow(symbol: "video.fill", title: "Camera", detail: detail, lamp: lamp, dense: dense, menu: choices, more: more)
@@ -97,7 +114,10 @@ struct SourcesPanel: View {
         let choices = studio.mics.map { d in
             MenuChoice(title: "\(d.localizedName) (\(Studio.connection(d)))", selected: d.uniqueID == studio.micID) { studio.micID = d.uniqueID }
         }
-        return SourceRow(symbol: "mic.fill", title: "Microphone", detail: detail, lamp: lamp, dense: dense, menu: choices,
+        // With more than one mic, this one can be the video's sound again.
+        let more = manyMics ? [MenuChoice(title: "Use for the video's sound", selected: studio.videoMicID == nil) { studio.useForVideo(nil) }] : []
+        return SourceRow(symbol: "mic.fill", title: "Microphone", detail: detail,
+                         also: manyMics && studio.videoMicID == nil ? "The video's sound" : nil, lamp: lamp, dense: dense, menu: choices, more: more,
                          note: name != nil && !studio.micHeardRecently && studio.micAllowed && !resting ? "Say something to test it." : nil) {
             if !resting { LiveMeter(meter: studio.meter) }
         }
@@ -246,7 +266,7 @@ struct SourceRow<Below: View>: View {
     }
 }
 
-/// + Add: another camera, or the screen when it is not being recorded from the start.
+/// + Add: another camera or another microphone.
 struct AddSourceButton: View {
     @ObservedObject var studio: Studio
     @State private var hover = false
@@ -281,6 +301,23 @@ struct AddSourceButton: View {
                             Button(studio.phoneInUse ? "Add another phone with a QR code…" : "Add a phone with a QR code…") { studio.addPhone() }
                         }
                     }
+                    // More microphones: each records its own file, and any of them can be the video's sound.
+                    let micsFree = studio.mics.filter { $0.uniqueID != studio.micID && !studio.extraMicIDs.contains($0.uniqueID) }
+                    let phoneMics = studio.phonesInUse.filter { studio.filmsWith($0) && !studio.extraMicIDs.contains(PhoneLink.micID($0)) }
+                    Section("Another microphone") {
+                        if micsFree.isEmpty && phoneMics.isEmpty {
+                            Text("No other microphone is connected")
+                        }
+                        ForEach(micsFree, id: \.uniqueID) { device in
+                            Button("\(device.localizedName) (\(Studio.connection(device)))") { studio.toggleMic(device.uniqueID) }
+                        }
+                        ForEach(phoneMics, id: \.self) { n in
+                            Button("\(PhoneLink.name(n))'s mic") { studio.togglePhoneSound(n) }
+                        }
+                        if studio.freePhone != nil {
+                            Button("A phone as a microphone, with a QR code…") { studio.addPhoneMic() }
+                        }
+                    }
                     Divider()
                     Button("How to connect a camera…") { SettingsWindow.show(.cameraGuide) }
                 } label: { face }
@@ -290,7 +327,7 @@ struct AddSourceButton: View {
         }
         .fixedSize()
         .onHover { hover = $0 }
-        .help("Film another angle at the same time. Each camera records its own file.")
+        .help("Film another angle or record another mic at the same time. Each one records its own file.")
     }
 }
 
@@ -359,5 +396,67 @@ struct HeaderButton: View {
         .onHover { hover = $0 }
         .help(help)
         .fixedSize()
+    }
+}
+
+/// Microphone 2 and on: its level, whether it is the video's sound, and for a phone its mute,
+/// which the phone shares.
+private struct ExtraMicRow: View {
+    @ObservedObject var studio: Studio
+    @ObservedObject var heard: MicHeard
+    var mic: Studio.ExtraMic
+    var number: Int
+    var meter: LevelMeter
+    var dense: Bool
+
+    var body: some View {
+        let resting = studio.cameraResting
+        var detail = "\(mic.name) · \(mic.connection)"
+        var lamp: LampState = .ok
+        var live = !resting
+        var note: String?
+        var menu: [MenuChoice] = [MenuChoice(title: "Use for the video's sound", selected: studio.videoMicID == mic.id) { studio.useForVideo(mic.id) }]
+        if let n = mic.phone {
+            let state = studio.phoneState(n)
+            if !Snapshots.active && !state.present {
+                detail = "\(mic.name) · Waiting for the phone"; lamp = .warn; live = false
+            } else if state.muted {
+                detail = "\(mic.name) · \(state.mutedOnPhone ? "Muted on the phone" : "Muted from this Mac")"; lamp = .off; live = false
+            } else if resting {
+                detail = "\(mic.name) · Resting"; lamp = .off
+            } else if state.mic == .asking {
+                detail = "\(mic.name) · Tap Allow on the phone"; lamp = .warn; live = false
+            } else if state.mic == .denied {
+                detail = "\(mic.name) · Mic not allowed on the phone"; lamp = .fail; live = false
+                note = "On the phone: Settings, Apps, Safari, Microphone, Allow. Then reload AVA's page."
+            }
+            menu.append(MenuChoice(title: state.muted ? "Unmute the phone's mic" : "Mute the phone's mic", selected: false) {
+                studio.setPhoneMuted(n, !state.muted)
+            })
+            menu.append(MenuChoice(title: "Show the code again…", selected: false) { studio.showPhoneCode(n) })
+        } else if resting {
+            detail += " · Resting"; lamp = .off
+        } else if mic.connection == "Bluetooth" {
+            note = "Bluetooth mics record at phone call quality. A USB mic or a wireless kit sounds better."
+        }
+        if live, lamp == .ok, !heard.recently {
+            lamp = .warn
+            note = note ?? "Say something to test it."
+        }
+        menu.append(MenuChoice(title: "Stop recording this mic", selected: false) { studio.toggleMic(mic.id) })
+        let muted = mic.phone.map { studio.phoneState($0).muted } ?? false
+        return SourceRow(symbol: muted ? "mic.slash.fill" : "mic.fill", badge: "\(number)", title: "Microphone \(number)", detail: detail,
+                         also: studio.videoMicID == mic.id ? "The video's sound" : nil, lamp: lamp, dense: dense, menu: menu, note: note) {
+            if live { ExtraMicMeter(meter: meter) }
+        }
+    }
+}
+
+/// An extra mic's level, from its own meter, so only this row redraws as it moves.
+private struct ExtraMicMeter: View {
+    @ObservedObject var meter: LevelMeter
+
+    var body: some View {
+        MeterBar(level: meter.level, peak: meter.peak)
     }
 }

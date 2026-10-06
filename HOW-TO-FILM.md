@@ -41,6 +41,14 @@ The **Recordings** button at the top right of the panel (or Command-Shift-R) sho
 
 Connect the second camera first: an iPhone, a USB webcam, or a real camera through an HDMI to USB capture card (Bluetooth cannot carry video). **Settings, Connect a camera** (also **+ Add, How to connect a camera…**) walks through each one and lists the cameras the Mac sees. Then press **+ Add** and pick it under **Another camera**. It gets its own row and its own file (`camera-2.mov`, then `camera-3.mov`), with the same mic in it so the finisher can line it up. The main camera stays the one in `camera.mov`, and the face box always uses it.
 
+## More than one microphone
+
+Press **+ Add** and pick a mic under **Another microphone**: a USB mic, a wireless kit's receiver, AirPods (they record at phone call quality, so a USB mic or a wireless kit sounds better), or a phone. A phone that already films an angle can record its own sound too ("Phone 1's mic", or "Record this phone's sound too" in its row's menu). **A phone as a microphone, with a QR code…** makes a spare phone a mic only: scan its code, tap Start microphone, Allow, and keep it close to the person talking, about a hand's width from the mouth.
+
+Each mic gets its own row with its own level and its own file (`mic-2.m4a`, then `mic-3.m4a`). The video uses the main mic unless another row's menu says **Use for the video's sound**; that row then reads "The video's sound". Every mic records either way, so while watching a take, **Sound** at the bottom right plays any mic under any picture to hear which is best, and the files are all there for editing.
+
+A phone's **Mute** is one switch shared by the phone and the Mac: tap Mute on the phone, or pick "Mute the phone's mic" in its row on the Mac, and both show it ("Muted on the phone" or "Muted from this Mac"). Either side can unmute. While muted the phone's mic is fully off, and its file stays silent for that stretch so it still lines up.
+
 ## Watching from another laptop or phone
 
 The **Live** row shows the shoot on any browser, with no login: every camera, the screen while recording, the mic level and the checks. A camera picture that stops updating is marked "No new picture".

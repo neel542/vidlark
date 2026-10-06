@@ -15,6 +15,10 @@ struct ReportInput {
     var screenNote: String?
     var sync: SyncResult
     var extraCameras: [ExtraCameraSync]
+    var extraMics: [ExtraMicSync] = []
+    /// The extra mic file the video's sound comes from, if one was picked and could be used.
+    var videoMic: String?
+    var videoSoundNote: String?
     var transcript: TranscriptOutcome
     var retakes: [Retake]?
     var chapters: [Chapter]
@@ -86,6 +90,9 @@ func buildReport(_ r: ReportInput) -> String {
     for extra in r.extraCameras {
         out.append("- Extra camera (\(extra.file)): \(length(extra.duration))")
     }
+    for mic in r.extraMics {
+        out.append("- Extra mic (\(mic.file)\(mic.name.map { ", \($0)" } ?? "")): \(length(mic.duration))")
+    }
 
     out.append("")
     out.append("## Sync")
@@ -118,6 +125,36 @@ func buildReport(_ r: ReportInput) -> String {
                        + "confidence \(String(format: "%.2f", c)) (\(verdict)), saved in sync.json")
         } else {
             out.append("- \(extra.file): not measured, because \(extra.sync.note ?? "it has no sound to match"). sync.json says offset 0.")
+        }
+    }
+
+    if !r.extraMics.isEmpty {
+        out.append("")
+        out.append("## Microphones")
+        out.append("")
+        if let mic = r.videoMic {
+            out.append("The video's sound is \(r.extraMics.first { $0.file == mic }?.name ?? mic) (\(mic)). Every mic's file is in the folder, so another can be used in editing.")
+        } else {
+            out.append("The video's sound is the main mic, from camera.mov. Every mic's file is in the folder, so another can be used in editing.")
+        }
+        if let note = r.videoSoundNote { out.append(""); out.append("Note: \(note).") }
+        for mic in r.extraMics {
+            out.append("")
+            let who = mic.name.map { "\(mic.file) (\($0))" } ?? mic.file
+            switch mic.sync.method {
+            case "audio":
+                let c = mic.sync.confidence
+                let verdict = c >= 0.8 ? "high" : "medium, worth a quick listen"
+                out.append("- \(who): lined up by sound, offset \(jsonNumber(mic.sync.offset)) seconds (camera time = mic time + offset), confidence \(String(format: "%.2f", c)) (\(verdict))")
+            case "clock":
+                out.append("- \(who): lined up by the Mac's clock, offset \(jsonNumber(mic.sync.offset)) seconds, because \(mic.sync.note ?? "its sound did not match"). Check the lip sync by eye.")
+            default:
+                out.append("- \(who): not lined up, because \(mic.sync.note ?? "it could not be read").")
+            }
+            let mutes = (r.events?.mutes ?? []).filter { $0.file == mic.file }
+            for m in mutes {
+                out.append("  - \(m.on ? "Muted" : "Unmuted") at \(clock(m.t)), \(m.byPhone ? "on the phone" : "from the Mac")\(m.on ? ": the file is silent until it was unmuted" : "")")
+            }
         }
     }
 
@@ -183,8 +220,11 @@ func buildReport(_ r: ReportInput) -> String {
     out.append("")
     out.append("## Video")
     out.append("")
-    if let video = r.video {
-        out.append("video.mp4 is the finished video: \(clock(video.seconds)), \(video.width) by \(video.height). It is what was on the screen, with her camera across the whole screen for Me.")
+    let micWords = r.videoMic.map { file in r.extraMics.first { $0.file == file }?.name.map { "\($0) (\(file))" } ?? file }
+    if let video = r.video, r.screenDuration == nil {
+        out.append("video.mp4 is the finished video: \(clock(video.seconds)), \(video.width) by \(video.height). It is camera.mov's picture as it was, with the sound from \(micWords ?? "the main mic").")
+    } else if let video = r.video {
+        out.append("video.mp4 is the finished video: \(clock(video.seconds)), \(video.width) by \(video.height). It is what was on the screen, with her camera across the whole screen for Me\(micWords.map { ", and the sound from \($0)" } ?? "").")
         if let until = video.cameraUntil {
             out.append("")
             out.append("Until \(clock(until)), before the screen was shared, it is camera.mov.")
