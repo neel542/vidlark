@@ -32,7 +32,7 @@ struct PanelView: View {
 
     private var viewfinder: some View {
         Viewfinder(preview: preview ?? studio.mainPreview, hasCamera: studio.cameraName != nil && studio.cameraAllowed,
-                   rolling: studio.isRolling, resting: studio.cameraResting)
+                   rolling: studio.isRolling, resting: studio.cameraResting, countdown: studio.countdown)
     }
 
     /// The small window: everything stacked, like the face of a pocket recorder.
@@ -164,6 +164,11 @@ struct PanelView: View {
 
     private func transport(big: Bool) -> some View {
         VStack(alignment: .leading, spacing: 14) {
+            // A take of just the camera: the one way to bring the screen in.
+            if studio.isRolling && !studio.takeHasScreen {
+                ShareScreenButton(studio: studio)
+                    .transition(.opacity)
+            }
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(timecode(studio.elapsed))
@@ -194,7 +199,7 @@ struct PanelView: View {
     private var keyLook: RecordKey.Look {
         switch studio.phase {
         case .idle, .done, .failed: studio.canStart ? .ready : .unavailable
-        case .starting: .busy(nil)
+        case .starting: studio.countingIn ? .rolling : .busy(nil)
         case .recording: .rolling
         case .stopping: .busy(nil)
         case .finishing(_, let p): .busy(p)
@@ -204,13 +209,14 @@ struct PanelView: View {
     private var keyEnabled: Bool {
         switch studio.phase {
         case .recording: true
+        case .starting: studio.countingIn
         case .idle, .done, .failed: studio.canStart
         default: false
         }
     }
 
     private func keyPressed() {
-        if studio.isRolling { studio.stop() } else { studio.start() }
+        if studio.countingIn { studio.cancelStart() } else if studio.isRolling { studio.stop() } else { studio.start() }
     }
 
     @ViewBuilder private var guidance: some View {
@@ -219,10 +225,15 @@ struct PanelView: View {
             Text(studio.canStart ? "Ready. Press the red button to record." : "Not ready yet. The note above says what to fix.")
                 .guidanceStyle()
         case .starting:
-            Text("Starting the camera and screen.").guidanceStyle()
-        case .recording:
-            Text(studio.countdown != nil ? "Rolling. Start talking after the count." : "Recording. Press to stop.")
+            Text(studio.countingIn ? "Get ready. Recording starts after the count, so start talking at the beep. Press the button to cancel."
+                 : studio.takeHasScreen ? "Starting the camera and screen." : "Starting the camera.")
                 .guidanceStyle()
+        case .recording:
+            if let problem = studio.shareProblem, !studio.takeHasScreen {
+                Text(problem).guidanceStyle(Palette.amber)
+            } else {
+                Text("Recording. Press to stop.").guidanceStyle()
+            }
         case .stopping:
             Text("Closing the files.").guidanceStyle()
         case .finishing(let step, _):
@@ -445,13 +456,15 @@ struct Viewfinder: View {
     var hasCamera: Bool
     var rolling: Bool
     var resting = false
+    /// 3, 2, 1 over the picture before a take.
+    var countdown: Int?
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             Palette.well
             if hasCamera && Snapshots.active {
                 LinearGradient(colors: [Color(hex: 0x2A302D), Color(hex: 0x111413)], startPoint: .top, endPoint: .bottom)
-                if !resting {
+                if !resting && countdown == nil {
                     Text("Camera picture").font(.system(size: 12)).foregroundStyle(Palette.engraved)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -486,6 +499,16 @@ struct Viewfinder: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            if let countdown {
+                Color.black.opacity(0.5)
+                Text("\(countdown)")
+                    .font(.system(size: 96, weight: .ultraLight))
+                    .monospacedDigit()
+                    .foregroundStyle(Palette.ink)
+                    .contentTransition(.numericText(countsDown: true))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity)
+            }
             if rolling {
                 HStack(spacing: 6) {
                     Lamp(state: .fail, size: 7)
@@ -503,6 +526,53 @@ struct Viewfinder: View {
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Palette.hairline))
         .animation(.easeOut(duration: 0.2), value: rolling)
         .animation(.easeOut(duration: 0.25), value: resting)
+        .animation(.easeOut(duration: 0.24), value: countdown)
+    }
+}
+
+/// During a take of just the camera, the one way to bring the screen in. It says what will be
+/// recorded and what happens to this window, so pressing it holds no surprise.
+private struct ShareScreenButton: View {
+    @ObservedObject var studio: Studio
+    @State private var hover = false
+
+    var body: some View {
+        Button { studio.askToShare() } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Palette.signal.opacity(studio.sharing ? 0.08 : 0.14))
+                    if studio.sharing {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: "rectangle.inset.filled.and.person.filled")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Palette.signal)
+                    }
+                }
+                .frame(width: 30, height: 30)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(studio.sharing ? "Sharing the screen" : "Share screen")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Palette.ink)
+                    Text("Adds \(studio.sharePhrase) to the video. This window then shrinks to a small box with Me, Screen and Stop.")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(Palette.dim)
+                        .lineSpacing(1.5)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(12)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(hover && !studio.sharing ? Palette.raised : Palette.face))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Palette.hairline))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(studio.sharing)
+        .onHover { hover = $0 }
+        .animation(.easeOut(duration: 0.2), value: hover)
+        .help("Start recording the screen too. Your camera keeps recording.")
     }
 }
 

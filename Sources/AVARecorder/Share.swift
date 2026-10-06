@@ -143,7 +143,7 @@ struct SharePickerView: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(Palette.ink)
                 Text(purpose == .shareNow ? "Pick the whole screen or one window. Only what you pick goes into the video."
-                                          : "This is shared when you press Screen. Only what you pick goes into the video.")
+                                          : "This is recorded once you press Share screen. Only what you pick goes into the video.")
                     .font(.system(size: 12.5))
                     .foregroundStyle(Palette.dim)
             }

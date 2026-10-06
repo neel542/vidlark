@@ -79,13 +79,13 @@ struct SourcesPanel: View {
         }
     }
 
-    /// Every take starts on her face. This row only says what Screen will share when pressed
+    /// Every take starts on her face. This row only says what Share screen will record when pressed
     /// (already picked in the chooser), and changes it. The Mac's sound is set in the recording box.
     private var screenRow: some View {
         let lamp: LampState = !studio.screenAllowed ? .fail : .ok
         let detail = !studio.screenAllowed ? "Not allowed yet" : sharedName
         return SourceRow(symbol: isWindow ? "macwindow" : "display", title: "Screen", detail: detail,
-                         also: studio.screenAllowed ? "Shared when you press Screen" : nil, lamp: lamp, dense: dense, menu: shareChoices)
+                         also: studio.screenAllowed ? "Recorded once you press Share screen" : nil, lamp: lamp, dense: dense, menu: shareChoices)
     }
 
     private var isWindow: Bool {

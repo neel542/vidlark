@@ -25,7 +25,12 @@ enum Snapshots {
         }
 
         panel("ready") { $0.stage(phase: .idle, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
-        panel("recording") { $0.stage(phase: .recording, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -14, elapsed: 462, cardIndex: 5, cardElapsed: 41, countdown: nil, screenAllowed: true, script: script) }
+        // A take of just the camera: the window stays, with Share screen in it.
+        panel("recording") {
+            $0.stage(phase: .recording, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -14, elapsed: 462, cardIndex: 5, cardElapsed: 41, countdown: nil, screenAllowed: true, script: script)
+            $0.stageCameraFirst()
+        }
+        panel("countdown") { $0.stage(phase: .starting, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: 2, screenAllowed: true, script: script) }
         panel("finishing") { $0.stage(phase: .finishing(step: "Writing the transcript", progress: 0.5), camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -60, elapsed: 905, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
         panel("resting") {
             $0.stage(phase: .idle, camera: "MacBook Air Camera", mic: "MacBook Air Microphone", level: -60, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script)
@@ -44,7 +49,10 @@ enum Snapshots {
             write(PanelView(studio: s).preferredColorScheme(.dark), size: CGSize(width: 1512, height: 945), to: dir.appendingPathComponent("wide-\(name).png"))
         }
         wide("ready") { $0.stage(phase: .idle, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
-        wide("recording") { $0.stage(phase: .recording, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -14, elapsed: 462, cardIndex: 5, cardElapsed: 41, countdown: nil, screenAllowed: true, script: script) }
+        wide("recording") {
+            $0.stage(phase: .recording, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -14, elapsed: 462, cardIndex: 5, cardElapsed: 41, countdown: nil, screenAllowed: true, script: script)
+            $0.stageCameraFirst()
+        }
 
         for (name, open, showing) in [("pill-open", true, Studio.Show.screen), ("pill-closed", false, .screen), ("pill-me", true, .camera)] {
             let s = Studio()

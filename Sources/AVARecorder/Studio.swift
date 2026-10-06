@@ -165,6 +165,24 @@ final class Studio: ObservableObject {
         }
     }
 
+    /// What Share screen adds, in a phrase: "the Samsung S24R35A screen", "this Mac's screen" or
+    /// "the Google Chrome window".
+    var sharePhrase: String {
+        switch shareTarget {
+        case .screen(let id):
+            guard let d = displays.first(where: { $0.id == id }) ?? display, !d.builtIn else { return "this Mac's screen" }
+            return "the \(d.name) screen"
+        case .window(_, let appName, _): return "the \(appName) window"
+        }
+    }
+
+    /// Share screen, pressed: asks what to share first when Settings says to.
+    func askToShare() {
+        guard isRolling, !takeHasScreen, !sharing else { return }
+        shareProblem = nil
+        if askBeforeSharing { SharePicker.show(.shareNow, studio: self) } else { shareScreen() }
+    }
+
     /// A self test changes what is shared and heard for its own take only, never the saved choices.
     static let selfTesting = CommandLine.arguments.contains("--self-test")
 
@@ -192,7 +210,8 @@ final class Studio: ObservableObject {
     /// Why sharing the screen mid-take did not work, shown in the face box.
     @Published var shareProblem: String?
     /// True while the screen recorder is starting for a mid-take share.
-    private var sharing = false
+    /// True from a click on Share screen until the screen is recording, or has failed to.
+    @Published private(set) var sharing = false
     private var takeWantsTranscript = true
     private var takeWantsVideo = true
     /// macOS Studio Light: brightens her face and softens the background, inside the camera itself.
@@ -262,7 +281,7 @@ final class Studio: ObservableObject {
     private var checker: Timer?
     private var appObserver: NSObjectProtocol?
     private var spaceObserver: NSObjectProtocol?
-    private var countdownTask: Task<Void, Never>?
+    private var startTask: Task<Void, Never>?
     private var booted = false
     var onDisplaysChanged: (() -> Void)?
     private var staged: (camera: String?, mic: String?)?
@@ -530,6 +549,19 @@ final class Studio: ObservableObject {
 
     var isRolling: Bool { phase == .recording }
 
+    /// The 3, 2, 1 before a take, which the record button can still call off.
+    var countingIn: Bool { phase == .starting && countdown != nil }
+
+    /// The recorder window steps aside for the small recording box only while the screen is
+    /// recorded, or about to be. A take of just the camera keeps the window as it is.
+    var screenInTake: Bool {
+        guard countdown == nil, takeHasScreen || sharing else { return false }
+        switch phase {
+        case .starting, .recording, .stopping: return true
+        default: return false
+        }
+    }
+
     var currentItem: VideoItem? { queue.first { $0.id == currentID } }
     var cameraName: String? { staged?.camera ?? cameras.first { $0.uniqueID == cameraID }?.localizedName }
     var micName: String? { staged?.mic ?? mics.first { $0.uniqueID == micID }?.localizedName }
@@ -591,7 +623,7 @@ final class Studio: ObservableObject {
 
         let sound = screenAudio ? " · Mac sound" : ""
         if !recordScreen {
-            let when = isRolling && takeHasScreen ? "sharing now" : "shared when you press Screen"
+            let when = isRolling && takeHasScreen ? "sharing now" : "recorded once you press Share screen"
             out.append(Check(id: "screen", state: screenAllowed ? .ok : .warn, value: "\(shareLabel) · \(when)" + sound))
         } else if !screenAllowed {
             out.append(Check(id: "screen", state: .fail, value: "Not allowed", problem: "Click the screen row to allow screen recording."))
@@ -777,8 +809,19 @@ final class Studio: ObservableObject {
         cardElapsed = 0
         cardIndex = 0
         ended = false
+        // The camera wakes and settles during the count, so the file opens the moment it ends.
+        camera.prepareForTake()
+        extras.forEach { $0.prepareForTake() }
 
-        Task {
+        startTask = Task {
+            // 3, 2, 1 before anything records, so the take begins clean, on the first word.
+            for n in [3, 2, 1] {
+                countdown = n
+                Beeps.count()
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if Task.isCancelled || phase != .starting { return }
+            }
+            countdown = nil
             do {
                 var item = currentItem
                 let folder = try Library.newRecordingFolder(for: &item)
@@ -787,10 +830,9 @@ final class Studio: ObservableObject {
                     try? item.script.write(to: folder.appendingPathComponent("script.md"), atomically: true, encoding: .utf8)
                 }
                 self.folder = folder
-                camera.prepareForTake()
-                extras.forEach { $0.prepareForTake() }
 
                 if withScreen {
+                await waitForStage()
                 let content = try await shareableContent(for: shareTarget)
                 let capture = try capture(content, shareTarget)
 
@@ -954,6 +996,7 @@ final class Studio: ObservableObject {
                 guard screenAllowed else {
                     throw RecorderError("Screen recording is not allowed yet. Allow AVA Recorder in System Settings, Privacy, then open the app again.")
                 }
+                await waitForStage()
                 var capture = try capture(try await shareableContent(for: wanted), wanted)
                 screen.onError = { [weak self] error in
                     Task { @MainActor in self?.screenFailed(error) }
@@ -1139,21 +1182,13 @@ final class Studio: ObservableObject {
         PrompterKeys.shared.enable()
         startListening()
 
-        // Three seconds of head room before the first line, which also gives the editor a clean in point.
-        countdownTask = Task { @MainActor in
-            for n in [3, 2, 1] {
-                countdown = n
-                Beeps.count()
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-                if Task.isCancelled || phase != .recording { countdown = nil; return }
-            }
-            countdown = nil
-            goAt = CACurrentMediaTime()
-            elapsed = 0
-            Beeps.go()
-            showCard(0)
-            if autoScroll { scrollFrom = 0; scrollAt = Date() }
-        }
+        // The count was before the file opened: the take starts on the first line. The go beep
+        // says the camera is rolling, so talking can start.
+        goAt = CACurrentMediaTime()
+        elapsed = 0
+        Beeps.go()
+        showCard(0)
+        if autoScroll { scrollFrom = 0; scrollAt = Date() }
     }
 
     // MARK: Scrolling by itself
@@ -1257,7 +1292,6 @@ final class Studio: ObservableObject {
         windowWatch = nil
         sharing_ = nil
         sharedArea = nil
-        countdownTask?.cancel()
         countdown = nil
         PrompterKeys.shared.disable()
         stopListening()
@@ -1308,6 +1342,28 @@ final class Studio: ObservableObject {
     }
 
     /// The camera file never started. Close the screen file and say so.
+    /// The record button pressed again during the 3, 2, 1: nothing was recorded, so nothing is kept.
+    func cancelStart() {
+        guard countingIn else { return }
+        startTask?.cancel()
+        countdown = nil
+        camera.cancelTake()
+        extras.forEach { $0.cancelTake() }
+        takeHasScreen = false
+        phase = .idle
+    }
+
+    /// Waits, at most a second, until the stage that holds her camera is on screen and known to
+    /// the recorder, so the screen recording has it from its first moment. The recorder window
+    /// steps aside first, and that brings the stage up.
+    private func waitForStage() async {
+        var waited = 0.0
+        while shownWindowIDs.isEmpty && waited < 1 {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            waited += 0.05
+        }
+    }
+
     private func cameraEndedEarly(_ error: Error?) {
         guard phase == .starting else { return }
         phase = .stopping
@@ -1423,7 +1479,7 @@ final class Studio: ObservableObject {
         if let e = error as? RecorderError { return e.message }
         let text = error.localizedDescription
         if text.lowercased().contains("invalid parameter") {
-            return "The window was not on screen when sharing began. Open it, then press Screen again."
+            return "The window was not on screen when sharing began. Open it, then press Share screen again."
         }
         if text.lowercased().contains("declined") || text.lowercased().contains("permission") {
             return "Screen recording is not allowed yet. Allow it in System Settings, then try again."
@@ -1626,11 +1682,20 @@ extension Studio {
                     recorderOpen = false
                 }
             }
-            // AVA_SHARE_AT=<seconds>: a camera-first take shares the screen that far in.
+            // AVA_SHARE_AT=<seconds>: a camera-first take shares the screen that far in. The log
+            // says which windows were up just before and 2 seconds after.
             if let at = ProcessInfo.processInfo.environment["AVA_SHARE_AT"].flatMap(Double.init) {
                 Task { @MainActor in
+                    @MainActor func windows(_ when: String) {
+                        let main = NSApp.windows.contains { !($0 is NSPanel) && $0.isVisible }
+                        let box = NSApp.windows.contains { $0 is PrompterPanel && $0.isVisible }
+                        log?.write(["type": "selftest-windows", "when": when, "recorderWindow": main, "floatingBox": box])
+                    }
                     try? await Task.sleep(nanoseconds: UInt64(at * 1_000_000_000))
+                    windows("before sharing")
                     shareScreen()
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    windows("after sharing")
                 }
             }
             let step = seconds / 4

@@ -241,6 +241,14 @@ final class CameraRecorder: NSObject {
         }
     }
 
+    /// The take was called off before its file opened: the outputs go back to what they asked for.
+    func cancelTake() {
+        queue.async { [self] in
+            guard !movie.isRecording else { return }
+            takeEnded()
+        }
+    }
+
     /// Asks for frames to an extra output, or stops them. During a take the change waits until
     /// the file has closed; the output just drops the frames it does not want until then.
     func setFrames(_ output: AVCaptureOutput, on: Bool) {

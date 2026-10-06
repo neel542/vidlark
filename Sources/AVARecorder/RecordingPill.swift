@@ -503,14 +503,7 @@ struct RecordingPillView: View {
         HStack(spacing: 2) {
             ViewChoice(title: "Me", symbol: "person.fill", on: studio.showing == .camera) { studio.show(.camera) }
             ViewChoice(title: "Screen", symbol: "display", on: studio.showing == .screen) {
-                if studio.takeHasScreen {
-                    studio.show(.screen)
-                } else if studio.askBeforeSharing {
-                    studio.shareProblem = nil
-                    SharePicker.show(.shareNow, studio: studio)
-                } else {
-                    studio.shareScreen()
-                }
+                if studio.takeHasScreen { studio.show(.screen) } else { studio.askToShare() }
             }
         }
         .padding(2)
@@ -832,10 +825,11 @@ final class RecordingPillController {
         studio.camera.attach(tracker.output, framesOn: false)
         watches.append(studio.$light.sink { [weak self] on in self?.tracker.light = on })
 
-        watches.append(studio.$phase
-            .removeDuplicates()
+        // Any of these can move the recorder window aside or bring it back.
+        watches.append(studio.$phase.map { _ in () }
+            .merge(with: studio.$takeHasScreen.map { _ in () }, studio.$sharing.map { _ in () }, studio.$countdown.map { _ in () })
             .receive(on: RunLoop.main)
-            .sink { [weak self] phase in self?.follow(phase) })
+            .sink { [weak self] in self?.followTake() })
         watches.append(state.$expanded
             .dropFirst()
             .receive(on: RunLoop.main)
@@ -867,9 +861,7 @@ final class RecordingPillController {
             .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
-                guard let self, self.studio.isRolling, !self.studio.takeHasScreen else { return }
-                self.studio.shareProblem = nil
-                if self.studio.askBeforeSharing { SharePicker.show(.shareNow, studio: self.studio) } else { self.studio.shareScreen() }
+                self?.studio.askToShare()
             })
         // One shared window: the stage covers it and the bubble sits in its corner, following it.
         watches.append(studio.$sharedArea
@@ -982,9 +974,12 @@ final class RecordingPillController {
         if stage.fillsScreen { stage.grow(from: bubbleLook(), cameraAspect: studio.feed.aspect, animated: false) }
     }
 
-    private func follow(_ phase: Studio.Phase) {
-        switch phase {
-        case .starting, .recording, .stopping:
+    /// The recorder window steps aside for this box, the stage and the bubble only while the
+    /// screen is recorded, or about to be (Share screen was pressed). A take of just the camera
+    /// stays in the recorder window, with the 3, 2, 1 on it.
+    private func followTake() {
+        let phase = studio.phase
+        if studio.screenInTake {
             updateTracker(visible: true)
             guard !panel.isVisible else {
                 if phase == .recording {
@@ -1001,7 +996,10 @@ final class RecordingPillController {
             place()
             panel.orderFrontRegardless()
             syncBubble()
-        default:
+            // Her camera across the screen straight away, so the screen recording opens on her
+            // and the finished video can change to it without a jump.
+            if phase == .recording { applyShowing(animated: false) }
+        } else {
             tracker.active = false
             state.askingToShare = false
             studio.recorderOpen = false
@@ -1011,7 +1009,7 @@ final class RecordingPillController {
             guard panel.isVisible else { return }
             panel.orderOut(nil)
             syncBubble()
-            // Back to the full panel, which now shows the finishing progress.
+            // Back to the recorder window: the take has ended, or sharing the screen did not start.
             NSApp.activate(ignoringOtherApps: true)
             hiddenWindow?.makeKeyAndOrderFront(nil)
         }
