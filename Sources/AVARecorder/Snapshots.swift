@@ -114,7 +114,7 @@ enum Snapshots {
                               ("connected", PhoneState(serving: true, present: true, connected: true, width: 1920, height: 1080, fps: 30))] {
             let s = Studio()
             s.stagePhone(state)
-            write(PhoneCodeView(studio: s).preferredColorScheme(.dark), size: CGSize(width: 740, height: 440),
+            write(PhoneCodeView(studio: s).preferredColorScheme(.dark), size: CGSize(width: 740, height: 500),
                   to: dir.appendingPathComponent("phone-code-\(name).png"))
         }
 

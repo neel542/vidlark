@@ -19,7 +19,7 @@ enum PhoneCodeWindow {
         w.styleMask = [.titled, .closable, .fullSizeContentView]
         w.titlebarAppearsTransparent = true
         w.titleVisibility = .hidden
-        w.title = "Connect your iPhone"
+        w.title = "Connect a phone"
         w.appearance = NSAppearance(named: .darkAqua)
         w.backgroundColor = NSColor(Palette.body)
         w.isReleasedWhenClosed = false
@@ -44,19 +44,19 @@ struct PhoneCodeView: View {
         HStack(alignment: .top, spacing: 32) {
             code
             VStack(alignment: .leading, spacing: 0) {
-                Text("Connect your iPhone")
+                Text("Connect a phone")
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(Palette.ink)
-                Text("No app, no cable and no shared Apple Account. The iPhone only needs to be on the same Wi-Fi as this Mac.")
+                Text("An iPhone or an Android phone, with any account. No app and no cable: the phone only needs the same Wi-Fi as this Mac. \(role)")
                     .font(.system(size: 13))
                     .foregroundStyle(Palette.dim)
                     .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 6)
                 VStack(alignment: .leading, spacing: 14) {
-                    Step(n: 1, text: "Point the iPhone's Camera app at the code, then tap the link that appears.")
-                    Step(n: 2, text: "The first time, Safari says \u{201C}This Connection Is Not Private\u{201D}. Tap Show Details, then \u{201C}visit this website\u{201D}, then Visit Website. It is AVA's own link, only on your Wi-Fi.")
-                    Step(n: 3, text: "Tap Start camera, then Allow. Turn the iPhone sideways, back camera facing you.")
+                    Step(n: 1, text: "Point the phone's camera at the code, then tap the link that appears.")
+                    Step(n: 2, text: "The first time, the phone warns that the connection is not private. It is AVA's own link, only on your Wi-Fi. On an iPhone, tap Show Details, then \u{201C}visit this website\u{201D}, then Visit Website. On Android, tap Advanced, then Proceed.")
+                    Step(n: 3, text: "Tap Start camera, then Allow. Turn the phone sideways, back camera facing you.")
                 }
                 .padding(.top, 22)
                 Spacer(minLength: 22)
@@ -80,7 +80,7 @@ struct PhoneCodeView: View {
                         .resizable()
                         .frame(width: 216, height: 216)
                 } else {
-                    Text("This Mac has no name on the network yet. Check Wi-Fi is on.")
+                    Text("This Mac has no address on the network yet. Check Wi-Fi is on.")
                         .font(.system(size: 12))
                         .foregroundStyle(Color.black.opacity(0.7))
                         .multilineTextAlignment(.center)
@@ -96,12 +96,18 @@ struct PhoneCodeView: View {
                         .foregroundStyle(Palette.dim)
                 }
                 .buttonStyle(.plain)
-                .help("For sending to the iPhone another way, such as by Messages")
+                .help("For sending to the phone another way, such as by a message")
             }
         }
     }
 
     private var state: PhoneState { studio.phoneState }
+
+    /// What the phone will be once it connects.
+    private var role: String {
+        studio.usingPhone ? "It becomes the camera AVA films with."
+            : "It records as another camera, next to the main one. To film with it instead, pick it in the Camera row."
+    }
 
     @ViewBuilder private var status: some View {
         HStack(spacing: 10) {
@@ -133,17 +139,17 @@ struct PhoneCodeView: View {
     }
 
     private var headline: String {
-        if state.failure != nil { return "The iPhone link is not running" }
+        if state.failure != nil { return "The phone link is not running" }
         if state.connected { return "Connected" }
-        if state.present { return "The iPhone page is open" }
-        return "Waiting for the iPhone"
+        if state.present { return "The phone's page is open" }
+        return "Waiting for the phone"
     }
 
     private var detail: String? {
         if let failure = state.failure { return failure }
-        if state.connected { return "\(state.width) \u{00D7} \(state.height) at \(max(state.fps, 1)) frames a second. AVA uses it as the camera." }
-        if state.present { return "Tap Start camera on the iPhone." }
-        return "Scan the code with the iPhone."
+        if state.connected { return "\(state.width) \u{00D7} \(state.height) at \(max(state.fps, 1)) frames a second." }
+        if state.present { return "Tap Start camera on the phone." }
+        return "Scan the code with the phone."
     }
 
     private func copyLink() {

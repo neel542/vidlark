@@ -34,7 +34,7 @@ final class PhoneLink: @unchecked Sendable {
     static let shared = PhoneLink()
     /// The camera ID the app stores when the iPhone over Wi-Fi is the camera.
     static let cameraID = "ava.iphone.wifi"
-    static let name = "iPhone over Wi-Fi"
+    static let name = "Phone over Wi-Fi"
     static let port: UInt16 = 8791
 
     private let queue = DispatchQueue(label: "ava.phone")
@@ -57,6 +57,8 @@ final class PhoneLink: @unchecked Sendable {
     private var keyWanted = false
     private var resting = false
     private var recording = false
+    /// The recorder the pictures go to: the main camera's, or another camera's.
+    private var owner: ObjectIdentifier?
     private var compressed: ((CMSampleBuffer) -> Void)?
     private var decoded: ((CMSampleBuffer) -> Void)?
     private var sized: ((Int, Int) -> Void)?
@@ -70,11 +72,32 @@ final class PhoneLink: @unchecked Sendable {
         }
     }
 
-    /// The link the QR code holds: this Mac's name on the home network, which stays the same when
-    /// the router hands out a new address.
+    /// The link the QR code holds: this Mac's address on the Wi-Fi. Many Android phones cannot
+    /// find a Mac by its .local name, so the number it is reached at now goes in; the code is made
+    /// again each time it shows. With no address, the .local name.
     var link: String? {
-        guard let name = SCDynamicStoreCopyLocalHostName(nil) as String? else { return nil }
-        return "https://\(name).local:\(Self.port)/\(lock.withLock { secret })/"
+        let host = Self.wifiAddress() ?? (SCDynamicStoreCopyLocalHostName(nil) as String?).map { "\($0).local" }
+        guard let host else { return nil }
+        return "https://\(host):\(Self.port)/\(lock.withLock { secret })/"
+    }
+
+    /// The IPv4 address of the network the Mac uses now (Wi-Fi, or a cable).
+    static func wifiAddress() -> String? {
+        let key = "State:/Network/Global/IPv4" as CFString
+        guard let global = SCDynamicStoreCopyValue(nil, key) as? [String: Any],
+              let primary = global["PrimaryInterface"] as? String else { return nil }
+        var list: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&list) == 0, let first = list else { return nil }
+        defer { freeifaddrs(list) }
+        for entry in sequence(first: first, next: { $0.pointee.ifa_next }) {
+            let item = entry.pointee
+            guard String(cString: item.ifa_name) == primary, let address = item.ifa_addr, address.pointee.sa_family == UInt8(AF_INET) else { continue }
+            var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            if getnameinfo(address, socklen_t(address.pointee.sa_len), &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST) == 0 {
+                return String(cString: host)
+            }
+        }
+        return nil
     }
 
     var state: PhoneState {
@@ -89,13 +112,26 @@ final class PhoneLink: @unchecked Sendable {
         }
     }
 
-    /// Where the pictures go: compressed ones for camera.mov, decoded ones for everything on screen,
-    /// and the picture size whenever it changes. Nil handlers stop them.
-    func deliver(compressed: ((CMSampleBuffer) -> Void)?, decoded: ((CMSampleBuffer) -> Void)?, sized: ((Int, Int) -> Void)?) {
+    /// Where the pictures go: compressed ones for the camera file, decoded ones for everything on
+    /// screen, and the picture size whenever it changes. One recorder at a time; the newest wins.
+    func deliver(to owner: AnyObject, compressed: @escaping (CMSampleBuffer) -> Void, decoded: @escaping (CMSampleBuffer) -> Void,
+                 sized: @escaping (Int, Int) -> Void) {
         lock.withLock {
+            self.owner = ObjectIdentifier(owner)
             self.compressed = compressed
             self.decoded = decoded
             self.sized = sized
+        }
+    }
+
+    /// That recorder no longer wants the pictures. A recorder that has since taken over keeps them.
+    func stopDelivering(to owner: AnyObject) {
+        lock.withLock {
+            guard self.owner == ObjectIdentifier(owner) else { return }
+            self.owner = nil
+            compressed = nil
+            decoded = nil
+            sized = nil
         }
     }
 

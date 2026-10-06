@@ -325,6 +325,7 @@ final class CameraRecorder: NSObject {
     /// Lets go of the camera and mic, for an extra camera that is no longer wanted.
     func release() {
         queue.async { [self] in
+            usePhone(nil)
             if session.isRunning { session.stopRunning() }
             session.beginConfiguration()
             session.inputs.forEach(session.removeInput)
@@ -414,11 +415,12 @@ extension CameraRecorder {
     /// Camera queue only. Switches the iPhone in as the camera, or out again.
     fileprivate func usePhone(_ link: PhoneLink?) {
         guard link !== phone else { return }
-        phone?.deliver(compressed: nil, decoded: nil, sized: nil)
+        phone?.stopDelivering(to: self)
         phone = link
         phoneLock.withLock { phoneOn = link != nil }
         guard let link else { return }
         link.deliver(
+            to: self,
             compressed: { [weak self] sample in
                 guard let self else { return }
                 self.phoneQueue.async { self.phoneTake?.video(sample, askForKey: { link.askForKeyPicture() }, started: { time in self.onStarted?(time) }) }
@@ -545,7 +547,7 @@ final class PhoneTake {
 
     func finish(_ done: @escaping (Error?) -> Void) {
         guard let writer, writer.status == .writing else {
-            done(writer == nil ? RecorderError("The iPhone sent no pictures, so camera.mov was not made. Check the iPhone page is open.") : writer?.error)
+            done(writer == nil ? RecorderError("The phone sent no pictures, so its camera file was not made. Check the phone's page is open.") : writer?.error)
             return
         }
         videoIn?.markAsFinished()

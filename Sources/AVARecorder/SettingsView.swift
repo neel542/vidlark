@@ -400,12 +400,12 @@ private struct CameraGuide: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             seen
-            Method(symbol: "qrcode", title: "Your iPhone, over Wi-Fi",
-                   why: "The quickest way in, with any Apple Account. No app and no cable: the iPhone only needs the same Wi-Fi as this Mac.", steps: [
-                "Press Show the code below, or pick \(PhoneLink.name) in the Camera row's menu.",
-                "Point the iPhone's Camera app at the code and tap the link. The first time, Safari says \u{201C}This Connection Is Not Private\u{201D}: tap Show Details, then \u{201C}visit this website\u{201D}, then Visit Website.",
-                "Tap Start camera, then Allow. Turn the iPhone sideways in its stand, back camera facing you, and keep the page open.",
-            ], after: "It records up to 1080p at 30 frames a second, timed to the Mac's mic. Keep the iPhone plugged in for a long take.",
+            Method(symbol: "qrcode", title: "Your phone, over Wi-Fi",
+                   why: "The quickest way in: any iPhone or Android phone, with any account. No app and no cable, only the same Wi-Fi as this Mac.", steps: [
+                "Press Show the code below to film with the phone, or + Add, Add a phone with a QR code, to record it next to the main camera.",
+                "Point the phone's camera at the code and tap the link. The first time, it warns that the connection is not private. On an iPhone, tap Show Details, then \u{201C}visit this website\u{201D}, then Visit Website. On Android, tap Advanced, then Proceed.",
+                "Tap Start camera, then Allow. Turn the phone sideways in its stand, back camera facing you, and keep the page open.",
+            ], after: "It records up to 1080p at 30 frames a second, timed to the Mac's mic. Keep the phone plugged in for a long take.",
                    action: studio.isBusy ? nil : ("Show the code", { studio.usePhone() }))
             Method(symbol: "iphone", title: "Your iPhone, linked by Apple",
                    why: "Apple's own link: the sharpest picture, at up to 4K. It needs the iPhone and this Mac on the same Apple Account.", steps: [

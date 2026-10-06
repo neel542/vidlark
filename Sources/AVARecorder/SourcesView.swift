@@ -34,10 +34,13 @@ struct SourcesPanel: View {
 
     private var rowViews: [AnyView] {
         var rows: [AnyView] = [AnyView(cameraRow), AnyView(micRow)]
-        for (i, device) in studio.activeExtras.enumerated() {
-            rows.append(AnyView(SourceRow(symbol: "video.fill", badge: "\(i + 2)", title: "Camera \(i + 2)", detail: device.localizedName,
-                                          lamp: .ok, dense: dense,
-                                          menu: [MenuChoice(title: "Stop recording this camera", selected: false) { studio.toggleExtra(device.uniqueID) }])))
+        for (i, extra) in studio.activeExtras.enumerated() {
+            let waiting = extra.isPhone && !Snapshots.active && !studio.phoneReady
+            var menu = [MenuChoice(title: "Stop recording this camera", selected: false) { studio.toggleExtra(extra.id) }]
+            if extra.isPhone { menu.insert(MenuChoice(title: "Show the code again…", selected: false) { studio.addPhone() }, at: 0) }
+            rows.append(AnyView(SourceRow(symbol: extra.isPhone ? "qrcode" : "video.fill", badge: "\(i + 2)", title: "Camera \(i + 2)",
+                                          detail: waiting ? "\(extra.name) · Waiting for the phone" : extra.name,
+                                          lamp: waiting ? .warn : .ok, dense: dense, menu: menu)))
         }
         rows.append(AnyView(screenRow))
         return rows
@@ -51,7 +54,7 @@ struct SourcesPanel: View {
         if resting {
             detail += " · Resting"
         } else if phoneWaiting {
-            detail += " · Waiting for the iPhone"
+            detail += " · Waiting for the phone"
         } else {
             if let format = studio.cameraFormat, studio.cameraName != nil { detail += " · \(format.name)" }
             if studio.touchUpOn && studio.cameraName != nil && !studio.usingPhone { detail += " · Studio Light" }
@@ -258,6 +261,10 @@ struct AddSourceButton: View {
                         }
                         ForEach(others, id: \.uniqueID) { device in
                             Button(device.localizedName) { studio.toggleExtra(device.uniqueID) }
+                        }
+                        // Any iPhone or Android phone, over Wi-Fi.
+                        if !studio.phoneInUse {
+                            Button("Add a phone with a QR code…") { studio.addPhone() }
                         }
                     }
                     Divider()

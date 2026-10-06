@@ -55,15 +55,15 @@ ol li { margin: 5px 0; }
   <header><i class="lamp" id="lamp"></i><h1>AVA camera</h1><span id="state">Not started</span></header>
   <div class="view">
     <video id="v" playsinline muted autoplay></video>
-    <div class="veil" id="veil"><b id="veilTitle">This iPhone becomes AVA's camera</b><span id="veilText">Tap Start camera. The picture goes to AVA Recorder on the Mac, over your Wi-Fi.</span></div>
+    <div class="veil" id="veil"><b id="veilTitle">This phone becomes AVA's camera</b><span id="veilText">Tap Start camera. The picture goes to AVA Recorder on the Mac, over your Wi-Fi.</span></div>
   </div>
   <p class="note" id="note" hidden></p>
   <button class="go" id="go">Start camera</button>
   <div class="tools" id="tools" hidden><button class="small" id="flip">Use the front camera</button><span class="facts" id="facts"></span></div>
   <ol id="tips">
-    <li>Turn the iPhone sideways, with the back camera facing you.</li>
+    <li>Turn the phone sideways, with the back camera facing you.</li>
     <li>Keep this page open. The screen stays on by itself.</li>
-    <li>For a long take, plug the iPhone in to charge.</li>
+    <li>For a long take, plug the phone in to charge.</li>
   </ol>
 </main>
 <script>
@@ -89,7 +89,7 @@ function portrait() { const v = $("v"); return v.videoHeight > v.videoWidth; }
 function show() {
   if (!running) return;
   if (resting) { setState("Resting", ""); veil("AVA is resting the camera", "It wakes by itself when someone looks at AVA on the Mac."); return; }
-  if (portrait()) { setState("Turn sideways", "warn"); veil("Turn the iPhone sideways", "AVA records a wide picture, like YouTube shows."); return; }
+  if (portrait()) { setState("Turn sideways", "warn"); veil("Turn the phone sideways", "AVA records a wide picture, like YouTube shows."); return; }
   veil(null);
   if (failures > 2) setState("Cannot reach the Mac", "warn");
   else if (recording) setState("Recording", "rec");
@@ -114,7 +114,7 @@ async function post(body) {
 }
 
 function handle(j) {
-  if (j.replaced) { stop(); veil("Another page took over", "AVA is using the camera from another tab or iPhone now. Tap Start camera to take it back."); return; }
+  if (j.replaced) { stop(); veil("Another page took over", "AVA is using the camera from another tab or phone now. Tap Start camera to take it back."); return; }
   if (j.key) forceKey = true;
   if (j.rest !== resting) { resting = j.rest; forceKey = true; }
   recording = j.recording;
@@ -224,18 +224,18 @@ async function awake() {
 async function start() {
   note("");
   if (!window.isSecureContext || !navigator.mediaDevices) { note("Open this page from the QR code in AVA Recorder, so it comes over AVA's secure link."); return; }
-  if (typeof VideoEncoder === "undefined" || typeof VideoFrame === "undefined") { note("This iPhone needs iOS 16.4 or newer: Settings, General, Software Update."); return; }
+  if (typeof VideoEncoder === "undefined" || typeof VideoFrame === "undefined") { note("This browser is too old for AVA. On an iPhone, update to iOS 16.4 or newer. On Android, update Chrome, or open this link in Chrome."); return; }
   $("go").disabled = true; setState("Starting", "");
   try { await camera(); }
   catch (e) {
     $("go").disabled = false; setState("Not started", "");
-    note(e.name === "NotAllowedError" ? "The camera was not allowed. Tap Start camera and choose Allow. If Safari does not ask: iPhone Settings, Apps, Safari, Camera, Allow." : "The camera did not start: " + e.message);
+    note(e.name === "NotAllowedError" ? "The camera was not allowed. Tap Start camera and choose Allow. If it does not ask: on an iPhone, Settings, Apps, Safari, Camera, Allow; on Android, tap the icon left of the address, then Permissions, Camera, Allow." : "The camera did not start: " + e.message);
     return;
   }
   canvas = document.createElement("canvas"); canvas.width = W; canvas.height = H;
   ctx = canvas.getContext("2d", { alpha: false });
   try { await makeEncoder(); }
-  catch (e) { stop(); note("This iPhone cannot make the video AVA needs. Update it to the newest iOS."); return; }
+  catch (e) { stop(); note("This phone cannot make the video AVA needs. Update its system and browser; on Android, use Chrome."); return; }
   running = true; frames = 0; failures = 0; needKey = false; forceKey = true; queue = []; formatKey = ""; formatRec = null;
   $("go").hidden = true; $("go").disabled = false; $("tools").hidden = false; $("tips").hidden = true;
   awake();
