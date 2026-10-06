@@ -265,7 +265,7 @@ final class MicRecorder: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate,
     /// Queue only. The loudest sample and the average, about 15 times a second; nil clears it.
     private func level(_ sample: CMSampleBuffer?) {
         guard let sample else {
-            DispatchQueue.main.async { [meter] in meter.level = -160; meter.peak = -160 }
+            DispatchQueue.main.async { [meter] in meter.show(-160, peak: -160) }
             return
         }
         let now = CACurrentMediaTime()
@@ -294,8 +294,7 @@ final class MicRecorder: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate,
         if average > -45 { lastLoud = now }
         let loud = now - lastLoud < 8
         DispatchQueue.main.async { [meter, heard] in
-            meter.level = average
-            meter.peak = top
+            meter.show(average, peak: top)
             if heard.recently != loud { heard.recently = loud }
         }
     }

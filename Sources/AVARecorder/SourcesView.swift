@@ -447,16 +447,7 @@ private struct ExtraMicRow: View {
         let muted = mic.phone.map { studio.phoneState($0).muted } ?? false
         return SourceRow(symbol: muted ? "mic.slash.fill" : "mic.fill", badge: "\(number)", title: "Microphone \(number)", detail: detail,
                          also: studio.videoMicID == mic.id ? "The video's sound" : nil, lamp: lamp, dense: dense, menu: menu, note: note) {
-            if live { ExtraMicMeter(meter: meter) }
+            if live { LiveMeter(meter: meter) }
         }
-    }
-}
-
-/// An extra mic's level, from its own meter, so only this row redraws as it moves.
-private struct ExtraMicMeter: View {
-    @ObservedObject var meter: LevelMeter
-
-    var body: some View {
-        MeterBar(level: meter.level, peak: meter.peak)
     }
 }

@@ -185,6 +185,38 @@ enum Snapshots {
                       to: dir.appendingPathComponent("recordings-watch-\(name).png"))
             }
         }
+        meters(to: dir.appendingPathComponent("meters.png"))
+    }
+
+    /// The live meter's layers (top of each pair) over the `MeterBar` a snapshot draws, at the same
+    /// levels and widths, so the two can be compared.
+    @MainActor
+    private static func meters(to url: URL) {
+        let rows: [(level: Float, peak: Float, width: CGFloat)] = [(-24, -18, 300), (-8, -2, 300), (-50, -41, 300), (-160, -160, 300), (-14, -6, 44)]
+        let scale: CGFloat = 2, pad: CGFloat = 12, size = CGSize(width: 324, height: pad + CGFloat(rows.count) * 26)
+        guard let ctx = CGContext(data: nil, width: Int(size.width * scale), height: Int(size.height * scale), bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return }
+        ctx.scaleBy(x: scale, y: scale)
+        ctx.setFillColor(NSColor(Palette.face).cgColor)
+        ctx.fill(CGRect(origin: .zero, size: size))
+        for (i, row) in rows.enumerated() {
+            let top = size.height - pad - CGFloat(i) * 26
+            let meter = LevelMeter()
+            meter.show(row.level, peak: row.peak)
+            let layers = MeterNSView(meter: meter)
+            layers.frame = CGRect(x: 0, y: 0, width: row.width, height: 5)
+            layers.layout()
+            ctx.saveGState()
+            ctx.translateBy(x: pad, y: top - 5)
+            layers.layer?.render(in: ctx)
+            ctx.restoreGState()
+            let renderer = ImageRenderer(content: MeterBar(level: meter.level, peak: meter.peak).frame(width: row.width))
+            renderer.scale = scale
+            if let bar = renderer.cgImage { ctx.draw(bar, in: CGRect(x: pad, y: top - 15, width: row.width, height: 5)) }
+        }
+        guard let image = ctx.makeImage() else { return }
+        try? NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])?.write(to: url)
+        print("wrote \(url.path)")
     }
 
     @MainActor

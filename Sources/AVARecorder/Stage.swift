@@ -33,7 +33,10 @@ class FeedView: NSView {
     override func viewDidUnhide() { super.viewDidUnhide(); update() }
 
     private func update() {
-        let visible = Studio.quietDraw || (!dimmed && !isHiddenOrHasHiddenAncestor && (window?.occlusionState.contains(.visible) ?? false))
+        // Out of sight for a test, a see-through window that is open counts as seen; one that is put
+        // away does not, just as it would not on screen.
+        let open = Studio.quietDraw ? window?.isVisible ?? false : window?.occlusionState.contains(.visible) ?? false
+        let visible = !dimmed && !isHiddenOrHasHiddenAncestor && open
         feed?.set(preview, seen: visible)
     }
 }

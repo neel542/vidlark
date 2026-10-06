@@ -1,4 +1,5 @@
 import AVFoundation
+import Combine
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -285,12 +286,102 @@ struct MenuChoice: Identifiable {
     var action: () -> Void
 }
 
+/// A mic's live level. Core Animation draws it, not SwiftUI: on 6 Oct the SwiftUI meter cost about
+/// 4% of a processor core, a quarter of the app's idle work, because each of its 15 changes a
+/// second laid out the whole panel again. A snapshot has no live layers, so it draws `MeterBar`.
 struct LiveMeter: View {
-    @ObservedObject var meter: LevelMeter
+    let meter: LevelMeter
 
     var body: some View {
-        MeterBar(level: meter.level, peak: meter.peak)
+        if Snapshots.active {
+            MeterBar(level: meter.level, peak: meter.peak)
+        } else {
+            MeterLayers(meter: meter)
+                .frame(height: 5)
+                .accessibilityLabel("Mic level")
+        }
     }
+}
+
+private struct MeterLayers: NSViewRepresentable {
+    let meter: LevelMeter
+
+    func makeNSView(context: Context) -> MeterNSView { MeterNSView(meter: meter) }
+
+    func updateNSView(_ view: MeterNSView, context: Context) { view.follow(meter) }
+}
+
+/// `MeterBar`'s segments as layers. A new level changes only the segments that go on or off.
+final class MeterNSView: NSView {
+    private var segments: [CALayer] = []
+    private var lit: [Bool] = []
+    private var reading = LevelMeter.Reading()
+    private weak var meter: LevelMeter?
+    private var watch: AnyCancellable?
+
+    init(meter: LevelMeter) {
+        super.init(frame: .zero)
+        wantsLayer = true
+        follow(meter)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func follow(_ meter: LevelMeter) {
+        guard meter !== self.meter else { return }
+        self.meter = meter
+        // The publisher gives the current reading at once, then each new one on the main thread.
+        watch = meter.$reading.sink { [weak self] reading in
+            self?.reading = reading
+            self?.light()
+        }
+    }
+
+    override func layout() {
+        super.layout()
+        let gap: CGFloat = 2
+        let count = max(6, min(40, Int((bounds.width + gap) / 5)))
+        let width = (bounds.width - gap * CGFloat(count - 1)) / CGFloat(count)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        if segments.count != count {
+            segments.forEach { $0.removeFromSuperlayer() }
+            segments = (0..<count).map { i in
+                let segment = CALayer()
+                let position = Double(i) / Double(count)
+                segment.backgroundColor = NSColor(position >= 0.9 ? Palette.red : position >= 0.75 ? Palette.amber : Palette.signal).cgColor
+                segment.cornerRadius = 1
+                segment.opacity = 0.13
+                segment.actions = ["opacity": NSNull(), "bounds": NSNull(), "position": NSNull()]
+                layer?.addSublayer(segment)
+                return segment
+            }
+            lit = Array(repeating: false, count: count)
+        }
+        for (i, segment) in segments.enumerated() {
+            segment.frame = CGRect(x: CGFloat(i) * (width + gap), y: 0, width: width, height: bounds.height)
+        }
+        CATransaction.commit()
+        light()
+    }
+
+    private func light() {
+        let count = segments.count
+        guard count > 0 else { return }
+        let on = Int(Self.fraction(reading.level) * Double(count))
+        let peak = Int(Self.fraction(reading.peak) * Double(count)) - 1
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for i in 0..<count {
+            let now = i < on || (i == peak && peak >= 0)
+            guard now != lit[i] else { continue }
+            lit[i] = now
+            segments[i].opacity = now ? 1 : 0.13
+        }
+        CATransaction.commit()
+    }
+
+    private static func fraction(_ db: Float) -> Double { min(1, max(0, (Double(db) + 60) / 60)) }
 }
 
 /// Segmented level meter over the top 60 dB. Up to 40 segments, fewer when it is narrow.

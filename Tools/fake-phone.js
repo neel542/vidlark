@@ -53,6 +53,9 @@ function made(shape) {
 }
 const streams = { wide: made("wide"), tall: made("tall") };
 const pause = ms => new Promise(r => setTimeout(r, ms));
+// Every line starts with the seconds since the fake phones started, so a log lines up with a test.
+const began = performance.now(), say = console.log;
+console.log = (...words) => say(((performance.now() - began) / 1000).toFixed(1).padStart(6), ...words);
 
 // FAKE_MUTE="3:on,8:off" flips the phone's own mute switch that many seconds into each take, as
 // the person holding the phone would.

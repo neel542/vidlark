@@ -235,7 +235,6 @@ final class PrompterController {
         panel.hasShadow = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.minSize = NSSize(width: 480, height: 150)
-        panel.contentView = NSHostingView(rootView: PrompterView(studio: studio))
         panel.setFrameAutosaveName("Prompter")
         studio.onDisplaysChanged = { [weak self] in self?.placeIfLost() }
         // On screen during a take only, and only when Settings says to show it.
@@ -243,8 +242,8 @@ final class PrompterController {
             .receive(on: RunLoop.main)
             .sink { [weak self] phase, show in
                 switch phase {
-                case .starting, .recording: if show { self?.show() } else { self?.panel.orderOut(nil) }
-                default: self?.panel.orderOut(nil)
+                case .starting, .recording: if show { self?.show() } else { self?.hide() }
+                default: self?.hide()
                 }
             }
         // Bigger words need a taller strip, or they would only shrink back to fit.
@@ -256,9 +255,17 @@ final class PrompterController {
 
     func show() {
         guard !panel.isVisible, !Studio.quietTest else { return }
+        // The words are made as the strip shows. Kept while it is put away, they would still be
+        // redrawn with every change in the studio, the take's clock included.
+        panel.contentView = NSHostingView(rootView: PrompterView(studio: studio))
         if !panel.setFrameUsingName("Prompter") { placeAtTop() }
         placeIfLost()
         panel.orderFrontRegardless()
+    }
+
+    private func hide() {
+        panel.orderOut(nil)
+        if panel.contentView is NSHostingView<PrompterView> { panel.contentView = NSView() }
     }
 
     /// The strip's height for this text size, keeping its top edge where it is.

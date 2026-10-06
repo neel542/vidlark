@@ -44,7 +44,7 @@ final class Studio: ObservableObject {
     @Published var displayID: CGDirectDisplayID? { didSet { remember(); onDisplaysChanged?() } }
 
     // Checks
-    /// Level lives in its own object so 15 updates a second redraw the meter, not the whole panel.
+    /// Level lives in its own object, drawn by layers, so 15 updates a second never redraw the panel.
     let meter = LevelMeter()
     @Published private(set) var micHeardRecently = false
     @Published private(set) var cameraAllowed = false
@@ -496,7 +496,9 @@ final class Studio: ObservableObject {
     }
 
     private func runChecks() {
-        power = Preflight.power()
+        // Each of these redraws the panel when set, even to the same value, so only changes are set.
+        let power = Preflight.power()
+        if power != self.power { self.power = power }
         let watched = Set(phonesInUse + (PhoneCodeWindow.showing.map { [$0] } ?? []))
         if !watched.isEmpty || !phoneStates.isEmpty {
             let states = Dictionary(uniqueKeysWithValues: watched.map { ($0, PhoneLink.shared.state($0)) })
@@ -507,15 +509,18 @@ final class Studio: ObservableObject {
         // Asking macOS for free space is surprisingly costly, so once a minute is enough.
         let now = CACurrentMediaTime()
         if freeGB == nil || now - lastSpaceCheck > 60 {
-            freeGB = Preflight.freeGigabytes()
+            let free = Preflight.freeGigabytes()
+            if free != freeGB { freeGB = free }
             lastSpaceCheck = now
         }
-        screenAllowed = screenAllowed || CGPreflightScreenCaptureAccess()
-        cameraAllowed = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
-        micAllowed = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
-        touchUpOn = AVCaptureDevice.isStudioLightEnabled
-        portraitOn = AVCaptureDevice.isPortraitEffectEnabled
-        centerStageOn = AVCaptureDevice.isCenterStageEnabled
+        if !screenAllowed && CGPreflightScreenCaptureAccess() { screenAllowed = true }
+        let camera = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
+        if camera != cameraAllowed { cameraAllowed = camera }
+        let mic = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        if mic != micAllowed { micAllowed = mic }
+        if AVCaptureDevice.isStudioLightEnabled != touchUpOn { touchUpOn.toggle() }
+        if AVCaptureDevice.isPortraitEffectEnabled != portraitOn { portraitOn.toggle() }
+        if AVCaptureDevice.isCenterStageEnabled != centerStageOn { centerStageOn.toggle() }
         restCheck()
     }
 
@@ -603,8 +608,7 @@ final class Studio: ObservableObject {
     }
 
     private func takeLevel(_ avg: Float, _ pk: Float) {
-        meter.level = avg
-        meter.peak = pk
+        meter.show(avg, peak: pk)
         let now = CACurrentMediaTime()
         if avg > -45 { lastLoud = now }
         let heard = now - lastLoud < 8
@@ -923,8 +927,7 @@ final class Studio: ObservableObject {
         videoMicID = videoMic
         for (i, mic) in mics.enumerated() {
             let (meter, heard) = micMeter(i)
-            meter.level = mic.level
-            meter.peak = mic.level + 6
+            meter.show(mic.level, peak: mic.level + 6)
             heard.recently = mic.level > -45
         }
     }
@@ -2096,8 +2099,7 @@ extension Studio {
         micAllowed = true
         self.screenAllowed = screenAllowed
         micHeardRecently = level > -45
-        meter.level = level
-        meter.peak = level + 6
+        meter.show(level, peak: level + 6)
         displays = [DisplayChoice(id: 1, name: "Samsung S24R35A", pixelSize: CGSize(width: 1920, height: 1080), builtIn: false)]
         displayID = 1
         shareTarget = .screen(1)
@@ -2160,8 +2162,23 @@ extension Studio {
 }
 
 final class LevelMeter: ObservableObject {
-    @Published var level: Float = -160
-    @Published var peak: Float = -160
+    struct Reading: Equatable {
+        var level: Float = -160
+        var peak: Float = -160
+    }
+    @Published private(set) var reading = Reading()
+    var level: Float { reading.level }
+    var peak: Float { reading.peak }
+
+    /// Main thread. The meter shows the top 60 dB in at most 40 segments, so a change finer than
+    /// a segment, or anywhere below the bottom, would draw the same picture: it publishes only
+    /// when the picture changes, and a steady room redraws nothing.
+    func show(_ level: Float, peak: Float) {
+        let next = Reading(level: Self.step(level), peak: Self.step(peak))
+        if next != reading { reading = next }
+    }
+
+    private static func step(_ db: Float) -> Float { db <= -60 ? -160 : (db / 1.5).rounded(.down) * 1.5 }
 }
 
 /// Whether an extra mic has heard anything louder than a murmur in the last 8 seconds. Apart from
