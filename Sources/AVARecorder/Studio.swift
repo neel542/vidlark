@@ -52,10 +52,6 @@ final class Studio: ObservableObject {
     @Published private(set) var screenAllowed = false
     @Published private(set) var power = PowerState(pluggedIn: true, percent: nil)
     @Published private(set) var freeGB: Double?
-    /// macOS Reactions. With gestures on, a thumbs-up puts balloons in the camera file. Even with
-    /// gestures off, Reactions being on keeps hand detection running, about 10% CPU (measured 4 Oct).
-    @Published private(set) var reactionsOn = false
-    @Published private(set) var gesturesOn = false
     /// True while the camera rests to save power, until its first picture after waking arrives.
     @Published private(set) var cameraResting = false
     /// Extra cameras, recorded as camera-2.mov, camera-3.mov and so on, in the order they were added.
@@ -407,7 +403,7 @@ final class Studio: ObservableObject {
         Task { await probeScreen() }
     }
 
-    /// Only the person at the Mac can switch Reactions off. This opens the macOS Video Effects panel for it.
+    /// Only the person at the Mac can switch camera effects. This opens the macOS Video Effects panel.
     func openVideoEffects() {
         AVCaptureDevice.showSystemUserInterface(.videoEffects)
     }
@@ -446,8 +442,6 @@ final class Studio: ObservableObject {
         screenAllowed = screenAllowed || CGPreflightScreenCaptureAccess()
         cameraAllowed = AVCaptureDevice.authorizationStatus(for: .video) == .authorized
         micAllowed = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
-        reactionsOn = AVCaptureDevice.reactionEffectsEnabled
-        gesturesOn = AVCaptureDevice.reactionEffectGesturesEnabled
         touchUpOn = AVCaptureDevice.isStudioLightEnabled
         portraitOn = AVCaptureDevice.isPortraitEffectEnabled
         centerStageOn = AVCaptureDevice.isCenterStageEnabled
@@ -586,14 +580,6 @@ final class Studio: ObservableObject {
             }
         }
 
-        if gesturesOn {
-            out.append(Check(id: "effects", state: .warn, value: "Reactions on",
-                             problem: "Turn off Reactions, or a thumbs-up puts balloons in the video. See Settings, Camera effects."))
-        } else if reactionsOn {
-            out.append(Check(id: "effects", state: .warn, value: "Reactions on",
-                             problem: "Turn off Reactions to save battery. See Settings, Camera effects."))
-        }
-
         if !micAllowed {
             out.append(Check(id: "mic", state: .fail, value: "Not allowed", problem: "Allow the microphone in System Settings, Privacy."))
         } else if let name = micName {
@@ -655,7 +641,7 @@ final class Studio: ObservableObject {
     /// The one thing that needs fixing before a take, in plain words, with what fixes it. Nil when
     /// everything is ready. The panel shows only this, never a wall of rows.
     struct Attention: Equatable {
-        enum Fix: Equatable { case privacy(String), screenAccess, videoEffects, battery }
+        enum Fix: Equatable { case privacy(String), screenAccess, battery }
         var level: LampState
         var text: String
         var fix: Fix?
@@ -692,11 +678,6 @@ final class Studio: ObservableObject {
                              text: "Low Power Mode is on, so the camera freezes once the screen is shared. Plug in the charger, or turn Low Power Mode off.",
                              fix: .battery, fixTitle: "Open Battery settings", learnMore: .mac)
         }
-        if reactionsOn || gesturesOn {
-            return Attention(level: .warn,
-                             text: "macOS Reactions are on. A thumbs-up can fill your video with balloons, and they use battery.",
-                             fix: .videoEffects, fixTitle: "Open Video Effects", learnMore: .effects)
-        }
         if !power.pluggedIn {
             return Attention(level: .warn, text: "On battery\(power.percent.map { " (\($0)%)" } ?? ""). Plug in the charger before a long take.",
                              learnMore: .mac)
@@ -709,7 +690,6 @@ final class Studio: ObservableObject {
         case .privacy(let anchor):
             if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)") { NSWorkspace.shared.open(url) }
         case .screenAccess: askForScreenAccess()
-        case .videoEffects: openVideoEffects()
         case .battery:
             if let url = URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension") { NSWorkspace.shared.open(url) }
         }
@@ -1739,11 +1719,6 @@ extension Studio {
 
     func stageResting() {
         cameraResting = true
-    }
-
-    func stageReactions(_ on: Bool) {
-        reactionsOn = on
-        gesturesOn = on
     }
 
     func stageVoice(spoken: Int, hearing: Bool) {

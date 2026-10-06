@@ -137,7 +137,6 @@ struct SettingsView: View {
     /// A page with something on that usually should not be, shown with an amber lamp.
     private func alert(on item: SettingsPage) -> Bool {
         switch item {
-        case .effects: studio.reactionsOn || studio.gesturesOn
         case .mac: (studio.freeGB ?? 100) < 20 || !studio.power.pluggedIn
         case .live: studio.liveFailure != nil
         default: false
@@ -278,8 +277,6 @@ private struct EffectsSettings: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             SettingsGroup {
-                EffectRow(name: "Reactions", on: studio.reactionsOn || studio.gesturesOn, bestOff: true,
-                          what: "A hand gesture, like a thumbs-up or a heart, fills the picture with balloons, hearts or confetti, right in the recording. While it is on, the Mac also keeps watching your hands, which uses battery. Best off for filming.")
                 EffectRow(name: "Studio Light", on: studio.touchUpOn, bestOff: false,
                           what: "Lights your face and gently darkens the background, like a soft lamp in front of you. Many people like it on.")
                 EffectRow(name: "Portrait", on: studio.portraitOn, bestOff: false,
