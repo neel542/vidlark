@@ -201,6 +201,9 @@ final class Studio: ObservableObject {
     /// no Dock icon, no beeps. Launch it with `open -g` so it never comes to the front.
     nonisolated static let quietTest = CommandLine.arguments.contains("--self-test")
         && ProcessInfo.processInfo.environment["AVA_QUIET"] != nil
+    /// AVA_QUIET=draw: the previews take every picture as if they could be seen, so what showing
+    /// them costs can be measured out of sight.
+    nonisolated static let quietDraw = quietTest && ProcessInfo.processInfo.environment["AVA_QUIET"] == "draw"
 
     /// Where the Mac's sound comes from at the start of a take: one app's name, or nil for every app.
     var soundFromName: String? { Snapshots.active ? stagedSoundName : UserDefaults.standard.string(forKey: "soundFromName") }
@@ -1749,6 +1752,12 @@ extension Studio {
                 guard allSending() else { report(["ok": false, "stage": "phone", "reason": "no pictures from a phone's page"]); return }
                 phoneStates = Dictionary(uniqueKeysWithValues: numbers.map { ($0, PhoneLink.shared.state($0)) })
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
+            }
+            // AVA_IDLE=<seconds> waits that long, ready but not recording, so the cost of simply
+            // being open can be measured.
+            if let idle = ProcessInfo.processInfo.environment["AVA_IDLE"].flatMap(Double.init) {
+                holdAwake = true
+                try? await Task.sleep(nanoseconds: UInt64(idle * 1_000_000_000))
             }
             // AVA_REST_FIRST=1 puts the camera to rest first, so the take has to wake it.
             if ProcessInfo.processInfo.environment["AVA_REST_FIRST"] != nil {

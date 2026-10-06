@@ -91,14 +91,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         if Studio.quietTest {
-            // Out of sight: no Dock icon, and the panel never shows.
+            // Out of sight: no Dock icon, and the panel never shows. AVA_QUIET=draw keeps the
+            // windows in, see-through and click-through, so the previews still draw and their
+            // cost can be measured.
             NSApp.setActivationPolicy(.accessory)
+            let draw = Studio.quietDraw
             for delay in [0.0, 0.3, 1.0] {
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                     for window in NSApp.windows where window.isVisible {
                         window.alphaValue = 0
                         window.ignoresMouseEvents = true
-                        window.orderOut(nil)
+                        if !draw { window.orderOut(nil) }
                     }
                 }
             }

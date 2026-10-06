@@ -33,7 +33,7 @@ class FeedView: NSView {
     override func viewDidUnhide() { super.viewDidUnhide(); update() }
 
     private func update() {
-        let visible = !dimmed && !isHiddenOrHasHiddenAncestor && (window?.occlusionState.contains(.visible) ?? false)
+        let visible = Studio.quietDraw || (!dimmed && !isHiddenOrHasHiddenAncestor && (window?.occlusionState.contains(.visible) ?? false))
         feed?.set(preview, seen: visible)
     }
 }
