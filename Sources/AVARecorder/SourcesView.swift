@@ -35,12 +35,20 @@ struct SourcesPanel: View {
     private var rowViews: [AnyView] {
         var rows: [AnyView] = [AnyView(cameraRow), AnyView(micRow)]
         for (i, extra) in studio.activeExtras.enumerated() {
-            let waiting = extra.isPhone && !Snapshots.active && !studio.phoneReady
+            let waiting = extra.phone.map { !Snapshots.active && !studio.phoneReady($0) } ?? false
             var menu = [MenuChoice(title: "Stop recording this camera", selected: false) { studio.toggleExtra(extra.id) }]
-            if extra.isPhone { menu.insert(MenuChoice(title: "Show the code again…", selected: false) { studio.addPhone() }, at: 0) }
+            var detail = extra.name
+            if let n = extra.phone {
+                menu.insert(MenuChoice(title: "Show the code again…", selected: false) { studio.showPhoneCode(n) }, at: 0)
+                let state = studio.phoneState(n)
+                if waiting {
+                    detail += " · Waiting for the phone"
+                } else if state.width > 0 {
+                    detail += " · " + CameraFormat(width: state.width, height: state.height, fps: 30).name
+                }
+            }
             rows.append(AnyView(SourceRow(symbol: extra.isPhone ? "qrcode" : "video.fill", badge: "\(i + 2)", title: "Camera \(i + 2)",
-                                          detail: waiting ? "\(extra.name) · Waiting for the phone" : extra.name,
-                                          lamp: waiting ? .warn : .ok, dense: dense, menu: menu)))
+                                          detail: detail, lamp: waiting ? .warn : .ok, dense: dense, menu: menu)))
         }
         rows.append(AnyView(screenRow))
         return rows
@@ -48,7 +56,7 @@ struct SourcesPanel: View {
 
     private var cameraRow: some View {
         let resting = studio.cameraResting && studio.cameraAllowed && studio.cameraName != nil
-        let phoneWaiting = studio.usingPhone && !Snapshots.active && !studio.phoneReady
+        let phoneWaiting = studio.mainPhone.map { !Snapshots.active && !studio.phoneReady($0) } ?? false
         let lamp: LampState = !studio.cameraAllowed ? .fail : studio.cameraName == nil || phoneWaiting ? .warn : resting ? .off : .ok
         var detail = studio.cameraAllowed ? (studio.cameraName ?? "None connected") : "Not allowed yet"
         if resting {
@@ -59,11 +67,17 @@ struct SourcesPanel: View {
             if let format = studio.cameraFormat, studio.cameraName != nil { detail += " · \(format.name)" }
             if studio.touchUpOn && studio.cameraName != nil && !studio.usingPhone { detail += " · Studio Light" }
         }
-        // The iPhone over Wi-Fi works with any Apple Account: last in the list, as the way in when
-        // the iPhone does not show up by itself.
+        // Phones over Wi-Fi work with any account: last in the list, as the way in when the iPhone
+        // does not show up by itself. A phone already filming another angle can become the main one.
+        let phones = studio.phonesInUse.map { n in
+            n == studio.mainPhone
+                ? MenuChoice(title: "\(PhoneLink.name(n)): show the code…", selected: true) { studio.showPhoneCode(n) }
+                : MenuChoice(title: PhoneLink.name(n), selected: false) { studio.cameraID = PhoneLink.cameraID(n) }
+        }
+        let newPhone = studio.usingPhone || studio.freePhone == nil ? []
+            : [MenuChoice(title: "\(PhoneLink.name) (scan a code)…", selected: false) { studio.usePhone() }]
         let choices = studio.cameras.map { d in MenuChoice(title: d.localizedName, selected: d.uniqueID == studio.cameraID) { studio.cameraID = d.uniqueID } }
-            + [MenuChoice(title: studio.usingPhone ? "\(PhoneLink.name): show the code…" : "\(PhoneLink.name) (scan a code)…",
-                          selected: studio.usingPhone) { studio.usePhone() }]
+            + phones + newPhone
         // Quality straight from the camera's menu, without opening Settings.
         let more = CameraQuality.allCases.map { q in
             MenuChoice(title: "Quality: \(q.title)", selected: studio.cameraQuality == q) { studio.cameraQuality = q }
@@ -262,9 +276,9 @@ struct AddSourceButton: View {
                         ForEach(others, id: \.uniqueID) { device in
                             Button(device.localizedName) { studio.toggleExtra(device.uniqueID) }
                         }
-                        // Any iPhone or Android phone, over Wi-Fi.
-                        if !studio.phoneInUse {
-                            Button("Add a phone with a QR code…") { studio.addPhone() }
+                        // Any iPhone or Android phone, over Wi-Fi, up to four at once: each is another angle.
+                        if studio.freePhone != nil {
+                            Button(studio.phoneInUse ? "Add another phone with a QR code…" : "Add a phone with a QR code…") { studio.addPhone() }
                         }
                     }
                     Divider()
@@ -276,7 +290,7 @@ struct AddSourceButton: View {
         }
         .fixedSize()
         .onHover { hover = $0 }
-        .help("Add another camera")
+        .help("Film another angle at the same time. Each camera records its own file.")
     }
 }
 

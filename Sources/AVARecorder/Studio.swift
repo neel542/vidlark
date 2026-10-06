@@ -125,12 +125,18 @@ final class Studio: ObservableObject {
     }
     /// What the main camera is recording right now.
     @Published private(set) var cameraFormat: CameraFormat?
-    /// The iPhone over Wi-Fi, while it is the camera or its code is showing.
-    @Published private(set) var phoneState = PhoneState()
-    /// The iPhone over Wi-Fi is the camera.
-    var usingPhone: Bool { cameraID == PhoneLink.cameraID }
-    /// It is the camera and it is in touch: sending pictures, or resting with the rest of the camera.
-    var phoneReady: Bool { phoneState.connected || (phoneState.present && cameraResting) }
+    /// Each phone over Wi-Fi that is filming or has its code showing, by its number.
+    @Published private(set) var phoneStates: [Int: PhoneState] = [:]
+    /// Which phone over Wi-Fi is the main camera, if one is.
+    var mainPhone: Int? { PhoneLink.number(of: cameraID) }
+    /// A phone over Wi-Fi is the main camera.
+    var usingPhone: Bool { mainPhone != nil }
+    func phoneState(_ number: Int) -> PhoneState { phoneStates[number] ?? PhoneState() }
+    /// Phone n is in touch: sending pictures, or resting with the rest of the camera.
+    func phoneReady(_ number: Int) -> Bool {
+        let state = phoneState(number)
+        return state.connected || (state.present && cameraResting)
+    }
     /// macOS camera effects that change the picture for every app. Only the person at the Mac can
     /// switch them, in Video Effects.
     @Published private(set) var portraitOn = false
@@ -456,9 +462,10 @@ final class Studio: ObservableObject {
 
     private func runChecks() {
         power = Preflight.power()
-        if phoneInUse || PhoneCodeWindow.isOpen {
-            let state = PhoneLink.shared.state
-            if state != phoneState { phoneState = state }
+        let watched = Set(phonesInUse + (PhoneCodeWindow.showing.map { [$0] } ?? []))
+        if !watched.isEmpty || !phoneStates.isEmpty {
+            let states = Dictionary(uniqueKeysWithValues: watched.map { ($0, PhoneLink.shared.state($0)) })
+            if states != phoneStates { phoneStates = states }
         }
         // Low Power Mode came or went: light mode follows, between takes only.
         if lightWanted != light { applyInputs() }
@@ -480,8 +487,8 @@ final class Studio: ObservableObject {
     private func refreshDevices(preferredCamera: String?, preferredMic: String?) {
         cameras = Devices.cameras()
         mics = Devices.mics()
-        // The iPhone over Wi-Fi is never in the system's list, so it stays picked until changed.
-        let cam = preferredCamera == PhoneLink.cameraID ? preferredCamera
+        // A phone over Wi-Fi is never in the system's list, so it stays picked until changed.
+        let cam = PhoneLink.number(of: preferredCamera) != nil ? preferredCamera
             : cameras.first(where: { $0.uniqueID == preferredCamera })?.uniqueID ?? cameras.first?.uniqueID
         let mic = mics.first(where: { $0.uniqueID == preferredMic })?.uniqueID ?? mics.first?.uniqueID
         if cam != cameraID { cameraID = cam }
@@ -508,7 +515,7 @@ final class Studio: ObservableObject {
         // Light mode keeps the camera at 1080p and 30 frames a second: 4K or 60 is 2 to 4 times
         // the pixels for the Mac to encode while it also records the screen.
         let quality: CameraQuality = light && cameraQuality != .hd ? .fullHD : cameraQuality
-        camera.use(camera: cam, mic: mic, quality: quality, smooth: smoothMotion && !light, phone: usingPhone ? PhoneLink.shared : nil)
+        camera.use(camera: cam, mic: mic, quality: quality, smooth: smoothMotion && !light, phone: mainPhone.map(PhoneLink.shared.camera))
 
         // Each extra camera writes its own file with the same mic, so the finisher can line it up by sound.
         let wanted = cameraAllowed ? activeExtras : []
@@ -530,9 +537,13 @@ final class Studio: ObservableObject {
             }
             extraOrder = wanted.map(\.id)
         }
+        // A phone brings its own picture and takes the main camera's mic, so it opens nothing on
+        // the Mac: no camera, and no second copy of the mic.
         for (recorder, extra) in zip(extras, wanted) {
-            recorder.use(camera: extra.device, mic: mic, quality: light ? .fullHD : .best, phone: extra.isPhone ? PhoneLink.shared : nil)
+            recorder.use(camera: extra.device, mic: extra.isPhone ? nil : mic, quality: light ? .fullHD : .best,
+                         phone: extra.phone.map(PhoneLink.shared.camera))
         }
+        camera.shareMic(with: zip(extras, wanted).filter { $0.1.isPhone }.map(\.0))
     }
 
     private func remember() {
@@ -578,7 +589,7 @@ final class Studio: ObservableObject {
 
     var currentItem: VideoItem? { queue.first { $0.id == currentID } }
     var cameraName: String? {
-        staged?.camera ?? (usingPhone ? PhoneLink.name : cameras.first { $0.uniqueID == cameraID }?.localizedName)
+        staged?.camera ?? (mainPhone.map { PhoneLink.name($0) } ?? cameras.first { $0.uniqueID == cameraID }?.localizedName)
     }
     var micName: String? { staged?.mic ?? mics.first { $0.uniqueID == micID }?.localizedName }
     var display: DisplayChoice? { displays.first { $0.id == displayID } }
@@ -616,9 +627,9 @@ final class Studio: ObservableObject {
         var out: [Check] = []
         if !cameraAllowed {
             out.append(Check(id: "camera", state: .fail, value: "Not allowed", problem: "Allow the camera in System Settings, Privacy."))
-        } else if usingPhone, !Snapshots.active {
-            out.append(Check(id: "camera", state: phoneReady ? .ok : .warn, value: PhoneLink.name,
-                             problem: phoneReady ? nil : "Open AVA's link on the phone and tap Start camera. The code is in Sources, Camera."))
+        } else if let n = mainPhone, !Snapshots.active {
+            out.append(Check(id: "camera", state: phoneReady(n) ? .ok : .warn, value: PhoneLink.name(n),
+                             problem: phoneReady(n) ? nil : "Open AVA's link on the phone and tap Start camera. The code is in Sources, Camera."))
         } else if let name = cameraName {
             out.append(Check(id: "camera", state: .ok, value: touchUpOn ? "\(name) · touched up" : name))
         } else {
@@ -627,9 +638,9 @@ final class Studio: ObservableObject {
 
         if cameraAllowed {
             for (i, extra) in activeExtras.enumerated() {
-                let waiting = extra.isPhone && !Snapshots.active && !phoneReady
+                let waiting = extra.phone.map { !Snapshots.active && !phoneReady($0) } ?? false
                 out.append(Check(id: "camera-\(i + 2)", state: waiting ? .warn : .ok, value: extra.name,
-                                 problem: waiting ? "Open AVA's link on the phone and tap Start camera. + Add shows the code again." : nil))
+                                 problem: waiting ? "Open AVA's link on the phone and tap Start camera. Its row in Sources shows the code again." : nil))
             }
         }
 
@@ -694,7 +705,7 @@ final class Studio: ObservableObject {
     /// The one thing that needs fixing before a take, in plain words, with what fixes it. Nil when
     /// everything is ready. The panel shows only this, never a wall of rows.
     struct Attention: Equatable {
-        enum Fix: Equatable { case privacy(String), screenAccess, battery, phoneCode }
+        enum Fix: Equatable { case privacy(String), screenAccess, battery, phoneCode(Int) }
         var level: LampState
         var text: String
         var fix: Fix?
@@ -721,10 +732,11 @@ final class Studio: ObservableObject {
         if cameraName == nil {
             return Attention(level: .warn, text: "No camera connected. Plug one in, or bring the iPhone close to the Mac.")
         }
-        if phoneInUse, !Snapshots.active, !phoneReady {
+        if let n = phoneNotReady {
+            let who = phonesInUse.count > 1 ? PhoneLink.name(n) : "The phone"
             return Attention(level: .warn,
-                             text: phoneState.failure ?? "The phone is not sending its picture yet. Scan the code with it, then tap Start camera.",
-                             fix: .phoneCode, fixTitle: "Show the code", learnMore: .cameraGuide)
+                             text: phoneState(n).failure ?? "\(who) is not sending its picture yet. Scan its code with the phone, then tap Start camera.",
+                             fix: .phoneCode(n), fixTitle: "Show the code", learnMore: .cameraGuide)
         }
         if let freeGB, freeGB < 20 {
             return Attention(level: freeGB < 5 ? .fail : .warn,
@@ -750,16 +762,23 @@ final class Studio: ObservableObject {
         case .screenAccess: askForScreenAccess()
         case .battery:
             if let url = URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension") { NSWorkspace.shared.open(url) }
-        case .phoneCode: PhoneCodeWindow.show(studio: self)
+        case .phoneCode(let n): showPhoneCode(n)
         }
     }
 
-    /// The iPhone over Wi-Fi as the camera: its link starts, and the code shows for the iPhone to scan.
+    /// A phone over Wi-Fi as the main camera: the link starts, and its code shows for the phone to
+    /// scan. With a phone already the main camera, its code shows again.
     func usePhone() {
         guard !isBusy else { return }
+        let n = mainPhone ?? freePhone ?? 1
+        if mainPhone == nil { cameraID = PhoneLink.cameraID(n) }
+        showPhoneCode(n)
+    }
+
+    /// Phone n's code, for its phone to scan.
+    func showPhoneCode(_ number: Int) {
         PhoneLink.shared.start()
-        if !usingPhone { cameraID = PhoneLink.cameraID }
-        PhoneCodeWindow.show(studio: self)
+        PhoneCodeWindow.show(studio: self, phone: number)
     }
 
     /// How a microphone connects, so "AirPods" and "the mic receiver" are easy to tell apart.
@@ -776,30 +795,38 @@ final class Studio: ObservableObject {
     var activeExtras: [ExtraCamera] {
         extraCameraIDs.compactMap { id in
             if id == cameraID { return nil }
-            if id == PhoneLink.cameraID { return ExtraCamera(id: id, name: PhoneLink.name, device: nil) }
+            if let n = PhoneLink.number(of: id) { return ExtraCamera(id: id, name: PhoneLink.name(n), device: nil) }
             return cameras.first { $0.uniqueID == id }.map { ExtraCamera(id: id, name: $0.localizedName, device: $0) }
         }
     }
 
-    /// Another camera recorded next to the main one: a camera the Mac sees, or the phone over Wi-Fi.
+    /// Another camera recorded next to the main one, another angle: a camera the Mac sees, or a
+    /// phone over Wi-Fi.
     struct ExtraCamera: Equatable {
         var id: String
         var name: String
-        /// Nil for the phone over Wi-Fi.
+        /// Nil for a phone over Wi-Fi.
         var device: AVCaptureDevice?
-        var isPhone: Bool { device == nil }
+        /// The phone's number, for a phone over Wi-Fi.
+        var phone: Int? { PhoneLink.number(of: id) }
+        var isPhone: Bool { phone != nil }
     }
 
-    /// The phone over Wi-Fi is filming, as the main camera or another one.
-    var phoneInUse: Bool { usingPhone || activeExtras.contains { $0.isPhone } }
+    /// Every phone over Wi-Fi that films in the next take, the main camera's first.
+    var phonesInUse: [Int] { (mainPhone.map { [$0] } ?? []) + activeExtras.compactMap(\.phone) }
+    var phoneInUse: Bool { !phonesInUse.isEmpty }
+    /// The lowest phone number that is not filming yet, while another phone can join.
+    var freePhone: Int? { (1...PhoneLink.most).first { !phonesInUse.contains($0) } }
+    /// The first phone in use that is not in touch yet.
+    var phoneNotReady: Int? { Snapshots.active ? nil : phonesInUse.first { !phoneReady($0) } }
 
-    /// + Add, with a QR code: the phone joins as another camera, recorded next to the main one,
-    /// and its code shows.
+    /// + Add, with a QR code: another phone joins as another angle, recorded next to the main
+    /// camera, and its code shows.
     func addPhone() {
-        guard !isBusy else { return }
-        PhoneLink.shared.start()
-        if !usingPhone, !extraCameraIDs.contains(PhoneLink.cameraID) { extraCameraIDs.append(PhoneLink.cameraID) }
-        PhoneCodeWindow.show(studio: self)
+        guard !isBusy, let n = freePhone else { return }
+        let id = PhoneLink.cameraID(n)
+        if !extraCameraIDs.contains(id) { extraCameraIDs.append(id) }
+        showPhoneCode(n)
     }
 
     func toggleExtra(_ id: String) {
@@ -813,7 +840,7 @@ final class Studio: ObservableObject {
         default: return false
         }
         guard micAllowed, micID != nil else { return false }
-        if phoneInUse, !Snapshots.active, !phoneReady { return false }
+        if phoneNotReady != nil { return false }
         return !recordScreen || (screenAllowed && display != nil)
     }
 
@@ -1364,12 +1391,7 @@ final class Studio: ObservableObject {
         log?.write(["type": "stop"])
 
         Task {
-            let once = Once()
-            let cameraError: Error? = await withCheckedContinuation { done in
-                camera.onFinished = { error in if once.first() { done.resume(returning: error) } }
-                camera.stopRecording()
-            }
-            camera.onFinished = nil
+            let cameraError = await finishRecording(camera)
             await stopExtras()
             while sharing { try? await Task.sleep(nanoseconds: 100_000_000) }
             await screen.stop()
@@ -1429,6 +1451,8 @@ final class Studio: ObservableObject {
         guard phase == .starting else { return }
         phase = .stopping
         Task {
+            // A camera file still waiting to open must not open later with nobody to stop it.
+            _ = await finishRecording(camera)
             await stopExtras()
             await screen.stop()
             liveFrames.forget("screen")
@@ -1461,14 +1485,23 @@ final class Studio: ObservableObject {
     }
 
     private func stopExtras() async {
-        for recorder in extras {
-            let once = Once()
-            await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
-                recorder.onFinished = { _ in if once.first() { done.resume() } }
-                recorder.stopRecording()
+        for recorder in extras { _ = await finishRecording(recorder) }
+    }
+
+    /// Stops a recorder and waits for its file to close, at most ten seconds: a camera file that
+    /// never opened may never say it closed, and a take must always end, with every other
+    /// camera stopped and the app free to quit.
+    private func finishRecording(_ recorder: CameraRecorder) async -> Error? {
+        let once = Once()
+        let error: Error? = await withCheckedContinuation { done in
+            recorder.onFinished = { error in if once.first() { done.resume(returning: error) } }
+            recorder.stopRecording()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                if once.first() { done.resume(returning: RecorderError("The camera file did not close.")) }
             }
-            recorder.onFinished = nil
         }
+        recorder.onFinished = nil
+        return error
     }
 
     private func screenFailed(_ error: Error) {
@@ -1684,24 +1717,30 @@ extension Studio {
             guard canStart || (micAllowed && micID != nil) else {
                 report(["ok": false, "stage": "preflight", "cgPreflight": preflight, "screenProbe": probe ?? "ok"]); return
             }
-            // AVA_CAMERA=phone films with the iPhone over Wi-Fi: it waits up to a minute for a page
-            // to send pictures, and writes the link it serves to .selftest-phone.txt for the test.
-            // AVA_CAMERA=phone-extra records it as another camera instead.
+            // AVA_CAMERA=phone films with phone 1 over Wi-Fi: it waits up to a minute for its page
+            // to send pictures, and writes the links it serves to .selftest-phone.txt (one a line).
+            // AVA_CAMERA=phone-extra records phone 1 as another camera instead, and phones records
+            // phones 1 and 2 as two more angles next to the Mac's own camera.
             if let role = ProcessInfo.processInfo.environment["AVA_CAMERA"], role.hasPrefix("phone") {
-                if role == "phone-extra" {
-                    cameraID = cameras.first?.uniqueID
-                    extraCameraIDs = [PhoneLink.cameraID]
+                let numbers = role == "phones" ? [1, 2] : [1]
+                if role == "phone" {
+                    cameraID = PhoneLink.cameraID(1)
                 } else {
-                    cameraID = PhoneLink.cameraID
+                    cameraID = cameras.first?.uniqueID
+                    extraCameraIDs = numbers.map(PhoneLink.cameraID)
                 }
                 PhoneLink.shared.start()
-                try? (PhoneLink.shared.link ?? "").write(to: Library.root.appendingPathComponent(".selftest-phone.txt"), atomically: true, encoding: .utf8)
+                let links = numbers.compactMap { PhoneLink.shared.link($0) }.joined(separator: "\n")
+                try? links.write(to: Library.root.appendingPathComponent(".selftest-phone.txt"), atomically: true, encoding: .utf8)
+                // In touch is enough: a phone that came while the camera rested waits resting, and the
+                // take wakes it, as it would for Neel.
                 var waited = 0.0
-                while !PhoneLink.shared.state.connected && waited < 60 {
+                func allSending() -> Bool { numbers.allSatisfy { PhoneLink.shared.state($0).connected || PhoneLink.shared.state($0).present } }
+                while !allSending() && waited < 60 {
                     try? await Task.sleep(nanoseconds: 500_000_000); waited += 0.5
                 }
-                guard PhoneLink.shared.state.connected else { report(["ok": false, "stage": "phone", "reason": "no pictures from the phone's page"]); return }
-                phoneState = PhoneLink.shared.state
+                guard allSending() else { report(["ok": false, "stage": "phone", "reason": "no word from a phone's page"]); return }
+                phoneStates = Dictionary(uniqueKeysWithValues: numbers.map { ($0, PhoneLink.shared.state($0)) })
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
             // AVA_REST_FIRST=1 puts the camera to rest first, so the take has to wake it.
@@ -1867,8 +1906,8 @@ extension Studio {
         cameraResting = true
     }
 
-    func stagePhone(_ state: PhoneState) {
-        phoneState = state
+    func stagePhone(_ state: PhoneState, phone number: Int = 1) {
+        phoneStates[number] = state
     }
 
     func stageVoice(spoken: Int, hearing: Bool) {
@@ -1916,7 +1955,9 @@ extension Studio {
     func restCheck() {
         guard booted, !Snapshots.active else { return }
         let now = CACurrentMediaTime()
-        let looking = feed.anySeen && now - (inactiveSince ?? now) < 60
+        // A phone's code showing counts as looking: the phone is being set up, and should not rest
+        // the moment it connects.
+        let looking = (feed.anySeen && now - (inactiveSince ?? now) < 60) || PhoneCodeWindow.isOpen
         let watched = liveTaps.keys.contains(where: liveFrames.watching) || liveAudio.listening
         if isBusy || looking || watched {
             unneededSince = nil

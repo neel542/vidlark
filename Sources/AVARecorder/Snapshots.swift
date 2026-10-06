@@ -40,6 +40,13 @@ enum Snapshots {
             $0.stage(phase: .idle, camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script)
             $0.stageSound(from: "Google Chrome")
         }
+        // Three angles at once: the main camera, then two phones, one wide and one tall.
+        panel("angles") {
+            $0.stage(phase: .idle, camera: "MacBook Air Camera", mic: "Wireless Mic Rx", level: -24, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script)
+            $0.extraCameraIDs = [PhoneLink.cameraID(1), PhoneLink.cameraID(2)]
+            $0.stagePhone(PhoneState(serving: true, present: true, connected: true, width: 1920, height: 1080, fps: 30), phone: 1)
+            $0.stagePhone(PhoneState(serving: true, present: true, connected: true, width: 1080, height: 1920, fps: 30), phone: 2)
+        }
         panel("not-ready") { $0.stage(phase: .idle, camera: nil, mic: "MacBook Air Microphone", level: -70, elapsed: 0, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: false, script: nil) }
         panel("done") { $0.stage(phase: .done(folder: URL(fileURLWithPath: "/tmp"), note: nil), camera: "iPhone Camera", mic: "Wireless Mic Rx", level: -50, elapsed: 905, cardIndex: 0, cardElapsed: 0, countdown: nil, screenAllowed: true, script: script) }
 
@@ -109,12 +116,14 @@ enum Snapshots {
                   to: dir.appendingPathComponent("settings-\(page.rawValue).png"))
         }
 
-        // The iPhone over Wi-Fi window, waiting and connected.
-        for (name, state) in [("waiting", PhoneState(serving: true)),
-                              ("connected", PhoneState(serving: true, present: true, connected: true, width: 1920, height: 1080, fps: 30))] {
+        // A phone's code window, waiting and connected, and a second phone's, filming tall.
+        for (name, phone, state) in [("waiting", 1, PhoneState(serving: true)),
+                                     ("connected", 1, PhoneState(serving: true, present: true, connected: true, width: 1920, height: 1080, fps: 30)),
+                                     ("second", 2, PhoneState(serving: true, present: true, connected: true, width: 1080, height: 1920, fps: 30))] {
             let s = Studio()
-            s.stagePhone(state)
-            write(PhoneCodeView(studio: s).preferredColorScheme(.dark), size: CGSize(width: 740, height: 500),
+            if phone > 1 { s.extraCameraIDs = [PhoneLink.cameraID(phone)] }
+            s.stagePhone(state, phone: phone)
+            write(PhoneCodeView(studio: s, phone: phone).preferredColorScheme(.dark), size: CGSize(width: 740, height: 500),
                   to: dir.appendingPathComponent("phone-code-\(name).png"))
         }
 

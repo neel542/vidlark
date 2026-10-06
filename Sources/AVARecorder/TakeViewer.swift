@@ -11,6 +11,8 @@ struct TakeSource: Identifiable, Equatable {
     var url: URL
     /// camera time = this file's time + offset, as in sync.json. Zero for camera.mov.
     var offset: Double
+    /// Which camera filmed it ("Phone 2", "MacBook Air Camera"), from events.jsonl.
+    var name: String? = nil
 
     /// Every video file in the folder: the finished video first, then the camera and the screen.
     static func all(in take: TakeInfo) -> [TakeSource] {
@@ -32,13 +34,26 @@ struct TakeSource: Identifiable, Equatable {
             out.append(TakeSource(id: "screen", title: "Screen", url: folder.appendingPathComponent("screen.mov"), offset: offset))
         }
         let cameras = (sync["cameras"] as? [[String: Any]]) ?? []
+        let started = startLine(folder)
+        let names = ((started["extraCameras"] as? [[String: Any]]) ?? []).reduce(into: [String: String]()) { names, entry in
+            if let file = entry["file"] as? String, let name = entry["name"] as? String { names[file] = name }
+        }
         for n in 2...9 {
             let name = "camera-\(n).mov"
             guard !Snapshots.active, fm.fileExists(atPath: folder.appendingPathComponent(name).path) else { continue }
             let offset = (cameras.first { $0["file"] as? String == name }?["offsetSec"] as? NSNumber)?.doubleValue ?? 0
-            out.append(TakeSource(id: "camera-\(n)", title: "Camera \(n)", url: folder.appendingPathComponent(name), offset: offset))
+            out.append(TakeSource(id: "camera-\(n)", title: "Camera \(n)", url: folder.appendingPathComponent(name), offset: offset, name: names[name]))
         }
+        if let i = out.firstIndex(where: { $0.id == "camera" }) { out[i].name = started["cameraName"] as? String }
         return out
+    }
+
+    /// The "start" line of events.jsonl: which cameras filmed the take.
+    private static func startLine(_ folder: URL) -> [String: Any] {
+        guard let text = try? String(contentsOf: folder.appendingPathComponent("events.jsonl"), encoding: .utf8),
+              let line = text.split(separator: "\n").first(where: { $0.contains("\"start\"") }),
+              let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any] else { return [:] }
+        return object
     }
 
     /// The camera time of the "screen-start" line in events.jsonl, for a camera-first take.
@@ -223,6 +238,7 @@ private struct SourceSwitch: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .help(source.name.map { "Filmed by \($0)" } ?? "")
             }
         }
         .padding(2)

@@ -88,9 +88,11 @@ struct CameraFormat: Equatable {
     var height: Int
     var fps: Int
 
-    /// "1080p", "4K", "720p", or the size for anything else.
+    /// "1080p", "4K", "720p", or the size for anything else. A tall picture (a phone's 9:16) is
+    /// "1080p tall".
     var name: String {
-        switch height {
+        if height > width { return CameraFormat(width: height, height: width, fps: fps).name + " tall" }
+        return switch height {
         case 2160: "4K"
         case 1080, 1440: "\(height)p"
         case 720: "720p"
@@ -124,9 +126,9 @@ final class CameraRecorder: NSObject {
     private var settled: CFTimeInterval = 0
     /// True while the camera rests: the session is stopped and the camera light is off. Camera queue only.
     private var resting = false
-    /// The iPhone over Wi-Fi, while it is the camera. Its pictures come from `PhoneLink` instead of
-    /// the session, which then holds only the mic. Camera queue only.
-    private var phone: PhoneLink?
+    /// A phone over Wi-Fi, while it is this recorder's camera. Its pictures come from the phone link
+    /// instead of the session, which then holds only the mic. Camera queue only.
+    private var phone: PhoneCamera?
     /// camera.mov from the iPhone's pictures and the mic. Phone queue only.
     private var phoneTake: PhoneTake?
     /// The mic's sound format, for the iPhone take's file. Phone queue only.
@@ -137,6 +139,9 @@ final class CameraRecorder: NSObject {
     private var phoneTargets: [PhoneTarget] = []
     private var phoneOn = false
     private let phoneLock = NSLock()
+    /// Phones filming other angles take this recorder's mic, so they need no capture session of
+    /// their own: one mic session for the take, however many phones. Tap queue only.
+    private var micTakers: [CameraRecorder] = []
 
     var onLevel: ((Float, Float) -> Void)?
     /// The format the camera ended up recording in, after each `use`. Called on the camera queue.
@@ -150,7 +155,7 @@ final class CameraRecorder: NSObject {
         levelTap.setSampleBufferDelegate(self, queue: tapQueue)
     }
 
-    func use(camera: AVCaptureDevice?, mic: AVCaptureDevice?, quality: CameraQuality = .best, smooth: Bool = false, phone: PhoneLink? = nil) {
+    func use(camera: AVCaptureDevice?, mic: AVCaptureDevice?, quality: CameraQuality = .best, smooth: Bool = false, phone: PhoneCamera? = nil) {
         queue.async { [self] in
             usePhone(phone)
             session.beginConfiguration()
@@ -176,7 +181,27 @@ final class CameraRecorder: NSObject {
                 movie.setOutputSettings([AVVideoCodecKey: AVVideoCodecType.hevc], for: connection)
             }
             if !taking { frameOutputs.forEach { $0.output.connection(with: .video)?.isEnabled = $0.wanted } }
-            if !resting, !session.isRunning { session.startRunning() }
+            // A phone filming another angle has nothing here: its sound comes from the main mic.
+            if session.inputs.isEmpty {
+                if session.isRunning { session.stopRunning() }
+            } else if !resting, !session.isRunning {
+                session.startRunning()
+            }
+        }
+    }
+
+    /// Hands every mic buffer to these recorders too: phones filming other angles, recorded with
+    /// this recorder's mic. Set on the tap queue, where it is read.
+    func shareMic(with recorders: [CameraRecorder]) {
+        tapQueue.async { [self] in micTakers = recorders }
+    }
+
+    /// A mic buffer for the phone take's file, from this recorder's session or the main one's.
+    fileprivate func phoneAudio(_ sample: CMSampleBuffer) {
+        guard phoneLock.withLock({ phoneOn }) else { return }
+        phoneQueue.async { [self] in
+            micFormat = CMSampleBufferGetFormatDescription(sample)
+            phoneTake?.audio(sample)
         }
     }
 
@@ -412,8 +437,8 @@ private final class PhoneTarget: @unchecked Sendable {
 }
 
 extension CameraRecorder {
-    /// Camera queue only. Switches the iPhone in as the camera, or out again.
-    fileprivate func usePhone(_ link: PhoneLink?) {
+    /// Camera queue only. Switches a phone in as the camera, or out again.
+    fileprivate func usePhone(_ link: PhoneCamera?) {
         guard link !== phone else { return }
         phone?.stopDelivering(to: self)
         phone = link
@@ -438,14 +463,16 @@ extension CameraRecorder {
         refreshPhoneTargets()
     }
 
-    /// Camera queue only. The outputs that want pictures now, as during a take every one does.
+    /// Camera queue only. The outputs that want pictures now. With none, the phone's pictures are
+    /// not decoded at all: they only go into the camera file, as they came.
     fileprivate func refreshPhoneTargets() {
         let targets: [PhoneTarget] = phone == nil ? [] : frameOutputs.compactMap { item in
-            guard item.wanted || taking, let output = item.output as? AVCaptureVideoDataOutput,
+            guard item.wanted, let output = item.output as? AVCaptureVideoDataOutput,
                   let taker = output.sampleBufferDelegate as? FrameTaking, let queue = output.sampleBufferCallbackQueue else { return nil }
             return PhoneTarget(taker: taker, queue: queue)
         }
         phoneLock.withLock { phoneTargets = targets }
+        phone?.decode(!targets.isEmpty, for: self)
     }
 }
 
@@ -462,6 +489,15 @@ final class PhoneTake {
     private var last: CMTime = .invalid
     /// A picture could not be written, so the next ones wait for a whole picture.
     private var broken = false
+    /// Pictures and sound the writer is not ready for yet. It takes the two in step, so when
+    /// pictures come late over Wi-Fi the sound waits for them here instead of being lost, which
+    /// would leave the file's sound shorter than its picture and out of step.
+    private var waitingVideo: [CMSampleBuffer] = []
+    private var waitingAudio: [CMSampleBuffer] = []
+    /// About ten seconds of either; past that the oldest goes.
+    private static let mostWaiting = (video: 300, audio: 480)
+    /// When the take asked for its first picture, on the Mac's clock.
+    private let asked = CMClockGetTime(CMClockGetHostTimeClock())
     var micFormat: CMFormatDescription?
 
     init(url: URL) {
@@ -479,31 +515,62 @@ final class PhoneTake {
         let key = Self.isKey(sample)
         guard let format = CMSampleBufferGetFormatDescription(sample) else { return }
         if writer == nil {
-            guard key, let micFormat else { askForKey(); return }
+            // A whole picture from well before the take was asked for (one an encoder held back
+            // while the phone rested) would open the file seconds early, with a gap after it. Only
+            // for the first two seconds, so a phone whose clock is off can never keep it shut.
+            let waited = (CMClockGetTime(CMClockGetHostTimeClock()) - asked).seconds
+            let early = waited < 2 && CMTimeCompare(time, asked - CMTime(seconds: 1, preferredTimescale: 600)) < 0
+            guard key, !early, let micFormat else { askForKey(); return }
             guard open(video: format, audio: micFormat, at: time) else { return }
             started(time.seconds)
         }
-        guard let videoIn, let videoFormat else { return }
+        guard videoIn != nil, let videoFormat else { return }
         // A different picture shape cannot go into the same file; it waits for the next take.
         guard CMFormatDescriptionEqual(format, otherFormatDescription: videoFormat) else { return }
-        guard !last.isValid || CMTimeCompare(time, last) > 0 else { return }
+        let newest = waitingVideo.last.map(CMSampleBufferGetPresentationTimeStamp) ?? last
+        guard !newest.isValid || CMTimeCompare(time, newest) > 0 else { return }
         if broken {
             guard key else { return }
             broken = false
         }
-        if videoIn.isReadyForMoreMediaData, videoIn.append(sample) {
-            last = time
-        } else {
+        waitingVideo.append(sample)
+        if waitingVideo.count > Self.mostWaiting.video {
+            // Too far behind: what waits goes, and the pictures start again on a whole one.
+            waitingVideo.removeAll()
             broken = true
             askForKey()
         }
+        write()
     }
 
     func audio(_ sample: CMSampleBuffer) {
         if micFormat == nil { micFormat = CMSampleBufferGetFormatDescription(sample) }
-        guard let audioIn, start.isValid, CMTimeCompare(CMSampleBufferGetPresentationTimeStamp(sample), start) >= 0,
-              audioIn.isReadyForMoreMediaData else { return }
-        audioIn.append(sample)
+        guard audioIn != nil, start.isValid, CMTimeCompare(CMSampleBufferGetPresentationTimeStamp(sample), start) >= 0 else { return }
+        waitingAudio.append(sample)
+        if waitingAudio.count > Self.mostWaiting.audio { waitingAudio.removeFirst(waitingAudio.count - Self.mostWaiting.audio) }
+        write()
+    }
+
+    /// Hands the writer whatever it is ready for, oldest first.
+    private func write() {
+        if let videoIn {
+            while let next = waitingVideo.first, videoIn.isReadyForMoreMediaData {
+                waitingVideo.removeFirst()
+                if videoIn.append(next) {
+                    last = CMSampleBufferGetPresentationTimeStamp(next)
+                } else {
+                    waitingVideo.removeAll()
+                    broken = true
+                    break
+                }
+            }
+        }
+        if let audioIn {
+            while let next = waitingAudio.first, audioIn.isReadyForMoreMediaData {
+                waitingAudio.removeFirst()
+                audioIn.append(next)
+            }
+        }
     }
 
     private func open(video: CMFormatDescription, audio: CMFormatDescription, at time: CMTime) -> Bool {
@@ -550,6 +617,7 @@ final class PhoneTake {
             done(writer == nil ? RecorderError("The phone sent no pictures, so its camera file was not made. Check the phone's page is open.") : writer?.error)
             return
         }
+        write()
         videoIn?.markAsFinished()
         audioIn?.markAsFinished()
         if last.isValid { writer.endSession(atSourceTime: last + CMTime(value: 1, timescale: 30)) }
@@ -585,12 +653,8 @@ extension CameraRecorder: AVCaptureAudioDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         onAudio?(sampleBuffer)
         onLiveAudio?(sampleBuffer)
-        if phoneLock.withLock({ phoneOn }) {
-            phoneQueue.async { [self] in
-                micFormat = CMSampleBufferGetFormatDescription(sampleBuffer)
-                phoneTake?.audio(sampleBuffer)
-            }
-        }
+        phoneAudio(sampleBuffer)
+        for taker in micTakers { taker.phoneAudio(sampleBuffer) }
         let now = CACurrentMediaTime()
         guard now - lastLevel > 0.066 else { return }
         lastLevel = now

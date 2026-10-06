@@ -402,9 +402,9 @@ private struct CameraGuide: View {
             seen
             Method(symbol: "qrcode", title: "Your phone, over Wi-Fi",
                    why: "The quickest way in: any iPhone or Android phone, with any account. No app and no cable, only the same Wi-Fi as this Mac.", steps: [
-                "Press Show the code below to film with the phone, or + Add, Add a phone with a QR code, to record it next to the main camera.",
+                "Press Show the code below to film with the phone, or + Add, Add a phone with a QR code, to film another angle next to the main camera. Up to four phones can film at once, each with its own code.",
                 "Point the phone's camera at the code and tap the link. The first time, it warns that the connection is not private. On an iPhone, tap Show Details, then \u{201C}visit this website\u{201D}, then Visit Website. On Android, tap Advanced, then Proceed.",
-                "Tap Start camera, then Allow. Turn the phone sideways in its stand, back camera facing you, and keep the page open.",
+                "Pick Wide 16:9 or Tall 9:16, tap Start camera, then Allow. The picture keeps that shape however the phone turns. Put the phone in its stand, back camera facing you, and keep the page open.",
             ], after: "It records up to 1080p at 30 frames a second, timed to the Mac's mic. Keep the phone plugged in for a long take.",
                    action: studio.isBusy ? nil : ("Show the code", { studio.usePhone() }))
             Method(symbol: "iphone", title: "Your iPhone, linked by Apple",

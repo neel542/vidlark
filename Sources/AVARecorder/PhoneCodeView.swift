@@ -1,19 +1,24 @@
 import AppKit
 import SwiftUI
 
-/// The window with the QR code that turns the iPhone into the camera over Wi-Fi.
+/// The window with phone n's QR code, which makes that phone a camera over Wi-Fi.
 enum PhoneCodeWindow {
     private static var window: NSWindow?
+    /// Which phone's code is showing, if any.
+    private(set) static var showing: Int?
 
     static var isOpen: Bool { window != nil }
 
-    static func show(studio: Studio) {
+    static func show(studio: Studio, phone: Int) {
         if let window {
-            window.makeKeyAndOrderFront(nil)
-            NSApp.activate()
-            return
+            if showing == phone {
+                window.makeKeyAndOrderFront(nil)
+                NSApp.activate()
+                return
+            }
+            window.close()
         }
-        let host = NSHostingController(rootView: PhoneCodeView(studio: studio).preferredColorScheme(.dark))
+        let host = NSHostingController(rootView: PhoneCodeView(studio: studio, phone: phone).preferredColorScheme(.dark))
         host.sizingOptions = [.preferredContentSize]
         let w = NSWindow(contentViewController: host)
         w.styleMask = [.titled, .closable, .fullSizeContentView]
@@ -25,9 +30,14 @@ enum PhoneCodeWindow {
         w.isReleasedWhenClosed = false
         w.center()
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { _ in
-            MainActor.assumeIsolated { window = nil }
+            MainActor.assumeIsolated {
+                guard window === w else { return }
+                window = nil
+                showing = nil
+            }
         }
         window = w
+        showing = phone
         w.makeKeyAndOrderFront(nil)
         NSApp.activate()
     }
@@ -37,14 +47,16 @@ enum PhoneCodeWindow {
 
 struct PhoneCodeView: View {
     @ObservedObject var studio: Studio
+    var phone: Int
+
     /// Snapshots draw a stand-in link, since they have no network.
-    var link: String? = Snapshots.active ? "https://Your-Mac.local:8791/sample/" : PhoneLink.shared.link
+    private var link: String? { Snapshots.active ? "https://192.168.1.20:8791/sample/\(phone)/" : PhoneLink.shared.link(phone) }
 
     var body: some View {
         HStack(alignment: .top, spacing: 32) {
             code
             VStack(alignment: .leading, spacing: 0) {
-                Text("Connect a phone")
+                Text(title)
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(Palette.ink)
                 Text("An iPhone or an Android phone, with any account. No app and no cable: the phone only needs the same Wi-Fi as this Mac. \(role)")
@@ -56,7 +68,7 @@ struct PhoneCodeView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Step(n: 1, text: "Point the phone's camera at the code, then tap the link that appears.")
                     Step(n: 2, text: "The first time, the phone warns that the connection is not private. It is AVA's own link, only on your Wi-Fi. On an iPhone, tap Show Details, then \u{201C}visit this website\u{201D}, then Visit Website. On Android, tap Advanced, then Proceed.")
-                    Step(n: 3, text: "Tap Start camera, then Allow. Turn the phone sideways, back camera facing you.")
+                    Step(n: 3, text: "On the phone, pick Wide 16:9 or Tall 9:16, then tap Start camera and Allow. The picture keeps that shape however the phone turns.")
                 }
                 .padding(.top, 22)
                 Spacer(minLength: 22)
@@ -101,12 +113,17 @@ struct PhoneCodeView: View {
         }
     }
 
-    private var state: PhoneState { studio.phoneState }
+    private var state: PhoneState { studio.phoneState(phone) }
+
+    /// "Connect a phone", or which one once there can be several.
+    private var title: String {
+        studio.phonesInUse.count > 1 || phone > 1 ? "Connect phone \(phone)" : "Connect a phone"
+    }
 
     /// What the phone will be once it connects.
     private var role: String {
-        studio.usingPhone ? "It becomes the camera AVA films with."
-            : "It records as another camera, next to the main one. To film with it instead, pick it in the Camera row."
+        studio.mainPhone == phone ? "It becomes the camera AVA films with."
+            : "It films another angle, saved as its own file next to the main camera, so the angle can be picked in editing."
     }
 
     @ViewBuilder private var status: some View {
@@ -147,7 +164,10 @@ struct PhoneCodeView: View {
 
     private var detail: String? {
         if let failure = state.failure { return failure }
-        if state.connected { return "\(state.width) \u{00D7} \(state.height) at \(max(state.fps, 1)) frames a second." }
+        if state.connected {
+            let format = CameraFormat(width: state.width, height: state.height, fps: 30).name
+            return "\(state.tall ? "Tall 9:16" : "Wide 16:9"), \(format), \(max(state.fps, 1)) frames a second."
+        }
         if state.present { return "Tap Start camera on the phone." }
         return "Scan the code with the phone."
     }
