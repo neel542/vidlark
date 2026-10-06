@@ -368,7 +368,8 @@ final class CameraRecorder: NSObject {
     /// effects on it and the previews then cost about a third less of the app's idle work (7 Oct,
     /// 10.6% to 7.2% of a core). The preview's brightness stays the same, since the camera evens
     /// it out. The take's own rate comes back at the 3, 2, 1, and the file waits until `settled`.
-    /// Only a rate the camera's format offers is set. Returns whether it changed.
+    /// Only a rate the camera's format offers is set. (10 was tried: the MacBook Air camera offers
+    /// 15 to 30 only.) Returns whether it changed.
     @discardableResult
     private func pace(forTake: Bool) -> Bool {
         guard let device = videoInput?.device, let rate = takeRate else { return false }

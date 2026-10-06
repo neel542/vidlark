@@ -2216,14 +2216,15 @@ final class LineReader: @unchecked Sendable {
 extension Studio {
     /// The camera, the mic and Apple's effects on them (Reactions, Portrait) cost about 40% of a
     /// processor core even when nobody looks: measured 5 Oct with the app open but unseen all night.
-    /// So they rest once no preview has been seen, or the app has sat in the background for a minute,
+    /// So they rest once no preview has been seen, or the app has sat behind other apps for 5 seconds,
     /// for 15 seconds, and wake the moment anyone looks, a take starts or the live page asks.
     func restCheck() {
         guard booted, !Snapshots.active else { return }
         let now = CACurrentMediaTime()
         // A phone's code showing counts as looking: the phone is being set up, and should not rest
         // the moment it connects.
-        let looking = (feed.anySeen && now - (inactiveSince ?? now) < 60) || PhoneCodeWindow.isOpen
+        // Behind other apps for 5 seconds, then the 15 below: about 20 seconds in all.
+        let looking = (feed.anySeen && now - (inactiveSince ?? now) < 5) || PhoneCodeWindow.isOpen
         let watched = liveTaps.keys.contains(where: liveFrames.watching) || liveAudio.listening
         if isBusy || looking || watched || holdAwake {
             unneededSince = nil
