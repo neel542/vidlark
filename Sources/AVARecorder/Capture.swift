@@ -50,6 +50,12 @@ enum Devices {
 
 // MARK: - Camera and mic
 
+/// Light mode films at 1080p and 30 frames a second, so a slower Mac keeps up. Automatic
+/// switches it on for a slower Mac (`Machine.modest`) and while Low Power Mode is on.
+enum LightMode: String, CaseIterable {
+    case automatic, on, off
+}
+
 /// How sharp the camera records. Higher is sharper and makes bigger files.
 enum CameraQuality: String, CaseIterable, Identifiable {
     case best, uhd, fullHD, hd

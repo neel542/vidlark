@@ -55,6 +55,19 @@ struct PowerState: Equatable {
     var lowPower = false
 }
 
+/// What kind of Mac this is, for light mode.
+enum Machine {
+    static let memoryGB = Int((ProcessInfo.processInfo.physicalMemory + (1 << 29)) >> 30)
+    static let intel: Bool = {
+        var arm: Int32 = 0
+        var size = MemoryLayout<Int32>.size
+        return sysctlbyname("hw.optional.arm64", &arm, &size, nil, 0) != 0 || arm == 0
+    }()
+    /// An Intel Mac, or one with 8 GB of memory or less: recording a sharp camera and a sharp
+    /// screen at once can be more than it keeps up with.
+    static let modest = intel || memoryGB <= 8
+}
+
 enum Preflight {
     static func power() -> PowerState {
         guard let blob = IOPSCopyPowerSourcesInfo()?.takeRetainedValue() else {

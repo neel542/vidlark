@@ -104,9 +104,21 @@ final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSam
         output.setSampleBufferDelegate(self, queue: queue)
     }
 
+    /// Light mode looks half as often.
+    var light: Bool {
+        get { lock.withLock { slow } }
+        set { lock.withLock { slow = newValue } }
+    }
+    private var slow = false
+
+    /// The size of the last picture looked at and how many looks so far, for the self test.
+    static var seen: (width: Int, height: Int, looks: Int) { seenLock.withLock { seen_ } }
+    private static var seen_ = (width: 0, height: 0, looks: 0)
+    private static let seenLock = NSLock()
+
     /// Seconds between looks right now.
     func interval(at time: CFTimeInterval) -> CFTimeInterval {
-        time < busyUntil ? 0.1 : 0.25
+        (time < busyUntil ? 0.1 : 0.25) * (light ? 2 : 1)
     }
 
     func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
@@ -118,6 +130,7 @@ final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSam
         let now = CACurrentMediaTime()
         guard now - last >= interval(at: now) - 0.01, let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         last = now
+        Self.seenLock.withLock { Self.seen_ = (CVPixelBufferGetWidth(pixels), CVPixelBufferGetHeight(pixels), Self.seen_.looks + 1) }
         let next = frame(pixels, at: now)
         let glide = lastGlide
         let hasFace = lostSince.map { now - $0 < 2 } ?? true
@@ -817,6 +830,7 @@ final class RecordingPillController {
 
         tracker.camera = studio.camera
         studio.camera.attach(tracker.output, framesOn: false)
+        watches.append(studio.$light.sink { [weak self] on in self?.tracker.light = on })
 
         watches.append(studio.$phase
             .removeDuplicates()

@@ -102,6 +102,31 @@ final class Studio: ObservableObject {
     @Published var smoothMotion = UserDefaults.standard.bool(forKey: "smoothMotion") {
         didSet { if !Snapshots.active { UserDefaults.standard.set(smoothMotion, forKey: "smoothMotion") }; applyInputs() }
     }
+    @Published var lightMode = LightMode(rawValue: UserDefaults.standard.string(forKey: "lightMode") ?? "") ?? .automatic {
+        didSet { if !Snapshots.active { UserDefaults.standard.set(lightMode.rawValue, forKey: "lightMode") }; applyInputs() }
+    }
+    /// Whether light mode is in force. Only changes between takes.
+    @Published private(set) var light = false
+    /// What light mode should be now. `AVA_LIGHT=on` or `off` overrides it, for tests.
+    var lightWanted: Bool {
+        switch LightMode(rawValue: ProcessInfo.processInfo.environment["AVA_LIGHT"] ?? "") ?? lightMode {
+        case .on: true
+        case .off: false
+        case .automatic: Machine.modest || power.lowPower
+        }
+    }
+    /// Why light mode is on or off right now, in a sentence.
+    var lightNote: String {
+        switch lightMode {
+        case .on: return "On. The camera records at most 1080p, 30 frames a second."
+        case .off: return "Off. The camera and screen record as sharp as they can."
+        case .automatic:
+            if Machine.intel { return "On now: this is an Intel Mac." }
+            if Machine.memoryGB <= 8 { return "On now: this Mac has \(Machine.memoryGB) GB of memory." }
+            if power.lowPower { return "On now, while Low Power Mode is on." }
+            return "Off now: this Mac keeps up at full sharpness."
+        }
+    }
     /// What the main camera is recording right now.
     @Published private(set) var cameraFormat: CameraFormat?
     /// macOS camera effects that change the picture for every app. Only the person at the Mac can
@@ -410,6 +435,8 @@ final class Studio: ObservableObject {
 
     private func runChecks() {
         power = Preflight.power()
+        // Low Power Mode came or went: light mode follows, between takes only.
+        if lightWanted != light { applyInputs() }
         // Asking macOS for free space is surprisingly costly, so once a minute is enough.
         let now = CACurrentMediaTime()
         if freeGB == nil || now - lastSpaceCheck > 60 {
@@ -452,7 +479,11 @@ final class Studio: ObservableObject {
         guard !isBusy, !Snapshots.active else { return }
         let cam = cameraAllowed ? cameras.first { $0.uniqueID == cameraID } : nil
         let mic = micAllowed ? mics.first { $0.uniqueID == micID } : nil
-        camera.use(camera: cam, mic: mic, quality: cameraQuality, smooth: smoothMotion)
+        light = lightWanted
+        // Light mode keeps the camera at 1080p and 30 frames a second: 4K or 60 is 2 to 4 times
+        // the pixels for the Mac to encode while it also records the screen.
+        let quality: CameraQuality = light && cameraQuality != .hd ? .fullHD : cameraQuality
+        camera.use(camera: cam, mic: mic, quality: quality, smooth: smoothMotion && !light)
 
         // Each extra camera writes its own file with the same mic, so the finisher can line it up by sound.
         let wanted = cameraAllowed ? activeExtras : []
@@ -474,7 +505,7 @@ final class Studio: ObservableObject {
             }
             extraOrder = wanted.map(\.uniqueID)
         }
-        for (recorder, device) in zip(extras, wanted) { recorder.use(camera: device, mic: mic) }
+        for (recorder, device) in zip(extras, wanted) { recorder.use(camera: device, mic: mic, quality: light ? .fullHD : .best) }
     }
 
     private func remember() {
@@ -848,7 +879,11 @@ final class Studio: ObservableObject {
                     ?? content.displays.first else { throw RecorderError("No screen to record.") }
             let hidden = Set([Bundle.main.bundleIdentifier ?? "inc.ava.recorder", "com.apple.notificationcenterui"])
             let excluded = content.applications.filter { hidden.contains($0.bundleIdentifier) }
-            let size = displays.first { $0.id == target.displayID }?.pixelSize ?? CGSize(width: target.width * 2, height: target.height * 2)
+            let full = displays.first { $0.id == target.displayID }?.pixelSize ?? CGSize(width: target.width * 2, height: target.height * 2)
+            // At most 4K, which is what YouTube shows, and 1920 in light mode, the size video.mp4
+            // is made at anyway. A 5K display at full size is twice the pixels of 4K to encode.
+            let k = min(1, (light ? 1920 : 3840) / max(full.width, full.height, 1))
+            let size = CGSize(width: CGFloat(Int(full.width * k) & ~1), height: CGFloat(Int(full.height * k) & ~1))
             return Capture(filter: SCContentFilter(display: target, excludingApplications: excluded, exceptingWindows: ours),
                            display: target, pixelSize: size, source: nil, windowID: nil,
                            name: displays.first { $0.id == target.displayID }?.name ?? "Screen")
@@ -1529,6 +1564,10 @@ extension Studio {
             let previews = feed.report
             all["previews"] = ["framesShown": previews.frames, "states": previews.states]
             all["drops"] = FrameDrops.report
+            let face = FaceTracker.seen
+            all["face"] = ["frame": "\(face.width)x\(face.height)", "looks": face.looks]
+            all["light"] = light
+            all["camera"] = cameraFormat?.text ?? "none"
             if let data = try? JSONSerialization.data(withJSONObject: all, options: [.prettyPrinted, .sortedKeys]) {
                 try? data.write(to: out)
             }

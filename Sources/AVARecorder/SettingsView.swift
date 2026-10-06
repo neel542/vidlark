@@ -46,7 +46,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .effects: "macOS can change the camera picture for every app on this Mac. Only you can switch these, in Video Effects. Here is what each one does, and whether it is on."
         case .prompter: "The prompter shows the script one line at a time. A key, your voice or a Bluetooth remote moves it on."
         case .live: "Watch the shoot from another laptop or a phone, in a web browser. There is no login: the secret link is the key, so only share it with people you trust."
-        case .mac: "Space and power for a long take."
+        case .mac: "Space, power and speed for a long take."
         case .cameraGuide: "Any camera this Mac can see can be a source: your iPhone, a USB webcam or a real camera. Cameras connect by cable, or by Wi-Fi the way an iPhone does. Bluetooth is too slow for video."
         }
     }
@@ -245,6 +245,8 @@ private struct QualitySettings: View {
             .disabled(studio.isBusy)
             if studio.isBusy {
                 Text("Quality can be changed once this take has stopped.").note()
+            } else if studio.light {
+                Text("Light mode is on (This Mac), so the camera records at most 1080p, 30 frames a second.").note()
             }
         }
     }
@@ -379,6 +381,13 @@ private struct MacSettings: View {
             }
             SettingRow("Low Power Mode", "Slows the Mac to save battery, and the camera then freezes once the screen is shared. Keep it off while filming: System Settings, Battery.") {
                 StatusValue(lamp: studio.power.lowPower ? .warn : .ok, text: studio.power.lowPower ? "On" : "Off")
+            }
+            SettingRow("Light mode",
+                       "Records the camera and the screen at 1080p, 30 frames a second, and looks for your face less often, so a slower Mac keeps up. Automatic turns it on for Intel Macs, Macs with 8 GB of memory or less, and in Low Power Mode.") {
+                Segments(choices: [("Automatic", LightMode.automatic), ("On", .on), ("Off", .off)], selected: studio.lightMode) { studio.lightMode = $0 }
+                    .disabled(studio.isBusy)
+            } below: {
+                Text(studio.isBusy ? "Light mode can be changed once this take has stopped." : studio.lightNote).note()
             }
         }
     }
