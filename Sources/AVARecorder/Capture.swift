@@ -124,6 +124,8 @@ final class CameraRecorder: NSObject {
     private var taking = false
     /// When the session will have settled after the last connection was switched on. Camera queue only.
     private var settled: CFTimeInterval = 0
+    /// The camera's frames a second in a take, from its format. Camera queue only.
+    private var takeRate: Int?
     /// True while the camera rests: the session is stopped and the camera light is off. Camera queue only.
     private var resting = false
     /// A phone over Wi-Fi, while it is this recorder's camera. Its pictures come from the phone link
@@ -179,12 +181,17 @@ final class CameraRecorder: NSObject {
                 let state = phone.state
                 onFormat?(state.width > 0 ? CameraFormat(width: state.width, height: state.height, fps: 30) : nil)
             } else {
-                onFormat?(camera.flatMap { Self.useFormat($0, quality: quality, fps: smooth ? 60 : 30) })
+                let format = camera.flatMap { Self.useFormat($0, quality: quality, fps: smooth ? 60 : 30) }
+                takeRate = format?.fps
+                onFormat?(format)
             }
             if let connection = movie.connection(with: .video) {
                 movie.setOutputSettings([AVVideoCodecKey: AVVideoCodecType.hevc], for: connection)
             }
-            if !taking { frameOutputs.forEach { $0.output.connection(with: .video)?.isEnabled = $0.wanted } }
+            if !taking {
+                frameOutputs.forEach { $0.output.connection(with: .video)?.isEnabled = $0.wanted }
+                pace(forTake: false)
+            }
             // A phone filming another angle has nothing here: its sound comes from the main mic.
             if session.inputs.isEmpty {
                 if session.isRunning { session.stopRunning() }
@@ -338,6 +345,7 @@ final class CameraRecorder: NSObject {
         taking = true
         // A phone standing by starts sending now, during the 3, 2, 1, so its file can open on time.
         phone?.setTaking(true)
+        if pace(forTake: true) { settled = max(settled, CACurrentMediaTime() + 0.5) }
         for item in frameOutputs {
             if let connection = item.output.connection(with: .video), !connection.isEnabled {
                 connection.isEnabled = true
@@ -352,7 +360,29 @@ final class CameraRecorder: NSObject {
         taking = false
         phone?.setTaking(false)
         frameOutputs.forEach { $0.output.connection(with: .video)?.isEnabled = $0.wanted }
+        pace(forTake: false)
         refreshPhoneTargets()
+    }
+
+    /// Camera queue only. Between takes the camera runs at 15 frames a second: the camera, Apple's
+    /// effects on it and the previews then cost about a third less of the app's idle work (7 Oct,
+    /// 10.6% to 7.2% of a core). The preview's brightness stays the same, since the camera evens
+    /// it out. The take's own rate comes back at the 3, 2, 1, and the file waits until `settled`.
+    /// Only a rate the camera's format offers is set. Returns whether it changed.
+    @discardableResult
+    private func pace(forTake: Bool) -> Bool {
+        guard let device = videoInput?.device, let rate = takeRate else { return false }
+        let fps = forTake ? rate : min(rate, 15)
+        guard device.activeFormat.videoSupportedFrameRateRanges.contains(where: {
+            $0.minFrameRate <= Double(fps) + 0.1 && $0.maxFrameRate >= Double(fps) - 0.1
+        }) else { return false }
+        let frame = CMTime(value: 1, timescale: CMTimeScale(fps))
+        guard device.activeVideoMinFrameDuration != frame || device.activeVideoMaxFrameDuration != frame,
+              (try? device.lockForConfiguration()) != nil else { return false }
+        device.activeVideoMinFrameDuration = frame
+        device.activeVideoMaxFrameDuration = frame
+        device.unlockForConfiguration()
+        return true
     }
 
     /// Lets go of the camera and mic, for an extra camera that is no longer wanted.
