@@ -129,24 +129,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }
 
-/// Graphite body, a hairline ring and the lit green key: the panel's record key as an icon.
+/// The logo: a lark whose body is the record button, on a green key. The same drawing as
+/// website/assets/mark.svg, on its 64-point grid.
 enum AppIcon {
     @MainActor
     static func view() -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 186, style: .continuous)
-                .fill(LinearGradient(colors: [Color(hex: 0x222826), Color(hex: 0x0C0F0E)], startPoint: .top, endPoint: .bottom))
-                .overlay(RoundedRectangle(cornerRadius: 186, style: .continuous).strokeBorder(Color.white.opacity(0.08), lineWidth: 3))
+                .fill(LinearGradient(colors: [Color(hex: 0x2BDB89), Color(hex: 0x1FD17C), Color(hex: 0x19BC6E)], startPoint: .top, endPoint: .bottom))
+                .overlay(RoundedRectangle(cornerRadius: 186, style: .continuous).strokeBorder(Color.white.opacity(0.18), lineWidth: 3))
                 .frame(width: 824, height: 824)
                 .shadow(color: .black.opacity(0.35), radius: 18, y: 12)
-            Circle()
-                .strokeBorder(Color.white.opacity(0.13), lineWidth: 7)
-                .frame(width: 470, height: 470)
-            Circle()
-                .fill(LinearGradient(colors: [Palette.signalHot, Palette.signal, Color(hex: 0x23955A)], startPoint: .top, endPoint: .bottom))
-                .frame(width: 330, height: 330)
-                .overlay(Circle().strokeBorder(Color.white.opacity(0.3), lineWidth: 2))
-                .shadow(color: .black.opacity(0.5), radius: 16, y: 10)
+            Canvas { ctx, size in
+                ctx.scaleBy(x: size.width / 64, y: size.height / 64)
+                let ink = Color(hex: 0x0E1F16)
+                var crest = Path()
+                crest.move(to: CGPoint(x: 24.4, y: 20.4))
+                crest.addCurve(to: CGPoint(x: 17.6, y: 11.0), control1: CGPoint(x: 23.0, y: 16.2), control2: CGPoint(x: 20.8, y: 13.0))
+                crest.addCurve(to: CGPoint(x: 29.8, y: 17.2), control1: CGPoint(x: 22.6, y: 11.2), control2: CGPoint(x: 26.8, y: 13.4))
+                crest.addCurve(to: CGPoint(x: 28.2, y: 9.6), control1: CGPoint(x: 30.2, y: 14.4), control2: CGPoint(x: 29.6, y: 11.8))
+                crest.addCurve(to: CGPoint(x: 35.8, y: 18.4), control1: CGPoint(x: 32.4, y: 11.2), control2: CGPoint(x: 35.0, y: 14.4))
+                crest.closeSubpath()
+                ctx.fill(crest, with: .color(ink))
+                ctx.fill(Path { $0.addLines([CGPoint(x: 18.4, y: 44.2), CGPoint(x: 9.2, y: 52.8), CGPoint(x: 22.6, y: 48.6)]) }, with: .color(ink))
+                ctx.fill(Path { $0.addLines([CGPoint(x: 44, y: 29), CGPoint(x: 55.4, y: 33.8), CGPoint(x: 44, y: 38.6)]) }, with: .color(Color(hex: 0xFFD43D)))
+                ctx.fill(Path(ellipseIn: CGRect(x: 31 - 16.5, y: 34 - 16.5, width: 33, height: 33)), with: .color(ink))
+                ctx.stroke(Path(ellipseIn: CGRect(x: 31 - 11.4, y: 34 - 11.4, width: 22.8, height: 22.8)), with: .color(.white), lineWidth: 2.6)
+                ctx.fill(Path(ellipseIn: CGRect(x: 31 - 7.4, y: 34 - 7.4, width: 14.8, height: 14.8)), with: .color(Color(hex: 0xF04E3E)))
+            }
+            .frame(width: 824, height: 824)
         }
         .frame(width: 1024, height: 1024)
     }

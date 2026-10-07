@@ -23,7 +23,7 @@ enum Library {
         if !fm.fileExists(atPath: url.path) {
             try fm.createDirectory(at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o777])
         }
-        // Shared on purpose: Neel's and the presenter's accounts both write here.
+        // Shared on purpose: every user account on the Mac can write here.
         try? fm.setAttributes([.posixPermissions: 0o777], ofItemAtPath: url.path)
     }
 

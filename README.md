@@ -77,3 +77,7 @@ Leave out `SKIP_FIXTURE=1` the first time, so the test videos get built. To see 
 ## Privacy
 
 Everything stays on your Mac: video, sound, transcript and the live view. The only exception is the live view's **Anywhere** mode, which sends the page through a Cloudflare tunnel to whoever has the secret link.
+
+## Licence
+
+MIT. Use it, change it and share it for free, as long as the copyright notice in [LICENSE](LICENSE) stays with it.

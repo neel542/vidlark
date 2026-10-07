@@ -13,7 +13,7 @@ import SwiftUI
 
  STORY: Neel glances at the panel and knows camera, mic and screen are live. He picks today's video
  and presses the lit key. He watches time and level, then sees the files get finished and filed.
- the presenter sees only the prompter: one line, large, with the next line waiting faintly beneath it.
+ The presenter sees only the prompter: one line, large, with the next line waiting faintly beneath it.
 
  FIRST VIEWPORT: Full screen. The video title top left; Live, Recordings and Settings top right. The
  16:9 picture fills the left with the prompter strip under it. The right column: Sources (camera,

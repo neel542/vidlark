@@ -414,7 +414,7 @@ private struct CameraGuide: View {
                 "On the iPhone, open Settings, General, AirPlay & Continuity (AirPlay & Handoff on older iPhones), and switch on Continuity Camera.",
                 "Put the iPhone in a stand or on a tripod, sideways, with its back cameras facing you, and lock its screen.",
                 "For a long take, plug it into the Mac with its cable. It charges, and the picture stays steady.",
-                "In a few seconds it shows up here, with a name like \"the presenter's iPhone Camera\".",
+                "In a few seconds it shows up here, with a name like \"Alex's iPhone Camera\".",
             ])
             Method(symbol: "web.camera", title: "A USB webcam",
                    why: "Like a Logitech webcam. Plug it in and it works.", steps: [

@@ -382,6 +382,8 @@ code, .mono { font-family: var(--mono); font-size: 0.86em; }
 .doc section { padding-bottom: 64px; scroll-margin-top: 90px; }
 .doc h2 { font-size: clamp(1.9rem, 3.4vw, 2.6rem); margin-bottom: 18px; }
 .doc p + p { margin-top: 14px; }
+.doc h3 { font-size: 1.45rem; letter-spacing: -0.02em; margin: 34px 0 10px; scroll-margin-top: 90px; }
+.doc h2 + p + h3 { margin-top: 26px; }
 .doc ul.plain { padding-left: 1.2em; margin: 14px 0 0; }
 .doc ul.plain li { margin: 8px 0; }
 .steps { list-style: none; counter-reset: step; margin: 22px 0 0; padding: 0; display: grid; gap: 0; }
@@ -398,6 +400,8 @@ code, .mono { font-family: var(--mono); font-size: 0.86em; }
   font-family: var(--mono); font-size: 0.88rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; padding-right: 88px;
 }
 .code::selection, .code *::selection { background: var(--green); color: var(--ink); }
+.code.prompt, .code.prompt code { font-family: var(--display); font-size: 1rem; line-height: 1.55; font-variation-settings: "opsz" 14; overflow-wrap: break-word; }
+.code.prompt { padding: 48px 20px 18px; }
 .copy {
   position: absolute; top: 8px; right: 8px; background: #23362c; color: #e9f3ed; border: 0; border-radius: 9px; padding: 6px 9px; cursor: pointer;
   font-family: var(--display); font-weight: 700; font-size: 0.78rem;

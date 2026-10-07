@@ -35,7 +35,7 @@ final class Listener: @unchecked Sendable {
     /// Whether this Mac can listen without going online.
     static func available() async -> Bool { await choose() != nil }
 
-    /// Indian English first, as the presenter speaks it, then US English. Only models already on the Mac:
+    /// Indian English first, then US English. Only models already on the Mac:
     /// fetching one would go online. Reserving a locale is local bookkeeping that lets the app use it.
     private static func choose() async -> Choice? {
         if #available(macOS 26.0, *), SpeechTranscriber.isAvailable {

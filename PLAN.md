@@ -1,10 +1,10 @@
 # Vidlark
 
-A native Mac app for filming the presenter's YouTube videos. It replaces Loom. It records the face, the voice and the slides in one take, shows her a prompter under the lens, and hands tidy files to the `video-edit` skill.
+A native Mac app for filming YouTube videos. It replaces Loom. It records the face, the voice and the slides in one take, shows the presenter a prompter under the lens, and hands tidy files to the `video-edit` skill.
 
 ## How a filming day works
 
-- the presenter sits at the MacBook. The iPhone 15 is mounted on top of the prompter screen with its rear camera facing her, connected as a Continuity Camera.
+- The presenter sits at the MacBook. The iPhone is mounted on top of the prompter screen with its rear camera facing them, connected as a Continuity Camera.
 - Her mic receiver plugs into the Mac.
 - Neel runs the app: he picks the script, checks the setup and presses Start and Stop. He also handles the lighting.
 - The prompter sits directly under the iPhone lens and is never recorded. It shows the hook word for word, then one bullet at a time.
@@ -22,10 +22,10 @@ A native Mac app for filming the presenter's YouTube videos. It replaces Loom. I
 | 5 | "Retake" word | Saying "retake" out loud is found in the transcript and listed with its time |
 | 6 | No pop-ups in the video | Notification Center is cut out of the screen recording |
 | 7 | Check before recording | Shows the camera picture, mic level, disk space, battery and permissions |
-| 8 | Auto-naming and filing | `/Users/Shared/Vidlark Recordings/<date> <title>/recording-N/`. Shared, so it works from the presenter's own Mac user account too |
+| 8 | Auto-naming and filing | `/Users/Shared/Vidlark Recordings/<date> <title>/recording-N/`. Shared, so it works from a second Mac user account too |
 | 9 | Pace and time | Elapsed time against the target length, plus a per-section time budget on the prompter |
 | 10 | Load the script | Drop in a `.md` or `.txt` file, or paste the text |
-| 11 | Simple for the presenter | She only ever sees the prompter |
+| 11 | Simple for the presenter | They only ever see the prompter |
 | 12 | Batch day | A queue of videos for the day; the next one loads after each finishes |
 | 13 | Extra cameras | Added 4 Oct: any other camera can record its own file (`camera-2.mov` on) next to the main one, with the same mic for sync |
 | 15 | Face in video, any shape | Added 4 Oct: circle, square, oval or wide. The camera file is always separate, so the shape can also change in editing |

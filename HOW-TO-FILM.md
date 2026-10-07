@@ -60,7 +60,7 @@ The **Live** row shows the shoot on any browser, with no login: every camera, th
 - **Home Wi-Fi**: works on the same Wi-Fi. The link stays the same, so bookmark it once.
 - **Anywhere**: works from any internet connection through a free Cloudflare tunnel. The link changes every time it starts, so copy it again each time. Needs `cloudflared` installed.
 - **Copy link** puts the link on the clipboard. On a Mac signed in to the same Apple ID, just paste it on the other laptop.
-- The secret in the link is the only key. Anyone with the link sees her screen, including Seller Central, so never post it anywhere. **New link** stops every old link working.
+- The secret in the link is the only key. Anyone with the link sees the screen, including anything private on it, so never post it anywhere. **New link** stops every old link working.
 
 ## Where the files go
 
@@ -68,7 +68,7 @@ The **Live** row shows the shoot on any browser, with no login: every camera, th
 
 | File | What it is |
 |---|---|
-| camera.mov | the presenter on camera, with the mic |
+| camera.mov | The presenter on camera, with the mic |
 | camera-2.mov | A second camera, if one was added, with the same mic |
 | video.mp4 | The finished video: what was on the screen, including her camera filling it for Me. Made when the take has a screen |
 | screen.mov | The recorded screen, with the same mic (and the Mac's sound as a second track, if it was on). Starts when the screen was shared |

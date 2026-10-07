@@ -13,11 +13,11 @@ Delegated: Swift 6.3 + SwiftUI, AVFoundation for the camera and mic, ScreenCaptu
 ## Users
 
 - **Neel (operator).** Runs the app on the MacBook. He picks the video, checks the setup, presses Start and Stop, and handles the lighting. He is not technical and wants zero fiddling.
-- **The presenter (on camera).** The face of AVA INC. She sits at the MacBook, reads the prompter, clicks through PowerPoint or Seller Central, and presses one key to move the prompter forward. She only ever looks at the prompter.
+- **The presenter (on camera).** They sit at the MacBook, read the prompter, click through slides or a website, and press one key to move the prompter forward. They only ever look at the prompter.
 
 ## Product Purpose
 
-Film the presenter's YouTube videos without paying for Loom. Face, voice and screen are recorded in one take, the prompter keeps her on script, and the files land ready for the `video-edit` skill. Success means a filmed video in the folder with no manual steps between Stop and editing.
+Film YouTube videos without paying for Loom. Face, voice and screen are recorded in one take, the prompter keeps the presenter on script, and the files land ready for the `video-edit` skill. Success means a filmed video in the folder with no manual steps between Stop and editing.
 
 ## Operating Context
 
@@ -45,7 +45,7 @@ None needed. The product is internal.
 
 ## Product Principles
 
-1. the presenter's attention belongs to the lens. Nothing on her screen competes with the current line.
+1. The presenter's attention belongs to the lens. Nothing on their screen competes with the current line.
 2. One obvious action at a time for Neel: check, start, stop.
 3. Never lose a take. Safety is silent and automatic.
 4. Plain words, no settings jargon.

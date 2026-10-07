@@ -1,6 +1,6 @@
 # Design
 
-A field audio recorder face. Graphite body, engraved labels, lamps with a hot centre, a segmented meter, and one red record button. The panel holds only what a take needs (the picture, the sources, the button); everything else lives in Settings, each option with one plain sentence on what it does. Dark because the screens face the presenter while she is lit for camera. The contract is in the opening comment of `Sources/Vidlark/Theme.swift`.
+A field audio recorder face. Graphite body, engraved labels, lamps with a hot centre, a segmented meter, and one red record button. The panel holds only what a take needs (the picture, the sources, the button); everything else lives in Settings, each option with one plain sentence on what it does. Dark because the screens face the presenter, who is lit for camera. The contract is in the opening comment of `Sources/Vidlark/Theme.swift`.
 
 ## Tokens (`Palette` in Theme.swift)
 

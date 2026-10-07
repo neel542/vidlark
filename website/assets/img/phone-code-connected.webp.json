@@ -1,4 +1,4 @@
 {
-  "prompt": "Origin: not generated. A real screen of the Vidlark macOS app, rendered by the app itself with 'Vidlark --snapshot <dir>' (phone-code-connected.png), converted to WebP with cwebp on 7 Oct 2026. Its QR code encodes the snapshot's stand-in link https://192.168.1.20:8791/sample/1/, not a real one.",
-  "createdAt": "2026-10-07T17:18:13.411Z"
+  "prompt": "Origin: not generated. A real screen of the Vidlark macOS app, rendered by the app itself with 'Vidlark --snapshot <dir>' (phone-code-connected.png), converted to WebP with cwebp on 8 Oct 2026. Its QR code encodes the snapshot's stand-in link https://192.168.1.20:8791/sample/1/, a made-up address, not a real one.",
+  "createdAt": "2026-10-08T10:00:00.000Z"
 }
