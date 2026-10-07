@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to use it: AVA Recorder, a free Mac recorder for videos</title>
+<meta name="description" content="Install AVA Recorder from GitHub, record your first video, add a phone camera or another mic, and watch live from another device. Free.">
+<meta name="theme-color" content="#ff74b0">
+<link rel="icon" href="/assets/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-github" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></g></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></g></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></g></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Skip to the content</a>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="/"><img class="brand-mark" src="/assets/mark.svg" alt="" width="30" height="30">AVA Recorder</a>
+    <span class="free-pill">Free</span>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="menu" aria-label="Menu"><svg width="22" height="22"><use href="#i-menu"/></svg></button>
+    <nav class="nav-links" id="menu" aria-label="Main">
+      <a href="/features">Features</a>
+      <a href="/how-to" aria-current="page">How to use it</a>
+      <a class="btn" href="https://github.com/neel542/Video-Recorder"><svg><use href="#i-github"/></svg>GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="band pink page-head">
+  <div class="wrap">
+    <h1>How to use it</h1>
+    <p>Install it once from GitHub, then every video is one press of the record button. Everything here is free, including the tools it needs.</p>
+  </div>
+</section>
+
+<section class="band" style="padding-top:72px">
+  <div class="wrap doc-layout">
+    <nav class="toc" aria-label="On this page">
+      <a href="#need"><i style="background:var(--green)"></i>What you need</a>
+      <a href="#install"><i style="background:var(--sky)"></i>Install</a>
+      <a href="#first"><i style="background:var(--pink)"></i>The first time</a>
+      <a href="#take"><i style="background:var(--sun)"></i>Your first video</a>
+      <a href="#phone"><i style="background:var(--lime)"></i>Add a phone camera</a>
+      <a href="#mic"><i style="background:var(--green)"></i>Add a microphone</a>
+      <a href="#live"><i style="background:var(--sky)"></i>Watch live</a>
+      <a href="#files"><i style="background:var(--pink)"></i>Where files go</a>
+      <p class="toc-free">AVA Recorder is free. So are Xcode, Homebrew and every tool below.</p>
+    </nav>
+
+    <div class="doc">
+      <section id="need">
+        <h2>What you need</h2>
+        <ul class="plain">
+          <li>A Mac with Apple silicon on macOS 15 or later.</li>
+          <li>The Xcode app from the App Store, for the free certificate in step 3.</li>
+          <li>Start the Xcode download first: it is the largest part of the install.</li>
+          <li>For a phone camera or phone mic: the phone and the Mac on the same Wi-Fi.</li>
+        </ul>
+      </section>
+
+      <section id="install">
+        <h2>Install</h2>
+        <p>AVA Recorder is built on your own Mac from its code on GitHub. Open the Terminal app and follow these steps in order.</p>
+        <ol class="steps">
+          <li><div>
+            <p><b>Install Xcode's command line tools.</b> If they are already installed, Terminal says so.</p>
+            <pre class="code"><code>xcode-select --install</code></pre>
+          </div></li>
+          <li><div>
+            <p><b>Install Homebrew, then the two tools that finish each take.</b> ffmpeg makes the finished video, and whisper-cpp writes the transcript.</p>
+            <pre class="code"><code>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code></pre>
+            <pre class="code"><code>brew install ffmpeg whisper-cpp</code></pre>
+          </div></li>
+          <li><div>
+            <p><b>Get a free Apple Development certificate.</b> macOS only lets an app record the screen when it has one. In Xcode, open Settings, then Accounts, add your Apple ID, then Manage Certificates, the + button, and Apple Development.</p>
+          </div></li>
+          <li><div>
+            <p><b>Download the code.</b></p>
+            <pre class="code"><code>git clone https://github.com/neel542/Video-Recorder.git
+cd Video-Recorder</code></pre>
+          </div></li>
+          <li><div>
+            <p><b>Build the app and open it.</b> The build finds your certificate on its own.</p>
+            <pre class="code"><code>bash Tools/build.sh
+open "dist/AVA Recorder.app"</code></pre>
+          </div></li>
+          <li><div>
+            <p><b>For transcripts, download the speech model</b> (about 550 MB). Without it, everything records and only the transcript and the retakes list are skipped.</p>
+            <pre class="code"><code>mkdir -p ~/.cache/whisper
+curl -L -o ~/.cache/whisper/ggml-large-v3-turbo-q5_0.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin</code></pre>
+          </div></li>
+        </ol>
+      </section>
+
+      <section id="first">
+        <h2>The first time</h2>
+        <ol class="steps">
+          <li><div><p><b>Allow the camera and the microphone</b> when macOS asks.</p></div></li>
+          <li><div><p><b>Allow screen recording.</b> When the app asks, switch on AVA Recorder in System Settings, under Privacy and Security, Screen and System Audio Recording. Then quit the app and open it again.</p></div></li>
+        </ol>
+      </section>
+
+      <section id="take">
+        <h2>Your first video</h2>
+        <ol class="steps">
+          <li><div><p><b>Check the Sources list.</b> It shows your camera, mic and screen, each with a lamp. Green means ready. Click a row to change it.</p></div></li>
+          <li><div><p><b>Press the red record button.</b> It counts down 3, 2, 1 with beeps. Start talking at the higher beep: that is when recording starts.</p></div></li>
+          <li><div><p><b>Share your screen when you want it in the video.</b> Press Share screen, pick the entire screen or one window, then Share. The window shrinks to a small box with Me, Screen and the stop button.</p></div></li>
+          <li><div><p><b>Click Me or Screen</b> to switch what the video shows. Your camera grows to fill the screen, or shrinks back into the circle.</p></div></li>
+          <li><div><p><b>Press stop.</b> The app lines up the files and, if you shared your screen, makes the finished video. Open Recordings (Command-Shift-R) to watch it.</p></div></li>
+        </ol>
+        <p class="note"><b>Made a mistake?</b> Say "retake" and repeat the line. The take keeps going, and <code>retakes.json</code> lists where every retake is.</p>
+      </section>
+
+      <section id="phone">
+        <h2>Add a phone camera</h2>
+        <ol class="steps">
+          <li><div><p><b>Press + Add, then Add a phone with a QR code.</b> A window shows a QR code.</p></div></li>
+          <li><div><p><b>Point the phone's camera at the code</b> and tap the link that appears. It works with an iPhone or an Android phone, with no app to install.</p></div></li>
+          <li><div><p><b>Get past the one-time warning.</b> The phone says the connection is not private, because the link is the app's own, on your Wi-Fi only. On an iPhone, tap Show Details, then visit this website, then Visit Website. On Android, tap Advanced, then Proceed.</p></div></li>
+          <li><div><p><b>Pick Wide 16:9 or Tall 9:16, then tap Start camera.</b> The window on the Mac says Connected.</p></div></li>
+        </ol>
+        <p class="note">Each phone records its own file, <code>camera-2.mov</code> and on, lined up with the main camera by sound. Add up to four phones the same way.</p>
+      </section>
+
+      <section id="mic">
+        <h2>Add a microphone</h2>
+        <ol class="steps">
+          <li><div><p><b>Plug in the mic or connect it,</b> then press + Add and pick it under Another microphone.</p></div></li>
+          <li><div><p><b>For a phone as a wireless mic,</b> pick A phone as a microphone, with a QR code. Scan it, tap Start microphone, then Allow, and keep the phone about a hand's width from your mouth.</p></div></li>
+          <li><div><p><b>To use that mic in the finished video,</b> open its row's menu and pick Use for the video's sound.</p></div></li>
+        </ol>
+        <p class="note">Every mic records its own file, <code>mic-2.m4a</code> and on, whichever one the video uses.</p>
+      </section>
+
+      <section id="live">
+        <h2>Watch live from another device</h2>
+        <ol class="steps">
+          <li><div><p><b>Open Settings</b> (the gear, or Command-Comma), then Live view, and pick Home Wi-Fi.</p></div></li>
+          <li><div><p><b>Press Copy link</b> and open it in a browser on another laptop or phone on the same Wi-Fi. There is no login.</p></div></li>
+          <li><div><p><b>For other networks, pick Anywhere.</b> It needs one more free tool:</p><pre class="code"><code>brew install cloudflared</code></pre></div></li>
+        </ol>
+        <p class="note"><b>Keep the link private.</b> Anyone with it sees your screen. New link stops every old link working.</p>
+      </section>
+
+      <section id="files">
+        <h2>Where your files go</h2>
+        <p>Every take gets its own folder:</p>
+        <pre class="code"><code>/Users/Shared/AVA Recordings/&lt;date&gt; &lt;title&gt;/recording-1/</code></pre>
+        <table class="table">
+          <thead><tr><th>File</th><th>What it is</th></tr></thead>
+          <tbody>
+            <tr><td><code>video.mp4</code></td><td>The finished video, made when you share your screen.</td></tr>
+            <tr><td><code>camera.mov</code></td><td>Your camera, with your voice.</td></tr>
+            <tr><td><code>screen.mov</code></td><td>Your screen, with your voice and the Mac's sound if it was on.</td></tr>
+            <tr><td><code>camera-2.mov</code></td><td>Each extra camera or phone.</td></tr>
+            <tr><td><code>mic-2.m4a</code></td><td>Each extra microphone.</td></tr>
+            <tr><td><code>mic.wav</code></td><td>The clean voice track.</td></tr>
+            <tr><td><code>words.json</code></td><td>The transcript, with the time of every word.</td></tr>
+            <tr><td><code>chapters.txt</code></td><td>YouTube chapters to paste into a description.</td></tr>
+            <tr><td><code>retakes.json</code></td><td>Every "retake", with its time.</td></tr>
+            <tr><td><code>report.md</code></td><td>A plain summary of the take.</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
+  </div>
+</section>
+
+<section class="band lime close">
+  <div class="wrap">
+    <h2>Free, from the first take.</h2>
+    <p>No account, no subscription, no watermark and no time limit.</p>
+    <div class="actions">
+      <a class="btn" href="https://github.com/neel542/Video-Recorder"><svg><use href="#i-github"/></svg>Get it on GitHub</a>
+      <a class="btn ghost" href="/features">See every feature<svg><use href="#i-arrow"/></svg></a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div>
+      <a class="brand" href="/"><img class="brand-mark" src="/assets/mark.svg" alt="" width="30" height="30">AVA Recorder</a>
+      <p>A free Mac app that records your face, voice and screen in one take.</p>
+    </div>
+    <div>
+      <h3>Pages</h3>
+      <ul><li><a href="/">Home</a></li><li><a href="/features">Features</a></li><li><a href="/how-to">How to use it</a></li><li><a href="/#who-built-it">Who built it</a></li></ul>
+    </div>
+    <div>
+      <h3>Get it</h3>
+      <ul><li><a href="https://github.com/neel542/Video-Recorder">GitHub</a></li><li><a href="/how-to#install">Install steps</a></li></ul>
+    </div>
+    <p class="legal">© 2026 Neel Madhav. Free for everyone.</p>
+  </div>
+</footer>
+
+<script src="/assets/site.js" defer></script>
+</body>
+</html>

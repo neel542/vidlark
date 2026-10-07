@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AVA Recorder: record your face, voice and screen on a Mac, free</title>
+<meta name="description" content="A free Mac app for making videos. One button records your camera, mic and screen as separate files that stay in sync, then writes a transcript and YouTube chapters.">
+<meta name="theme-color" content="#1fd17c">
+<meta property="og:title" content="AVA Recorder: record your face, voice and screen, free">
+<meta property="og:description" content="One button records your camera, mic and screen on a Mac. Free, with no account, no watermark and no time limit.">
+<meta property="og:type" content="website">
+<link rel="icon" href="/assets/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css">
+</head>
+<body>
+<!--
+THESIS: A bright SaaS home that proves the product by acting out one real take (record, Me, Screen, Stop, the files), instead of a screenshot in a browser frame with an icon grid under it.
+OWN-WORLD: Drenched colour fields (signal green, sun yellow, sky blue, pink, lime) each owning a whole band; ink type on colour; Bricolage Grotesque at condensed display widths; the app's own dark screens as the only product imagery; 1.5px ink keylines on chips and buttons; the app's red record dot.
+STORY: A video maker learns it records face, voice and screen in one take on a Mac, sees every file it leaves, believes it is free with no catch, and goes to GitHub.
+FIRST VIEWPORT: Green field. Left: the headline, one sentence, Get it on GitHub and How to use it, four free facts. Right, larger: the take playing on a laptop screen, files landing under it.
+FORM: The category standard (bright SaaS, like Loom), pinned by the brief. Seed key dc28f21f.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+-->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-github" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></g></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></g></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></g></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></g></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></g></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 3.5v17a.5.5 0 0 0 .77.42l13-8.5a.5.5 0 0 0 0-.84l-13-8.5A.5.5 0 0 0 6 3.5Z" fill="currentColor"/></symbol>
+    <g id="person">
+      <rect width="160" height="100" fill="#bcd6ff"/>
+      <rect x="0" y="74" width="160" height="26" fill="#9ec2fb"/>
+      <rect x="14" y="16" width="26" height="34" rx="3" fill="#ffd43d"/>
+      <rect x="18" y="20" width="18" height="26" rx="2" fill="#ff74b0"/>
+      <path d="M130 74c-2-14 2-24 8-30-2 10 2 18-2 30Z" fill="#1fa865"/>
+      <path d="M136 74c4-12 12-18 18-20-6 8-8 14-12 20Z" fill="#28c277"/>
+      <rect x="126" y="70" width="18" height="16" rx="3" fill="#f2f2ea"/>
+      <path d="M48 100c2-22 14-32 32-32s30 10 32 32Z" fill="#ff74b0"/>
+      <path d="M70 66h20v10a10 10 0 0 1-20 0Z" fill="#b97a50"/>
+      <ellipse cx="80" cy="44" rx="17" ry="20" fill="#c98a5c"/>
+      <path d="M62 44c-2-16 6-26 19-26 12 0 21 8 19 24-2-6-6-10-10-11-6 4-16 6-24 4-2 2-3 5-4 9Z" fill="#2b1d16"/>
+      <circle cx="73" cy="46" r="1.8" fill="#2b1d16"/>
+      <circle cx="87" cy="46" r="1.8" fill="#2b1d16"/>
+      <path d="M75 55c3 2.5 7 2.5 10 0" fill="none" stroke="#2b1d16" stroke-width="1.6" stroke-linecap="round"/>
+    </g>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Skip to the content</a>
+
+<header class="nav on-green">
+  <div class="wrap">
+    <a class="brand" href="/"><img class="brand-mark" src="/assets/mark.svg" alt="" width="30" height="30">AVA Recorder</a>
+    <span class="free-pill">Free</span>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="menu" aria-label="Menu"><svg width="22" height="22"><use href="#i-menu"/></svg></button>
+    <nav class="nav-links" id="menu" aria-label="Main">
+      <a href="/features">Features</a>
+      <a href="/how-to">How to use it</a>
+      <a class="btn" href="https://github.com/neel542/Video-Recorder"><svg><use href="#i-github"/></svg>GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <h1>Record your face, voice and screen. Free.</h1>
+      <p class="lead">A Mac app for making videos. One button records your camera, your mic and your screen as separate files that stay in sync. Share your screen and, when you stop, it makes the finished video.</p>
+      <div class="actions">
+        <a class="btn" href="https://github.com/neel542/Video-Recorder"><svg><use href="#i-github"/></svg>Get it on GitHub</a>
+        <a class="btn ghost" href="/how-to">How to use it<svg><use href="#i-arrow"/></svg></a>
+      </div>
+      <ul class="facts" aria-label="What it costs">
+        <li><svg><use href="#i-check"/></svg>Free</li>
+        <li><svg><use href="#i-check"/></svg>No account</li>
+        <li><svg><use href="#i-check"/></svg>No watermark</li>
+        <li><svg><use href="#i-check"/></svg>No time limit</li>
+      </ul>
+      <p class="needs">For Macs with Apple silicon on macOS 15 or later.</p>
+    </div>
+
+    <figure class="take" aria-label="An animation of one take: recording, switching to the camera, back to the screen, then the files the take leaves" style="margin:0">
+      <div class="take-screen">
+        <div class="slide" aria-hidden="true">
+          <div class="slide-title">My video, on the screen</div>
+          <div class="slide-sub">Slides, a browser, any app or window</div>
+          <div class="bars"><span></span><span></span><span></span><span></span></div>
+        </div>
+        <div class="cam" aria-hidden="true"><svg viewBox="0 0 160 100" preserveAspectRatio="xMidYMid slice"><use href="#person"/></svg></div>
+        <div class="cam-ring" aria-hidden="true"></div>
+        <div class="rbox" aria-hidden="true">
+          <div class="seg"><span class="s-me">Me</span><span class="s-screen">Screen</span></div>
+          <div class="rrow"><span class="rdot"></span><span class="rtime">00:00</span><span class="rmeter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="rstop"></span></div>
+        </div>
+        <div class="take-veil" aria-hidden="true">Making the finished video</div>
+      </div>
+      <div class="take-base" aria-hidden="true"></div>
+      <ul class="files" aria-label="Files in the take's folder">
+        <li style="transition-delay:.05s"><i class="tag" style="background:var(--green)"></i><code>video.mp4</code></li>
+        <li style="transition-delay:.15s"><i class="tag" style="background:var(--pink)"></i><code>camera.mov</code></li>
+        <li style="transition-delay:.25s"><i class="tag" style="background:var(--sky)"></i><code>screen.mov</code></li>
+        <li style="transition-delay:.35s"><i class="tag" style="background:var(--sun)"></i><code>words.json</code></li>
+        <li style="transition-delay:.45s"><i class="tag" style="background:var(--lime)"></i><code>chapters.txt</code></li>
+      </ul>
+      <figcaption class="take-caption" aria-live="off"></figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="head">
+      <h2>One take. Every file you need.</h2>
+      <p class="muted">Press record once. When you stop, the take's folder has every part of it, lined up by sound, and the finished video if you shared your screen.</p>
+    </div>
+    <ul class="filegrid">
+      <li><code><i style="background:var(--green)"></i>video.mp4</code><p>The finished video, made when you share your screen.</p></li>
+      <li><code><i style="background:var(--pink)"></i>camera.mov</code><p>Your camera, with your voice.</p></li>
+      <li><code><i style="background:var(--sky)"></i>screen.mov</code><p>Your screen, with your voice and, if you want it, the Mac's sound.</p></li>
+      <li><code><i style="background:var(--pink)"></i>camera-2.mov</code><p>Each extra camera or phone, in its own file.</p></li>
+      <li><code><i style="background:var(--sun)"></i>mic-2.m4a</code><p>Each extra microphone, in its own file.</p></li>
+      <li><code><i style="background:var(--sun)"></i>words.json</code><p>The transcript, with the time of every word.</p></li>
+      <li><code><i style="background:var(--lime)"></i>chapters.txt</code><p>YouTube chapters, ready to paste into a description.</p></li>
+      <li><code><i style="background:var(--lime)"></i>retakes.json</code><p>Every time you said "retake", with its time.</p></li>
+    </ul>
+  </div>
+</section>
+
+<section class="band mist">
+  <div class="wrap">
+    <div class="head">
+      <h2>The demo video</h2>
+      <p class="muted">Coming soon: one take, from pressing record to the finished file.</p>
+    </div>
+    <div class="demo">
+      <img src="/assets/img/wide-recording.webp" alt="" width="1800" height="1125" loading="lazy">
+      <div class="demo-label">
+        <span class="play"><svg><use href="#i-play"/></svg></span>
+        <b>Demo video</b>
+        <span>Behind it: the app's window during a take.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band sun">
+  <div class="wrap split">
+    <div>
+      <h2>Switch between you and your screen in one click.</h2>
+      <p style="font-size:1.2rem;margin-top:20px;max-width:46ch">Every take starts on your face. Share your screen when you are ready: the whole screen or one window. Click <b>Me</b> and your camera grows out of the face circle to fill the screen. Click <b>Screen</b> and it shrinks back.</p>
+      <ul class="points">
+        <li><svg><use href="#i-check"/></svg><span>The finished video records exactly that, so there is nothing to cut afterwards.</span></li>
+        <li><svg><use href="#i-check"/></svg><span>Your face sits in the video as a circle, square, oval or wide shape.</span></li>
+        <li><svg><use href="#i-check"/></svg><span>The recording box and the app's other windows never appear in the video.</span></li>
+      </ul>
+      <div class="shape-row" aria-label="The four face shapes">
+        <span class="shape circle"><i><svg viewBox="0 0 160 100" preserveAspectRatio="xMidYMid slice"><use href="#person"/></svg></i>Circle</span>
+        <span class="shape square"><i><svg viewBox="0 0 160 100" preserveAspectRatio="xMidYMid slice"><use href="#person"/></svg></i>Square</span>
+        <span class="shape oval"><i><svg viewBox="0 0 160 100" preserveAspectRatio="xMidYMid slice"><use href="#person"/></svg></i>Oval</span>
+        <span class="shape wide"><i><svg viewBox="0 0 160 100" preserveAspectRatio="xMidYMid slice"><use href="#person"/></svg></i>Wide</span>
+      </div>
+    </div>
+    <div>
+      <div class="shot tall" style="max-width:380px"><img src="/assets/img/recording-box.webp" alt="The recording box: Back to the recorder, Me and Screen, Mac sound, the time, the mic level and the stop button" width="580" height="376" loading="lazy"></div>
+      <p class="shot-note">The box you control a take from. It never shows in the video.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band sky">
+  <div class="wrap split flip">
+    <div>
+      <h2>Turn any phone into a camera.</h2>
+      <p style="font-size:1.2rem;margin-top:20px;max-width:46ch">Scan a QR code with an iPhone or an Android phone and it films over your Wi-Fi. No app to install and no cable, at up to 1080p and 30 frames a second.</p>
+      <ul class="points">
+        <li><svg><use href="#i-phone"/></svg><span>Up to <b>four phones</b> at once, each saved as its own file.</span></li>
+        <li><svg><use href="#i-check"/></svg><span><b>Wide 16:9</b> for YouTube or <b>tall 9:16</b> for Shorts and Reels.</span></li>
+        <li><svg><use href="#i-check"/></svg><span>Every angle is lined up by sound, so you pick the angle while editing.</span></li>
+      </ul>
+    </div>
+    <div>
+      <div class="shot"><img src="/assets/img/phone-code-connected.webp" alt="The Connect a phone window: a QR code, three steps, and Connected, Wide 16:9, 1080p, 30 frames a second" width="1480" height="1000" loading="lazy"></div>
+    </div>
+  </div>
+</section>
+
+<section class="band pink">
+  <div class="wrap split">
+    <div>
+      <h2>Use any microphone. Or several.</h2>
+      <p style="font-size:1.2rem;margin-top:20px;max-width:46ch">A USB mic, a wireless mic, AirPods, or a phone's mic over Wi-Fi. Every mic records its own file, and you choose which one the video uses.</p>
+      <ul class="points">
+        <li><svg><use href="#i-mic"/></svg><span>A spare phone becomes a wireless mic: scan, tap Start microphone, and keep it near you.</span></li>
+        <li><svg><use href="#i-check"/></svg><span>Mute a phone's mic from the phone or from the Mac. Both show who did it.</span></li>
+        <li><svg><use href="#i-check"/></svg><span>While watching a take, play any mic under any camera to hear which is best.</span></li>
+      </ul>
+    </div>
+    <div>
+      <div class="shot tall"><img src="/assets/img/sources-mics.webp" alt="The app's Sources list with a camera, a phone, and four microphones, each with its own level meter" width="800" height="942" loading="lazy"></div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap split flip">
+    <div>
+      <h2>Lined up by sound, automatically.</h2>
+      <p style="font-size:1.2rem;margin-top:20px;max-width:48ch">Every camera and mic hears the same voice. After you stop, it uses that sound to line up every file, then writes the transcript, the YouTube chapters and a list of your retakes.</p>
+      <ul class="points">
+        <li><svg><use href="#i-check"/></svg><span>Say <b>"retake"</b> and repeat the line. The list shows where every retake is.</span></li>
+        <li><svg><use href="#i-check"/></svg><span>Chapters come out ready to paste into a YouTube description.</span></li>
+        <li><svg><use href="#i-check"/></svg><span>Lining up, the transcript and the chapters all run on your Mac.</span></li>
+      </ul>
+    </div>
+    <div>
+      <div class="sync" aria-label="An animation: a phone's sound slides until it lines up with the camera's sound">
+        <div class="wave"><b>Camera<small>camera.mov</small></b><div class="bars-wave"></div></div>
+        <div class="wave"><b>Phone<small>camera-2.mov</small></b><div class="bars-wave slide-in" style="--offset:54px"></div></div>
+        <div class="wave"><b>Phone mic<small>mic-2.m4a</small></b><div class="bars-wave slide-in" style="--offset:-38px"></div></div>
+        <p class="sync-state"><span class="lamp"></span><span class="before">Matching the sound</span><span class="later">Lined up</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band ink">
+  <div class="wrap">
+    <div class="head">
+      <h2>Safe for your take. Light on your Mac.</h2>
+    </div>
+    <ul class="facts-row">
+      <li><b>Saved every 2 seconds</b><p>The files are written in 2-second pieces, so a crash keeps the take.</p></li>
+      <li><b>A camera that stops is caught</b><p>If the camera stops sending pictures, the take stops within about 6 seconds and says why.</p></li>
+      <li><b>About 7% of one processor core</b><p>That is its use between takes on a MacBook Air. When you switch to another app, the camera turns off after about 20 seconds.</p></li>
+      <li><b>Stays on your Mac</b><p>Your recordings never leave your Mac. The live view reaches beyond your Wi-Fi only if you switch on Anywhere.</p></li>
+    </ul>
+  </div>
+</section>
+
+<section class="band lime">
+  <div class="wrap free-grid">
+    <div>
+      <h2>Completely free.</h2>
+      <p style="font-size:1.2rem;margin-top:20px;max-width:44ch">Every feature on this site is in the free app. There is no paid version, and the code is on GitHub.</p>
+      <div class="actions" style="display:flex;gap:12px;margin-top:28px;flex-wrap:wrap">
+        <a class="btn" href="https://github.com/neel542/Video-Recorder"><svg><use href="#i-github"/></svg>Get it on GitHub</a>
+        <a class="btn ghost" href="/features">See every feature<svg><use href="#i-arrow"/></svg></a>
+      </div>
+    </div>
+    <ul class="no-list">
+      <li><svg><use href="#i-check"/></svg>No account</li>
+      <li><svg><use href="#i-check"/></svg>No subscription</li>
+      <li><svg><use href="#i-check"/></svg>No watermark</li>
+      <li><svg><use href="#i-check"/></svg>No time limit</li>
+      <li><svg><use href="#i-check"/></svg>No ads</li>
+      <li><svg><use href="#i-check"/></svg>Recordings stay on your Mac</li>
+    </ul>
+  </div>
+</section>
+
+<section class="band" id="who-built-it">
+  <div class="wrap maker">
+    <div class="maker-mark" aria-hidden="true">NM</div>
+    <div>
+      <h2>Who built it</h2>
+      <p>AVA Recorder is built by <b>Neel Madhav</b>, a curious grade 9 student at Allen.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div>
+      <a class="brand" href="/"><img class="brand-mark" src="/assets/mark.svg" alt="" width="30" height="30">AVA Recorder</a>
+      <p>A free Mac app that records your face, voice and screen in one take.</p>
+    </div>
+    <div>
+      <h3>Pages</h3>
+      <ul><li><a href="/">Home</a></li><li><a href="/features">Features</a></li><li><a href="/how-to">How to use it</a></li><li><a href="/#who-built-it">Who built it</a></li></ul>
+    </div>
+    <div>
+      <h3>Get it</h3>
+      <ul><li><a href="https://github.com/neel542/Video-Recorder">GitHub</a></li><li><a href="/how-to#install">Install steps</a></li></ul>
+    </div>
+    <p class="legal">© 2026 Neel Madhav. Free for everyone.</p>
+  </div>
+</footer>
+
+<script src="/assets/site.js" defer></script>
+</body>
+</html>
