@@ -34,7 +34,6 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <symbol id="i-menu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></g></symbol>
     <symbol id="i-phone" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></g></symbol>
     <symbol id="i-mic" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></g></symbol>
-    <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 3.5v17a.5.5 0 0 0 .77.42l13-8.5a.5.5 0 0 0 0-.84l-13-8.5A.5.5 0 0 0 6 3.5Z" fill="currentColor"/></symbol>
     <g id="person">
       <rect width="160" height="100" fill="#bcd6ff"/>
       <rect x="0" y="74" width="160" height="26" fill="#9ec2fb"/>
@@ -140,15 +139,12 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   <div class="wrap">
     <div class="head">
       <h2>The demo video</h2>
-      <p class="muted">Coming soon: one take, from pressing record to the finished file.</p>
+      <p class="muted">One take in 91 seconds, from the record button to every file it leaves. The screens are Vidlark's own; the person on camera is drawn.</p>
     </div>
     <div class="demo">
-      <img src="/assets/img/wide-recording.webp" alt="" width="1800" height="1125" loading="lazy">
-      <div class="demo-label">
-        <span class="play"><svg><use href="#i-play"/></svg></span>
-        <b>Demo video</b>
-        <span>Behind it: the app's window during a take.</span>
-      </div>
+      <video controls playsinline preload="none" poster="/assets/img/demo-poster.webp" width="1920" height="1080" aria-label="Vidlark demo video, 91 seconds, with music">
+        <source src="/assets/video/vidlark-demo.mp4" type="video/mp4">
+      </video>
     </div>
   </div>
 </section>
