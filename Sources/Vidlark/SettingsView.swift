@@ -42,7 +42,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         switch self {
         case .video: "Every take starts on your face. Press Screen in the recording box to share the screen."
         case .quality: "How sharp the camera records. Sharper looks better on YouTube and makes bigger files."
-        case .after: "What AVA Recorder makes once you press stop. The camera and screen files are always kept."
+        case .after: "What Vidlark makes once you press stop. The camera and screen files are always kept."
         case .effects: "macOS can change the camera picture for every app on this Mac. Only you can switch these, in Video Effects. Here is what each one does, and whether it is on."
         case .prompter: "The prompter shows the script one line at a time. A key, your voice or a Bluetooth remote moves it on."
         case .live: "Watch the shoot from another laptop or a phone, in a web browser. There is no login: the secret link is the key, so only share it with people you trust."
@@ -77,7 +77,7 @@ enum SettingsWindow {
         w.isReleasedWhenClosed = false
         w.setContentSize(NSSize(width: 920, height: 660))
         w.center()
-        _ = w.setFrameAutosaveName("AVA Settings")
+        _ = w.setFrameAutosaveName("Vidlark Settings")
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { _ in
             MainActor.assumeIsolated { window = nil }
         }
@@ -286,7 +286,7 @@ private struct EffectsSettings: View {
             }
             HStack(spacing: 14) {
                 SmallButton(title: "Open Video Effects", primary: true) { studio.openVideoEffects() }
-                Text("Switch them in the panel that opens. AVA Recorder sees the change within a few seconds.").note()
+                Text("Switch them in the panel that opens. Vidlark sees the change within a few seconds.").note()
             }
         }
     }
@@ -436,7 +436,7 @@ private struct CameraGuide: View {
                 "Unplug it and plug it back in, or try another cable. Some USB\u{2011}C cables only charge.",
                 "For an iPhone: keep it near the Mac and locked, turn off its Personal Hotspot, and try its cable.",
                 "Quit other apps that may be using it, like FaceTime, Zoom or Photo Booth.",
-                "Open System Settings, Privacy & Security, Camera, and check AVA Recorder is switched on.",
+                "Open System Settings, Privacy & Security, Camera, and check Vidlark is switched on.",
                 "Restart the Mac.",
             ])
         }
@@ -916,7 +916,7 @@ private struct RemoteSettings: View {
         case .nextLine: return "Moves the prompter on one line."
         case .previousLine: return "Moves the prompter back one line."
         case .switchView: return "Me or Screen, like the switch in the recording box."
-        case .startStop: return "Starts recording when ready, and stops it during a take. While AVA Recorder is open and ready, this button does only this."
+        case .startStop: return "Starts recording when ready, and stops it during a take. While Vidlark is open and ready, this button does only this."
         }
     }
 

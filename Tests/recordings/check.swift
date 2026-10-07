@@ -1,7 +1,7 @@
 import Foundation
 
 // Checks the Recordings page's file logic (TakeStore) against a fake library that run.sh builds.
-// Never point it at /Users/Shared/AVA Recordings.
+// Never point it at /Users/Shared/Vidlark Recordings.
 
 @main
 struct RecordingsCheck {
@@ -17,7 +17,7 @@ struct RecordingsCheck {
         guard args.count == 3 else { print("usage: check <fake library> <copy target>"); exit(2) }
         let root = URL(fileURLWithPath: args[1], isDirectory: true)
         let copies = URL(fileURLWithPath: args[2], isDirectory: true)
-        guard root.path.hasPrefix("/Users/Shared/AVA Recordings") == false else { print("refusing the real library"); exit(2) }
+        guard root.path.hasPrefix("/Users/Shared/Vidlark Recordings") == false else { print("refusing the real library"); exit(2) }
         let fm = FileManager.default
 
         // Everything is old except the take that is "recording now".

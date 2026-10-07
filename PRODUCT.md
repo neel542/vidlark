@@ -37,7 +37,7 @@ Film the presenter's YouTube videos without paying for Loom. Face, voice and scr
 
 - Neel wants it "very beautiful, very minimalistic, very clean", and green.
 - No em dashes anywhere, including UI copy.
-- AVA's video brand accent (#FF9900 orange) belongs to the edited videos, not this tool.
+- AVA INC's video brand accent (#FF9900 orange) belongs to the edited videos, not this tool.
 
 ## Evidence on Hand
 

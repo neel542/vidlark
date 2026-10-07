@@ -16,7 +16,7 @@ final class MicRecorder: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate,
     /// The level, and whether it has been heard lately, for the panel. Updated on the main thread.
     let meter = LevelMeter()
     let heard = MicHeard()
-    private let queue = DispatchQueue(label: "ava.mic")
+    private let queue = DispatchQueue(label: "vidlark.mic")
     private let output = AVCaptureAudioDataOutput()
     // Queue only.
     private var session: AVCaptureSession?

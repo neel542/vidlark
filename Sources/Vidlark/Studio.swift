@@ -90,8 +90,8 @@ final class Studio: ObservableObject {
     /// when it is shared from the face box. A take that is never shared has no screen.mov.
     /// Every take starts on her face; the screen is shared when she presses Screen (4 Oct, Neel:
     /// nobody wants the screen from the first second). Only the self test starts with the screen,
-    /// with AVA_SCREEN_FIRST=1.
-    @Published var recordScreen = ProcessInfo.processInfo.environment["AVA_SCREEN_FIRST"] != nil
+    /// with VIDLARK_SCREEN_FIRST=1.
+    @Published var recordScreen = ProcessInfo.processInfo.environment["VIDLARK_SCREEN_FIRST"] != nil
     /// The tick box: write the transcript and chapters after a take, or skip them for a quick one.
     @Published var writeTranscript = UserDefaults.standard.object(forKey: "writeTranscript") as? Bool ?? true {
         didSet { if !Snapshots.active { UserDefaults.standard.set(writeTranscript, forKey: "writeTranscript") } }
@@ -117,9 +117,9 @@ final class Studio: ObservableObject {
     }
     /// Whether light mode is in force. Only changes between takes.
     @Published private(set) var light = false
-    /// What light mode should be now. `AVA_LIGHT=on` or `off` overrides it, for tests.
+    /// What light mode should be now. `VIDLARK_LIGHT=on` or `off` overrides it, for tests.
     var lightWanted: Bool {
-        switch LightMode(rawValue: ProcessInfo.processInfo.environment["AVA_LIGHT"] ?? "") ?? lightMode {
+        switch LightMode(rawValue: ProcessInfo.processInfo.environment["VIDLARK_LIGHT"] ?? "") ?? lightMode {
         case .on: true
         case .off: false
         case .automatic: Machine.modest || power.lowPower
@@ -216,13 +216,13 @@ final class Studio: ObservableObject {
 
     /// A self test changes what is shared and heard for its own take only, never the saved choices.
     static let selfTesting = CommandLine.arguments.contains("--self-test")
-    /// `--self-test` with AVA_QUIET=1 runs out of sight while someone uses the Mac: no windows,
+    /// `--self-test` with VIDLARK_QUIET=1 runs out of sight while someone uses the Mac: no windows,
     /// no Dock icon, no beeps. Launch it with `open -g` so it never comes to the front.
     nonisolated static let quietTest = CommandLine.arguments.contains("--self-test")
-        && ProcessInfo.processInfo.environment["AVA_QUIET"] != nil
-    /// AVA_QUIET=draw: the previews take every picture as if they could be seen, so what showing
+        && ProcessInfo.processInfo.environment["VIDLARK_QUIET"] != nil
+    /// VIDLARK_QUIET=draw: the previews take every picture as if they could be seen, so what showing
     /// them costs can be measured out of sight.
-    nonisolated static let quietDraw = quietTest && ProcessInfo.processInfo.environment["AVA_QUIET"] == "draw"
+    nonisolated static let quietDraw = quietTest && ProcessInfo.processInfo.environment["VIDLARK_QUIET"] == "draw"
 
     /// Where the Mac's sound comes from at the start of a take: one app's name, or nil for every app.
     var soundFromName: String? { Snapshots.active ? stagedSoundName : UserDefaults.standard.string(forKey: "soundFromName") }
@@ -681,7 +681,7 @@ final class Studio: ObservableObject {
             out.append(Check(id: "camera", state: .fail, value: "Not allowed", problem: "Allow the camera in System Settings, Privacy."))
         } else if let n = mainPhone, !Snapshots.active {
             out.append(Check(id: "camera", state: phoneReady(n) ? .ok : .warn, value: PhoneLink.name(n),
-                             problem: phoneReady(n) ? nil : "Open AVA's link on the phone and tap Start camera. The code is in Sources, Camera."))
+                             problem: phoneReady(n) ? nil : "Open Vidlark's link on the phone and tap Start camera. The code is in Sources, Camera."))
         } else if let name = cameraName {
             out.append(Check(id: "camera", state: .ok, value: touchUpOn ? "\(name) · touched up" : name))
         } else {
@@ -692,7 +692,7 @@ final class Studio: ObservableObject {
             for (i, extra) in activeExtras.enumerated() {
                 let waiting = extra.phone.map { !Snapshots.active && !phoneReady($0) } ?? false
                 out.append(Check(id: "camera-\(i + 2)", state: waiting ? .warn : .ok, value: extra.name,
-                                 problem: waiting ? "Open AVA's link on the phone and tap Start camera. Its row in Sources shows the code again." : nil))
+                                 problem: waiting ? "Open Vidlark's link on the phone and tap Start camera. Its row in Sources shows the code again." : nil))
             }
         }
 
@@ -767,11 +767,11 @@ final class Studio: ObservableObject {
 
     var attention: Attention? {
         if !cameraAllowed {
-            return Attention(level: .fail, text: "AVA Recorder is not allowed to use the camera yet.",
+            return Attention(level: .fail, text: "Vidlark is not allowed to use the camera yet.",
                              fix: .privacy("Privacy_Camera"), fixTitle: "Allow")
         }
         if !micAllowed {
-            return Attention(level: .fail, text: "AVA Recorder is not allowed to use the microphone yet.",
+            return Attention(level: .fail, text: "Vidlark is not allowed to use the microphone yet.",
                              fix: .privacy("Privacy_Microphone"), fixTitle: "Allow")
         }
         if micName == nil {
@@ -934,7 +934,7 @@ final class Studio: ObservableObject {
 
     /// A self test may record the main mic a second time as an extra one, to try the extra mic path
     /// on a Mac with only one mic.
-    private var testSameMic: Bool { Studio.selfTesting && ProcessInfo.processInfo.environment["AVA_MICS"]?.contains("same") == true }
+    private var testSameMic: Bool { Studio.selfTesting && ProcessInfo.processInfo.environment["VIDLARK_MICS"]?.contains("same") == true }
 
     /// Adds a mic, or takes it off again. Taking off the video's mic gives the video the main one.
     func toggleMic(_ id: String) {
@@ -1143,7 +1143,7 @@ final class Studio: ObservableObject {
         case .screen(let id):
             guard let target = content.displays.first(where: { $0.displayID == id }) ?? content.displays.first(where: { $0.displayID == displayID })
                     ?? content.displays.first else { throw RecorderError("No screen to record.") }
-            let hidden = Set([Bundle.main.bundleIdentifier ?? "inc.ava.recorder", "com.apple.notificationcenterui"])
+            let hidden = Set([Bundle.main.bundleIdentifier ?? "app.vidlark.mac", "com.apple.notificationcenterui"])
             let excluded = content.applications.filter { hidden.contains($0.bundleIdentifier) }
             let full = displays.first { $0.id == target.displayID }?.pixelSize ?? CGSize(width: target.width * 2, height: target.height * 2)
             // At most 4K, which is what YouTube shows, and 1920 in light mode, the size video.mp4
@@ -1174,7 +1174,7 @@ final class Studio: ObservableObject {
     /// What is being shared in the take in progress.
     private var sharing_: ShareTarget?
 
-    /// The AVA Recorder window is showing during the take ("Back to recorder" in the recording box).
+    /// The Vidlark window is showing during the take ("Back to recorder" in the recording box).
     @Published var recorderOpen = false
 
     /// The app whose window is being shared in this take, by bundle id and by name; nil for a whole screen.
@@ -1238,7 +1238,7 @@ final class Studio: ObservableObject {
             defer { sharing = false }
             do {
                 guard screenAllowed else {
-                    throw RecorderError("Screen recording is not allowed yet. Allow AVA Recorder in System Settings, Privacy, then open the app again.")
+                    throw RecorderError("Screen recording is not allowed yet. Allow Vidlark in System Settings, Privacy, then open the app again.")
                 }
                 await waitForStage()
                 var capture = try capture(try await shareableContent(for: wanted), wanted)
@@ -1710,9 +1710,9 @@ final class Studio: ObservableObject {
 
     // MARK: Finishing
 
-    /// Runs ava-finish: sync, transcript, chapters, retakes, report.
+    /// Runs vidlark-finish: sync, transcript, chapters, retakes, report.
     private func finish(_ folder: URL) {
-        guard let tool = Bundle.main.url(forAuxiliaryExecutable: "ava-finish"),
+        guard let tool = Bundle.main.url(forAuxiliaryExecutable: "vidlark-finish"),
               FileManager.default.isExecutableFile(atPath: tool.path) else {
             phase = .done(folder: folder, note: "Saved. The finishing tool is missing, so there is no transcript yet.")
             return
@@ -1883,7 +1883,7 @@ extension Studio {
 
 extension Studio {
     /// Records a short take with the real devices, finishes it, writes the outcome to
-    /// /Users/Shared/AVA Recordings/.selftest.json and quits. Used to check the whole chain.
+    /// /Users/Shared/Vidlark Recordings/.selftest.json and quits. Used to check the whole chain.
     func selfTest(seconds: Double) {
         let out = Library.root.appendingPathComponent(".selftest.json")
         func report(_ fields: [String: Any]) {
@@ -1907,7 +1907,7 @@ extension Studio {
             runChecks()
             let preflight = CGPreflightScreenCaptureAccess()
             let probe = await probeScreen()
-            if let sample = try? String(contentsOfFile: "/Users/you/Youtube video recorder/Examples/sample-script.md", encoding: .utf8) {
+            if let sample = try? String(contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Examples/sample-script.md"), encoding: .utf8) {
                 currentID = nil
                 script = Script.parse(sample, fallbackTitle: "Self test")
             }
@@ -1916,17 +1916,17 @@ extension Studio {
             guard canStart || (micAllowed && micID != nil) else {
                 report(["ok": false, "stage": "preflight", "cgPreflight": preflight, "screenProbe": probe ?? "ok"]); return
             }
-            // AVA_CAMERA=phone films with phone 1 over Wi-Fi: it waits up to a minute for its page
+            // VIDLARK_CAMERA=phone films with phone 1 over Wi-Fi: it waits up to a minute for its page
             // to send pictures, and writes the links it serves to .selftest-phone.txt (one a line).
-            // AVA_CAMERA=phone-extra records phone 1 as another camera instead, and phones records
+            // VIDLARK_CAMERA=phone-extra records phone 1 as another camera instead, and phones records
             // phones 1 and 2 as two more angles next to the Mac's own camera.
-            // AVA_MICS adds microphones: "phones" records the filming phones' own sound too,
+            // VIDLARK_MICS adds microphones: "phones" records the filming phones' own sound too,
             // "phone-only" adds one more phone for its sound only, and "same" records the main mic
             // a second time as an extra one (the device path, on a Mac with one mic). Comma separated.
-            // AVA_VIDEO_MIC=first makes the first extra mic the video's sound.
+            // VIDLARK_VIDEO_MIC=first makes the first extra mic the video's sound.
             let env = ProcessInfo.processInfo.environment
-            let role = env["AVA_CAMERA"] ?? ""
-            let micWords = (env["AVA_MICS"] ?? "").split(separator: ",").map(String.init)
+            let role = env["VIDLARK_CAMERA"] ?? ""
+            let micWords = (env["VIDLARK_MICS"] ?? "").split(separator: ",").map(String.init)
             let filming = role == "phones" ? [1, 2] : role.hasPrefix("phone") ? [1] : []
             let listeningOnly = micWords.contains("phone-only") ? [filming.count + 1] : []
             if role == "phone" {
@@ -1940,7 +1940,7 @@ extension Studio {
             if !micWords.isEmpty {
                 extraMicIDs = (micWords.contains("phones") ? filming.map(PhoneLink.micID) : []) + listeningOnly.map(PhoneLink.micID)
                     + (micWords.contains("same") ? [micID].compactMap { $0 } : [])
-                if env["AVA_VIDEO_MIC"] == "first" { videoMicID = extraMicIDs.first }
+                if env["VIDLARK_VIDEO_MIC"] == "first" { videoMicID = extraMicIDs.first }
             }
             let numbers = filming + listeningOnly
             if !numbers.isEmpty {
@@ -1973,22 +1973,22 @@ extension Studio {
                 phoneStates = Dictionary(uniqueKeysWithValues: numbers.map { ($0, PhoneLink.shared.state($0)) })
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
-            // AVA_IDLE=<seconds> waits that long, ready but not recording, so the cost of simply
+            // VIDLARK_IDLE=<seconds> waits that long, ready but not recording, so the cost of simply
             // being open can be measured.
-            if let idle = ProcessInfo.processInfo.environment["AVA_IDLE"].flatMap(Double.init) {
+            if let idle = ProcessInfo.processInfo.environment["VIDLARK_IDLE"].flatMap(Double.init) {
                 holdAwake = true
                 try? await Task.sleep(nanoseconds: UInt64(idle * 1_000_000_000))
             }
-            // AVA_REST_FIRST=1 puts the camera to rest first, so the take has to wake it.
-            if ProcessInfo.processInfo.environment["AVA_REST_FIRST"] != nil {
+            // VIDLARK_REST_FIRST=1 puts the camera to rest first, so the take has to wake it.
+            if ProcessInfo.processInfo.environment["VIDLARK_REST_FIRST"] != nil {
                 sleepCamera(true)
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
             }
-            // AVA_SHARE_WINDOW=<bundle id>|<window title> shares one window instead of the whole screen,
-            // and AVA_SHARE_WINDOW=screen the whole main screen, whatever was picked last.
-            if ProcessInfo.processInfo.environment["AVA_SHARE_WINDOW"] == "screen" {
+            // VIDLARK_SHARE_WINDOW=<bundle id>|<window title> shares one window instead of the whole screen,
+            // and VIDLARK_SHARE_WINDOW=screen the whole main screen, whatever was picked last.
+            if ProcessInfo.processInfo.environment["VIDLARK_SHARE_WINDOW"] == "screen" {
                 shareTarget = .screen(CGMainDisplayID())
-            } else if let spec = ProcessInfo.processInfo.environment["AVA_SHARE_WINDOW"] {
+            } else if let spec = ProcessInfo.processInfo.environment["VIDLARK_SHARE_WINDOW"] {
                 let parts = spec.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
                 shareTarget = .window(app: parts[0], appName: parts[0], title: parts.count > 1 ? parts[1] : "")
             }
@@ -2000,8 +2000,8 @@ extension Studio {
                 try? await Task.sleep(nanoseconds: 200_000_000); waited += 0.2
             }
             guard phase == .recording else { report(["ok": false, "stage": "start", "reason": "timed out"]); return }
-            // AVA_SWITCHES=4:camera,9:screen clicks Me or Screen at those seconds into the take.
-            for item in (ProcessInfo.processInfo.environment["AVA_SWITCHES"] ?? "").split(separator: ",") {
+            // VIDLARK_SWITCHES=4:camera,9:screen clicks Me or Screen at those seconds into the take.
+            for item in (ProcessInfo.processInfo.environment["VIDLARK_SWITCHES"] ?? "").split(separator: ",") {
                 let parts = item.split(separator: ":")
                 guard parts.count == 2, let at = Double(parts[0]), let what = Show(rawValue: String(parts[1])) else { continue }
                 Task { @MainActor in
@@ -2009,8 +2009,8 @@ extension Studio {
                     if what == .screen && !takeHasScreen { shareScreen() } else { show(what) }
                 }
             }
-            // AVA_MUTE=6:1:on,12:1:off mutes or unmutes phone 1's mic from the Mac at those seconds.
-            for item in (ProcessInfo.processInfo.environment["AVA_MUTE"] ?? "").split(separator: ",") {
+            // VIDLARK_MUTE=6:1:on,12:1:off mutes or unmutes phone 1's mic from the Mac at those seconds.
+            for item in (ProcessInfo.processInfo.environment["VIDLARK_MUTE"] ?? "").split(separator: ",") {
                 let parts = item.split(separator: ":")
                 guard parts.count == 3, let at = Double(parts[0]), let n = Int(parts[1]) else { continue }
                 Task { @MainActor in
@@ -2018,8 +2018,8 @@ extension Studio {
                     setPhoneMuted(n, parts[2] == "on")
                 }
             }
-            // AVA_SOUND=2:on,5:from:afplay,8:off switches the Mac's sound at those seconds into the take.
-            for item in (ProcessInfo.processInfo.environment["AVA_SOUND"] ?? "").split(separator: ",") {
+            // VIDLARK_SOUND=2:on,5:from:afplay,8:off switches the Mac's sound at those seconds into the take.
+            for item in (ProcessInfo.processInfo.environment["VIDLARK_SOUND"] ?? "").split(separator: ",") {
                 let parts = item.split(separator: ":", maxSplits: 2).map(String.init)
                 guard parts.count >= 2, let at = Double(parts[0]) else { continue }
                 Task { @MainActor in
@@ -2032,8 +2032,8 @@ extension Studio {
                     }
                 }
             }
-            // AVA_RECORDER_AT=<seconds>: presses Back to recorder that far in, and says what is on screen then.
-            if let at = ProcessInfo.processInfo.environment["AVA_RECORDER_AT"].flatMap(Double.init) {
+            // VIDLARK_RECORDER_AT=<seconds>: presses Back to recorder that far in, and says what is on screen then.
+            if let at = ProcessInfo.processInfo.environment["VIDLARK_RECORDER_AT"].flatMap(Double.init) {
                 Task { @MainActor in
                     try? await Task.sleep(nanoseconds: UInt64(at * 1_000_000_000))
                     recorderOpen = true
@@ -2048,9 +2048,9 @@ extension Studio {
                     recorderOpen = false
                 }
             }
-            // AVA_SHARE_AT=<seconds>: a camera-first take shares the screen that far in. The log
+            // VIDLARK_SHARE_AT=<seconds>: a camera-first take shares the screen that far in. The log
             // says which windows were up just before and 2 seconds after.
-            if let at = ProcessInfo.processInfo.environment["AVA_SHARE_AT"].flatMap(Double.init) {
+            if let at = ProcessInfo.processInfo.environment["VIDLARK_SHARE_AT"].flatMap(Double.init) {
                 Task { @MainActor in
                     @MainActor func windows(_ when: String) {
                         let main = NSApp.windows.contains { !($0 is NSPanel) && $0.isVisible }
@@ -2277,7 +2277,7 @@ extension Studio {
         }
         liveServer.onFailure = { [weak self] reason in
             Task { @MainActor in
-                self?.liveFailure = "The live view could not start (\(reason)). Quit any other copy of AVA Recorder, then pick Home Wi-Fi again."
+                self?.liveFailure = "The live view could not start (\(reason)). Quit any other copy of Vidlark, then pick Home Wi-Fi again."
             }
         }
         // Listen on the page hears the mic as it is recorded; the first listener wakes a resting mic.

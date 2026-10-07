@@ -44,6 +44,6 @@ printf '%s\n' '{"t":0,"type":"start","wall":"2026-09-01T12:00:00Z","title":"Old 
 
 mkdir -p "$WORK/copies"
 swiftc -O -parse-as-library -o "$WORK/check" \
-  Sources/AVARecorder/RecordingsStore.swift Sources/AVARecorder/Library.swift Sources/AVARecorder/Script.swift \
+  Sources/Vidlark/RecordingsStore.swift Sources/Vidlark/Library.swift Sources/Vidlark/Script.swift \
   Tests/recordings/check.swift
 "$WORK/check" "$ROOT" "$WORK/copies"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds synthetic recording folders under Tests/fixtures/out/ for ava-finish.
+# Builds synthetic recording folders under Tests/fixtures/out/ for vidlark-finish.
 #   main        camera.mov + screen.mov (screen audio delayed by 0.35 s), three sections
 #   truncated   a crash: both videos written in 2 s fragments and cut off part way through a fragment,
 #               events.jsonl with no stop line, a cut-off last line and a short section

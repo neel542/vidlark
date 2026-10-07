@@ -2,7 +2,7 @@
 # Speaks Tests/follow/speech.txt with an Indian English voice into one file for the follow test,
 # and prints when each part starts and ends. Rishi by default: Tara garbles "your money goes".
 #   [VOICE=Tara] bash Tests/follow/make_audio.sh [out.wav]
-#   "dist/AVA Recorder.app/Contents/MacOS/AVA Recorder" --test-follow <out.wav> Examples/sample-script.md
+#   "dist/Vidlark.app/Contents/MacOS/Vidlark" --test-follow <out.wav> Examples/sample-script.md
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="${1:-$HERE/../fixtures/out/follow/speech.wav}"

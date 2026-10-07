@@ -6,20 +6,20 @@ import Foundation
 /// picked on the phone and kept however the phone turns. Nothing to install: Safari on iOS 16.4 or
 /// newer, or Chrome on Android.
 ///
-/// The same page is a microphone when AVA asks for the phone's sound: 16-bit samples, timed on the
+/// The same page is a microphone when Vidlark asks for the phone's sound: 16-bit samples, timed on the
 /// Mac's clock like the pictures. A phone used only for its sound shows no viewfinder at all. The
 /// Mute switch is shared with the Mac: either side can flip it, and while it is on the phone's mic
 /// is off altogether. Between takes a phone filming another angle stands by: its picture stays on
 /// its screen for framing, and nothing is made or sent until a take starts.
 enum PhonePage {
-    /// The page, opening as a camera, a microphone or both. AVA can change that later.
+    /// The page, opening as a camera, a microphone or both. Vidlark can change that later.
     static func page(camera: Bool, mic: Bool) -> String {
         html.replacingOccurrences(of: "/*ROLE*/{ camera: true, sound: false }", with: "{ camera: \(camera), sound: \(mic) }")
     }
 
     /// Turns the mic's sound into 16-bit batches of 2048 samples, each with its place in the stream.
     static let micWorklet = #"""
-class AvaMic extends AudioWorkletProcessor {
+class VidlarkMic extends AudioWorkletProcessor {
   constructor() { super(); this.size = 2048; this.buf = new Int16Array(this.size); this.n = 0; this.first = 0; }
   process(inputs) {
     const ch = inputs[0] && inputs[0][0];
@@ -36,7 +36,7 @@ class AvaMic extends AudioWorkletProcessor {
     return true;
   }
 }
-registerProcessor("ava-mic", AvaMic);
+registerProcessor("vidlark-mic", VidlarkMic);
 """#
 
     static let html = #"""
@@ -48,7 +48,7 @@ registerProcessor("ava-mic", AvaMic);
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0E1110">
 <meta name="robots" content="noindex">
-<title>AVA camera</title>
+<title>Vidlark camera</title>
 <style>
 :root { --body: #0E1110; --face: #151917; --raised: #1B201E; --well: #070908; --hair: rgba(255,255,255,.075);
   --engraved: #86918B; --dim: #A3ADA8; --ink: #ECF1EE; --signal: #3DCC80; --amber: #E8B34B; --red: #F04E3E;
@@ -120,7 +120,7 @@ body.full .hint { bottom: calc(84px + env(safe-area-inset-bottom)); }
 .round[aria-pressed="true"] { color: var(--amber); border-color: rgba(232,179,75,.42); }
 @media (max-width: 400px) { #exit span { display: none; } #exit { padding: 0; } }
 
-/* The shape: one choice of two, picked before the camera starts and locked while AVA records. */
+/* The shape: one choice of two, picked before the camera starts and locked while Vidlark records. */
 .shape { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border: 1px solid var(--hair); border-radius: 14px; background: var(--face); }
 .shape button { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid transparent; border-radius: 10px;
   background: transparent; color: var(--dim); text-align: left; transition: background-color .2s var(--ease), color .2s var(--ease); }
@@ -147,7 +147,7 @@ body.full .hint { bottom: calc(84px + env(safe-area-inset-bottom)); }
 .meter i.red { background: var(--red); }
 .meter i.on { opacity: 1; }
 
-/* Sound under the viewfinder, while AVA records this phone's sound too. */
+/* Sound under the viewfinder, while Vidlark records this phone's sound too. */
 .soundline { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 4px 4px 14px; border: 1px solid var(--hair); border-radius: 12px; background: var(--face); }
 .soundline > svg { width: 18px; height: 18px; color: var(--engraved); }
 .soundline.live > svg { color: var(--signal); }
@@ -202,15 +202,15 @@ body:not(.mic-only) .card, body:not(.mic-only) .mic-tip { display: none !importa
   <symbol id="i-mute" viewBox="0 0 24 24"><path d="M15 9.5V6a3 3 0 0 0-5.6-1.5"/><path d="M9 9v2a3 3 0 0 0 4.6 2.5"/><path d="M5.5 11a6.5 6.5 0 0 0 10.6 5"/><path d="M18.4 12.6a6.5 6.5 0 0 0 .1-1.6"/><path d="M12 17.5V21"/><path d="M4 4l16 16"/></symbol>
 </svg>
 <main>
-  <header><i class="lamp" data-lamp></i><h1><span data-title>AVA camera</span><small data-phone></small></h1><span class="state" data-state>Not started</span></header>
+  <header><i class="lamp" data-lamp></i><h1><span data-title>Vidlark camera</span><small data-phone></small></h1><span class="state" data-state>Not started</span></header>
   <div class="view" id="view">
     <div class="frame">
       <video id="v" playsinline muted autoplay></video>
     </div>
-    <div class="veil" id="veil"><b id="veilTitle">This phone becomes a camera for AVA</b><span id="veilText">Pick the shape, then tap Start camera. The picture goes to AVA Recorder on the Mac, over your Wi-Fi.</span></div>
+    <div class="veil" id="veil"><b id="veilTitle">This phone becomes a camera for Vidlark</b><span id="veilText">Pick the shape, then tap Start camera. The picture goes to Vidlark on the Mac, over your Wi-Fi.</span></div>
     <div class="hint" id="hint" hidden><i class="lamp warn"></i><div><b id="hintTitle"></b><span id="hintText"></span></div></div>
     <div class="bar top">
-      <i class="lamp" data-lamp></i><span class="who"><span data-title>AVA camera</span><small data-phone></small></span><span class="state" data-state></span>
+      <i class="lamp" data-lamp></i><span class="who"><span data-title>Vidlark camera</span><small data-phone></small></span><span class="state" data-state></span>
     </div>
     <div class="bar bottom">
       <button class="round icon" data-flip aria-label="Use the other camera"><svg><use href="#i-flip"/></svg></button>
@@ -227,8 +227,8 @@ body:not(.mic-only) .card, body:not(.mic-only) .mic-tip { display: none !importa
   <div class="card" id="card">
     <div class="mic" id="micwell"><svg><use href="#i-mic" data-muteicon/></svg></div>
     <div class="meter" data-meter aria-hidden="true"></div>
-    <b id="cardTitle">This phone becomes a microphone for AVA</b>
-    <span id="cardText">Tap Start microphone. Its sound goes to AVA Recorder on the Mac, over your Wi-Fi.</span>
+    <b id="cardTitle">This phone becomes a microphone for Vidlark</b>
+    <span id="cardText">Tap Start microphone. Its sound goes to Vidlark on the Mac, over your Wi-Fi.</span>
   </div>
   <div class="soundline" id="soundline" hidden>
     <svg><use href="#i-mic" data-muteicon/></svg><span id="soundword">Sound on</span><div class="meter" id="linemeter" data-meter aria-hidden="true"></div><i class="gap" id="linegap"></i>
@@ -239,7 +239,7 @@ body:not(.mic-only) .card, body:not(.mic-only) .mic-tip { display: none !importa
     <button data-shape="wide" aria-pressed="true"><svg><use href="#i-wide"/></svg><div><b>Wide</b><span>16:9 · YouTube</span></div></button>
     <button data-shape="tall" aria-pressed="false"><svg><use href="#i-tall"/></svg><div><b>Tall</b><span>9:16 · Shorts, Reels</span></div></button>
   </div>
-  <p class="locked" id="locked" hidden>The shape stays as it is while AVA records.</p>
+  <p class="locked" id="locked" hidden>The shape stays as it is while Vidlark records.</p>
   <button class="go" id="go">Start camera</button>
   <div class="tools" id="tools" hidden>
     <button class="small" data-flip><svg><use href="#i-flip"/></svg><span data-flipword>Front camera</span></button>
@@ -265,10 +265,10 @@ const phone = numbered ? parts[1] : "1";
 const sid = Math.random().toString(36).slice(2) + Date.now().toString(36);
 const $ = id => document.getElementById(id);
 const all = sel => document.querySelectorAll(sel);
-// What AVA wants this phone for when the page opens; every reply can change it.
+// What Vidlark wants this phone for when the page opens; every reply can change it.
 const ROLE = /*ROLE*/{ camera: true, sound: false };
 let shape = "wide";
-try { if (localStorage.getItem("ava-shape") === "tall") shape = "tall"; } catch (e) {}
+try { if (localStorage.getItem("vidlark-shape") === "tall") shape = "tall"; } catch (e) {}
 let W = 1920, H = 1080;
 let stream = null, encoder = null, canvas = null, ctx = null, config = null, wakeLock = null;
 let running = false, facing = "environment", resting = false, recording = false, full = false;
@@ -279,7 +279,7 @@ let sentCount = 0, sentSince = performance.now(), fps = 0;
 // The mic. The mute switch is shared with the Mac: a flip here is sent until the Mac's reply shows it.
 let actx = null, micStream = null, micSource = null, micNode = null, micSink = null, micModule = false, micStarting = false;
 let micState = "off", muted = false, mutedBy = "phone", pendingMute = null, level = -160, levelShown = 0;
-try { muted = localStorage.getItem("ava-muted") === "1"; } catch (e) {}
+try { muted = localStorage.getItem("vidlark-muted") === "1"; } catch (e) {}
 
 all("[data-phone]").forEach(e => e.textContent = "Phone " + phone);
 all(".meter").forEach(m => { for (let i = 0; i < 24; i++) { const s = document.createElement("i"); if (i >= 21) s.className = "red"; else if (i >= 18) s.className = "amber"; m.appendChild(s); } });
@@ -303,7 +303,7 @@ function turned() {
 
 function syncRole() {
   document.body.classList.toggle("mic-only", !wantCamera);
-  const title = wantCamera ? "AVA camera" : "AVA microphone";
+  const title = wantCamera ? "Vidlark camera" : "Vidlark microphone";
   all("[data-title]").forEach(e => e.textContent = title);
   document.title = title + " · Phone " + phone;
   $("go").textContent = wantCamera ? "Start camera" : "Start microphone";
@@ -321,7 +321,7 @@ function syncSound() {
   all("[data-muteicon]").forEach(u => u.setAttribute("href", muted ? "#i-mute" : "#i-mic"));
   const live = micState === "on" && !muted;
   // The sound line under the viewfinder: the mic's state, its level while it sends, and the
-  // switch, which is there even while AVA does not use this phone's sound.
+  // switch, which is there even while Vidlark does not use this phone's sound.
   const line = $("soundline");
   line.hidden = !(running && wantCamera);
   line.classList.toggle("off", muted || micState === "denied");
@@ -340,8 +340,8 @@ function show() {
   if (!running) return;
   if (resting) {
     setState("Resting", "");
-    if (wantCamera) veil("AVA is resting the camera", "It wakes by itself when someone looks at AVA on the Mac.");
-    else card("AVA is resting the microphone", "It wakes by itself when someone looks at AVA on the Mac.");
+    if (wantCamera) veil("Vidlark is resting the camera", "It wakes by itself when someone looks at Vidlark on the Mac.");
+    else card("Vidlark is resting the microphone", "It wakes by itself when someone looks at Vidlark on the Mac.");
     return;
   }
   veil(null);
@@ -349,21 +349,21 @@ function show() {
     $("hint").hidden = false;
     $("hintTitle").textContent = shape === "wide" ? "Turn the phone sideways" : "Hold the phone upright";
     $("hintText").textContent = shape === "wide"
-      ? "AVA keeps the picture 16:9 and films the middle until you do. If it is already sideways, switch rotation lock off."
-      : "AVA keeps the picture 9:16 and films the middle until you do. If it is already upright, switch rotation lock off.";
+      ? "Vidlark keeps the picture 16:9 and films the middle until you do. If it is already sideways, switch rotation lock off."
+      : "Vidlark keeps the picture 9:16 and films the middle until you do. If it is already upright, switch rotation lock off.";
   }
   if (!wantCamera) {
     if (muted) card(muteWords(), "The phone's mic is off. Tap Unmute, here or on the Mac, to send its sound again.");
     else if (micState === "denied") card("The mic was not allowed", "On an iPhone: Settings, Apps, Safari, Microphone, Allow. On Android: tap the icon left of the address, then Permissions, Microphone, Allow. Then reload this page.");
-    else if (micState === "asking") card("Tap Allow", "The phone asks once whether AVA may use its microphone.");
-    else if (micState === "on") card(recording ? "Recording" : "Sending sound to AVA", "Keep the phone close to the person talking.");
-    else card("Waiting for AVA", "The sound starts as soon as AVA asks for it.");
+    else if (micState === "asking") card("Tap Allow", "The phone asks once whether Vidlark may use its microphone.");
+    else if (micState === "on") card(recording ? "Recording" : "Sending sound to Vidlark", "Keep the phone close to the person talking.");
+    else card("Waiting for Vidlark", "The sound starts as soon as Vidlark asks for it.");
   }
-  // Standing by is Ready: the picture shows here, and goes to AVA once a take starts.
+  // Standing by is Ready: the picture shows here, and goes to Vidlark once a take starts.
   if (failures > 2) setState("Cannot reach the Mac", "warn");
   else if (recording) setState("Recording", "rec");
-  else if (wantCamera) setState(sending ? "Sending to AVA" : "Ready", "ok");
-  else setState(micState === "on" ? "Sending to AVA" : "Ready", "ok");
+  else if (wantCamera) setState(sending ? "Sending to Vidlark" : "Ready", "ok");
+  else setState(micState === "on" ? "Sending to Vidlark" : "Ready", "ok");
   const facts = [];
   if (wantCamera) facts.push(sending && fps ? `${Math.min(W, H)}p · ${fps} fps` : sending ? `${Math.min(W, H)}p` : "Standing by");
   $("facts").textContent = facts.join(" · ");
@@ -404,7 +404,7 @@ async function post(body) {
 }
 
 function handle(j) {
-  if (j.replaced) { stop(); veil("Another phone took over", "Another phone or tab opened this same code, so AVA uses that one now. Tap Start to take it back."); card("Another phone took over", "Another phone or tab opened this same code. Tap Start microphone to take it back."); return; }
+  if (j.replaced) { stop(); veil("Another phone took over", "Another phone or tab opened this same code, so Vidlark uses that one now. Tap Start to take it back."); card("Another phone took over", "Another phone or tab opened this same code. Tap Start microphone to take it back."); return; }
   if (j.key) forceKey = true;
   if (j.rest !== resting) { resting = j.rest; forceKey = true; }
   recording = j.recording;
@@ -426,7 +426,7 @@ async function pump() {
   while (running) {
     const now = performance.now();
     if (!queue.length) {
-      // Nothing to send: a quiet hello now and then keeps the clock right and hears what AVA wants.
+      // Nothing to send: a quiet hello now and then keeps the clock right and hears what Vidlark wants.
       if (now - lastPost > 500 || pendingMute !== null) { try { handle(await post(new Uint8Array(0))); failures = 0; } catch (e) { failures++; show(); await pause(400); } }
       else await pause(15);
       continue;
@@ -524,7 +524,7 @@ function sizeFor(s) { return s === "tall" ? [1080, 1920] : [1920, 1080]; }
 async function setShape(next) {
   if (next === shape || recording) return;
   shape = next;
-  try { localStorage.setItem("ava-shape", shape); } catch (e) {}
+  try { localStorage.setItem("vidlark-shape", shape); } catch (e) {}
   [W, H] = sizeFor(shape);
   lockTurning();
   if (running && stream) {
@@ -573,10 +573,10 @@ async function camera() {
   forceKey = true;
 }
 
-// The camera and its encoder, opened when AVA wants this phone's picture and closed when it does not.
+// The camera and its encoder, opened when Vidlark wants this phone's picture and closed when it does not.
 async function openCamera() {
   if (opening || stream) return;
-  if (typeof VideoEncoder === "undefined" || typeof VideoFrame === "undefined") { note("This browser is too old to film for AVA. On an iPhone, update to iOS 16.4 or newer. On Android, update Chrome, or open this link in Chrome."); return; }
+  if (typeof VideoEncoder === "undefined" || typeof VideoFrame === "undefined") { note("This browser is too old to film for Vidlark. On an iPhone, update to iOS 16.4 or newer. On Android, update Chrome, or open this link in Chrome."); return; }
   opening = true;
   try { await camera(); }
   catch (e) {
@@ -588,7 +588,7 @@ async function openCamera() {
   canvas = document.createElement("canvas"); canvas.width = W; canvas.height = H;
   ctx = canvas.getContext("2d", { alpha: false });
   try { await makeEncoder(); }
-  catch (e) { opening = false; closeCamera(); note("This phone cannot make the video AVA needs. Update its system and browser; on Android, use Chrome."); throw e; }
+  catch (e) { opening = false; closeCamera(); note("This phone cannot make the video Vidlark needs. Update its system and browser; on Android, use Chrome."); throw e; }
   frames = 0; needKey = false; forceKey = true; formatKey = ""; formatRec = null;
   opening = false;
   $("v").requestVideoFrameCallback(frame);
@@ -603,14 +603,14 @@ function closeCamera() {
   exitFull();
 }
 
-// AVA changed its mind about this phone's picture while it runs.
+// Vidlark changed its mind about this phone's picture while it runs.
 function syncCamera() {
   if (!running) return;
   if (wantCamera && !stream) openCamera().catch(() => {});
   if (!wantCamera && stream) closeCamera();
 }
 
-// The mic is on only while AVA asks for this phone's sound, the page runs, nothing rests and the
+// The mic is on only while Vidlark asks for this phone's sound, the page runs, nothing rests and the
 // shared switch is not muted. Muted, its track is stopped, so the phone's mic is off altogether.
 function syncMic() {
   const want = running && micWanted && !muted && !resting;
@@ -632,7 +632,7 @@ async function startMic() {
     if (!(running && micWanted && !muted && !resting)) { got.getTracks().forEach(t => t.stop()); micState = "off"; return; }
     micStream = got;
     micSource = actx.createMediaStreamSource(got);
-    micNode = new AudioWorkletNode(actx, "ava-mic");
+    micNode = new AudioWorkletNode(actx, "vidlark-mic");
     micNode.port.onmessage = e => heardMic(e.data);
     micSink = actx.createGain(); micSink.gain.value = 0;
     micSource.connect(micNode); micNode.connect(micSink); micSink.connect(actx.destination);
@@ -675,7 +675,7 @@ function heardMic(data) {
 function setMuted(on, fromHere) {
   muted = on;
   if (fromHere) { mutedBy = "phone"; pendingMute = on; }
-  try { localStorage.setItem("ava-muted", on ? "1" : "0"); } catch (e) {}
+  try { localStorage.setItem("vidlark-muted", on ? "1" : "0"); } catch (e) {}
   syncMic();
   show();
 }
@@ -686,8 +686,8 @@ async function awake() {
 
 async function start() {
   note("");
-  if (!window.isSecureContext || !navigator.mediaDevices) { note("Open this page from the QR code in AVA Recorder, so it comes over AVA's secure link."); return; }
-  // Sound may only start from a tap. It is readied now, and the mic itself opens only when AVA asks.
+  if (!window.isSecureContext || !navigator.mediaDevices) { note("Open this page from the QR code in Vidlark, so it comes over Vidlark's secure link."); return; }
+  // Sound may only start from a tap. It is readied now, and the mic itself opens only when Vidlark asks.
   try { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); actx.resume().catch(() => {}); } catch (e) { actx = null; }
   // Full screen has to be asked for straight from the tap, before the camera question.
   if (wantCamera) enterFull();
@@ -736,7 +736,7 @@ $("v").addEventListener("resize", show);
 syncRole();
 syncSound();
 syncShape();
-if (!wantCamera) card("This phone becomes a microphone for AVA", "Tap Start microphone. Its sound goes to AVA Recorder on the Mac, over your Wi-Fi.");
+if (!wantCamera) card("This phone becomes a microphone for Vidlark", "Tap Start microphone. Its sound goes to Vidlark on the Mac, over your Wi-Fi.");
 </script>
 </body>
 </html>

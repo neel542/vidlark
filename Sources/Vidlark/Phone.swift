@@ -7,14 +7,14 @@ import SystemConfiguration
 import VideoToolbox
 
 // Phones over Wi-Fi. Continuity Camera needs the iPhone and the Mac on one Apple Account; this
-// needs nothing but the same Wi-Fi, and works with an Android phone too. AVA serves a small page
+// needs nothing but the same Wi-Fi, and works with an Android phone too. Vidlark serves a small page
 // over a secure connection, each phone opens it from its own QR code, and its browser sends the
 // camera here already compressed (H.264, made by the phone's own encoder through WebCodecs).
 // The camera file keeps those pictures exactly as they came, so nothing is compressed twice; a
 // decoded copy feeds the previews, the face framing and the live page, only while one shows it.
 // The sound is the Mac's mic, as with any other camera. Up to four phones film at once, each its
 // own camera file, so one take has several angles to pick from in editing. A phone can also be a
-// microphone: its page sends its sound as plain 16-bit samples, which AVA records as a file of its
+// microphone: its page sends its sound as plain 16-bit samples, which Vidlark records as a file of its
 // own. Its mute is one switch shared by the phone and the Mac: either can flip it, the last flip
 // wins, both show it, and while it is on the phone's mic is off altogether.
 //
@@ -22,7 +22,7 @@ import VideoToolbox
 // so it can be framed, but sends nothing until a take starts or the Mac shows its picture. That
 // saves the phone's battery and the Mac's work.
 //
-// Browsers only let a page use the camera over a secure connection, so AVA makes its own
+// Browsers only let a page use the camera over a secure connection, so Vidlark makes its own
 // certificate the first time. It is not signed by anyone the phone knows, which is why the browser
 // asks once ("This Connection Is Not Private"): the link only works on this Wi-Fi and carries a secret.
 
@@ -55,13 +55,13 @@ struct PhoneState: Equatable {
 
 /// A phone's microphone, as its page reports it.
 enum PhoneMic: String {
-    /// Not in use: AVA has not asked for it.
+    /// Not in use: Vidlark has not asked for it.
     case off
-    /// Sending its sound to AVA.
+    /// Sending its sound to Vidlark.
     case on
     /// Asking the person holding it to allow the mic.
     case asking
-    /// Muted on the phone: its mic stays off whatever AVA asks.
+    /// Muted on the phone: its mic stays off whatever Vidlark asks.
     case muted
     /// The phone did not allow its microphone.
     case denied
@@ -78,7 +78,7 @@ final class PhoneLink: @unchecked Sendable {
     static let port: UInt16 = 8791
 
     /// The camera ID the app stores for phone n. Phone 1 keeps the ID it had before there could be more.
-    static func cameraID(_ number: Int) -> String { number == 1 ? "ava.iphone.wifi" : "ava.phone.\(number)" }
+    static func cameraID(_ number: Int) -> String { number == 1 ? "vidlark.iphone.wifi" : "vidlark.phone.\(number)" }
 
     /// Which phone a stored camera ID is, or nil for any other camera.
     static func number(of id: String?) -> Int? {
@@ -89,7 +89,7 @@ final class PhoneLink: @unchecked Sendable {
     static func name(_ number: Int) -> String { "Phone \(number)" }
 
     /// The mic ID the app stores for phone n's microphone.
-    static func micID(_ number: Int) -> String { "ava.phone.\(number).mic" }
+    static func micID(_ number: Int) -> String { "vidlark.phone.\(number).mic" }
 
     /// Which phone a stored mic ID is, or nil for any other mic.
     static func number(ofMic id: String?) -> Int? {
@@ -97,7 +97,7 @@ final class PhoneLink: @unchecked Sendable {
         return (1...most).first { micID($0) == id }
     }
 
-    fileprivate let queue = DispatchQueue(label: "ava.phone")
+    fileprivate let queue = DispatchQueue(label: "vidlark.phone")
     private let lock = NSLock()
     private var listener: NWListener?
     private var secret: String
@@ -289,18 +289,18 @@ final class PhoneLink: @unchecked Sendable {
 
     // MARK: Certificate
 
-    /// AVA's own certificate, made the first time with the Mac's built-in openssl and kept in
+    /// Vidlark's own certificate, made the first time with the Mac's built-in openssl and kept in
     /// Application Support. It is read into memory only, never into the keychain.
     private static func identity() throws -> SecIdentity {
         let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("AVA Recorder/iPhone link", isDirectory: true)
+            .appendingPathComponent("Vidlark/iPhone link", isDirectory: true)
         let p12 = folder.appendingPathComponent("identity.p12")
         if !FileManager.default.fileExists(atPath: p12.path) {
             try make(p12, in: folder)
         }
         let data = try Data(contentsOf: p12)
         var items: CFArray?
-        let options: [CFString: Any] = [kSecImportExportPassphrase: "ava", kSecImportToMemoryOnly: true]
+        let options: [CFString: Any] = [kSecImportExportPassphrase: "vidlark", kSecImportToMemoryOnly: true]
         let status = SecPKCS12Import(data as CFData, options as CFDictionary, &items)
         guard status == errSecSuccess, let first = (items as? [[CFString: Any]])?.first,
               let identity = first[kSecImportItemIdentity] else {
@@ -324,8 +324,8 @@ final class PhoneLink: @unchecked Sendable {
             guard process.terminationStatus == 0 else { throw RecorderError("openssl \(arguments.first ?? "") failed.") }
         }
         try run(["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key.path, "-out", cert.path, "-days", "3650",
-                 "-subj", "/CN=AVA Recorder", "-addext", "subjectAltName=\(host)DNS:localhost"])
-        try run(["pkcs12", "-export", "-inkey", key.path, "-in", cert.path, "-out", p12.path, "-passout", "pass:ava"])
+                 "-subj", "/CN=Vidlark", "-addext", "subjectAltName=\(host)DNS:localhost"])
+        try run(["pkcs12", "-export", "-inkey", key.path, "-in", cert.path, "-out", p12.path, "-passout", "pass:vidlark"])
         try? FileManager.default.removeItem(at: key)
     }
 
@@ -554,7 +554,7 @@ final class PhoneCamera: @unchecked Sendable {
             read(body)
             if micChanged || muteChanged { link.changed(number) }
         }
-        // "sound": AVA records this phone's sound; "mic": the phone's mic should be on right now.
+        // "sound": Vidlark records this phone's sound; "mic": the phone's mic should be on right now.
         let reply = lock.withLock { () -> (key: Bool, resting: Bool, recording: Bool, send: Bool, camera: Bool, sound: Bool, muted: Bool, byPhone: Bool) in
             defer { keyWanted = false }
             return (keyWanted, resting, recording, wantsPictures, owner != nil || soundOwner == nil, soundOwner != nil, muted, mutedOnPhone)

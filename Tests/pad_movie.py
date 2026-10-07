@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Pads a movie the way AVCaptureMovieFileOutput does: every chunk starts on a 16 KB boundary,
-with zeros in between, and the chunk tables point at the new places. Used to test ava-finish
+with zeros in between, and the chunk tables point at the new places. Used to test vidlark-finish
 --tidy, which takes the padding out again. Usage: pad_movie.py <in.mov> <out.mov>"""
 import struct, sys
 

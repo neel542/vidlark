@@ -11,7 +11,7 @@ final class Listener: @unchecked Sendable {
     var onFail: ((String) -> Void)?
     private(set) var name = ""
 
-    private let queue = DispatchQueue(label: "ava.listen")
+    private let queue = DispatchQueue(label: "vidlark.listen")
     private let lock = NSLock()
     private var engine: ListenEngine?
     private var converter: AVAudioConverter?

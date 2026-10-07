@@ -1,6 +1,6 @@
 import Foundation
 
-// ava-finish <recording folder> [--no-transcribe] [--no-chapters] [--no-video] [--model <path to ggml model>]
+// vidlark-finish <recording folder> [--no-transcribe] [--no-chapters] [--no-video] [--model <path to ggml model>]
 // stdout carries only progress for the app: "STEP n/total ...", then "DONE <report.md>" or "FAIL <reason>".
 
 setvbuf(stdout, nil, _IOLBF, 0)
@@ -17,7 +17,7 @@ func fail(_ reason: String) -> Never {
     finish(1)
 }
 
-let usage = "usage: ava-finish <recording folder> [--no-transcribe] [--no-chapters] [--no-video] [--model <path>]"
+let usage = "usage: vidlark-finish <recording folder> [--no-transcribe] [--no-chapters] [--no-video] [--model <path>]"
 var folderArg: String?
 var transcribeWanted = true
 var chaptersWanted = true
@@ -36,7 +36,7 @@ while argIndex < argv.count {
         guard argIndex < argv.count else { fail(usage) }
         modelOverride = argv[argIndex]
     case "--tidy":
-        // ava-finish --tidy <movie>: takes the padding out of one movie and says what it saved.
+        // vidlark-finish --tidy <movie>: takes the padding out of one movie and says what it saved.
         argIndex += 1
         guard argIndex < argv.count else { fail(usage) }
         do {
@@ -87,7 +87,7 @@ do {
     let ffmpeg = try Tools.require("ffmpeg")
     let ffprobe = try Tools.require("ffprobe")
     let work = FileManager.default.temporaryDirectory
-        .appendingPathComponent("ava-finish-\(UUID().uuidString)", isDirectory: true)
+        .appendingPathComponent("vidlark-finish-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
     workDir = work
 

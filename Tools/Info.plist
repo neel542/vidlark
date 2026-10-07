@@ -3,15 +3,15 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>AVA Recorder</string>
+	<string>Vidlark</string>
 	<key>CFBundleExecutable</key>
-	<string>AVA Recorder</string>
+	<string>Vidlark</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>inc.ava.recorder</string>
+	<string>app.vidlark.mac</string>
 	<key>CFBundleName</key>
-	<string>AVA Recorder</string>
+	<string>Vidlark</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -25,14 +25,14 @@
 	<key>NSCameraReactionEffectGesturesEnabledDefault</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>AVA Recorder records the camera for your video.</string>
+	<string>Vidlark records the camera for your video.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>AVA Recorder shows the live view on your other laptop or phone over the home Wi-Fi.</string>
+	<string>Vidlark shows the live view on your other laptop or phone over the home Wi-Fi.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>AVA Recorder records your voice from the mic.</string>
+	<string>Vidlark records your voice from the mic.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>AVA Recorder listens on this Mac so the prompter follows your voice. Nothing leaves the Mac.</string>
+	<string>Vidlark listens on this Mac so the prompter follows your voice. Nothing leaves the Mac.</string>
 </dict>
 </plist>

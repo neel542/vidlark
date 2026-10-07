@@ -3,21 +3,21 @@ import ScreenCaptureKit
 import SwiftUI
 
 @main
-struct AVARecorderApp: App {
+struct VidlarkApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     init() {
-        // Build step: `AVA Recorder --render-icon <png>` draws the app icon and exits.
+        // Build step: `Vidlark --render-icon <png>` draws the app icon and exits.
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--render-icon"), i + 1 < args.count {
             AppIcon.writePNG(to: URL(fileURLWithPath: args[i + 1]))
             exit(0)
         }
-        // `AVA Recorder --test-follow <audio or .txt> <script.md>` prints where the prompter would move.
+        // `Vidlark --test-follow <audio or .txt> <script.md>` prints where the prompter would move.
         if let i = args.firstIndex(of: "--test-follow"), i + 2 < args.count {
             FollowTest.run(source: args[i + 1], script: args[i + 2])
         }
-        // `AVA Recorder --list-windows <file.json>` writes every window ScreenCaptureKit sees and
+        // `Vidlark --list-windows <file.json>` writes every window ScreenCaptureKit sees and
         // whether the share chooser would offer it. For finding out why a window is missing.
         if let i = args.firstIndex(of: "--list-windows"), i + 1 < args.count {
             let out = URL(fileURLWithPath: args[i + 1])
@@ -45,7 +45,7 @@ struct AVARecorderApp: App {
     }
 
     var body: some Scene {
-        Window("AVA Recorder", id: "panel") {
+        Window("Vidlark", id: "panel") {
             PanelView(studio: Studio.shared)
                 .preferredColorScheme(.dark)
         }
@@ -91,7 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         if Studio.quietTest {
-            // Out of sight: no Dock icon, and the panel never shows. AVA_QUIET=draw keeps the
+            // Out of sight: no Dock icon, and the panel never shows. VIDLARK_QUIET=draw keeps the
             // windows in, see-through and click-through, so the previews still draw and their
             // cost can be measured.
             NSApp.setActivationPolicy(.accessory)

@@ -1,8 +1,8 @@
-# AVA Recorder
+# Vidlark
 
 A free, private Loom replacement for filming YouTube videos on a Mac. One button records the camera, the mic and the screen as separate files that stay in sync. When you stop, it writes a transcript, YouTube chapters and a list of retakes, ready for editing.
 
-Built by AVA INC for our own channel. You are welcome to build your own copy and change it.
+Built by Neel Madhav. You are welcome to build your own copy and change it.
 
 ![The panel](previews/fullscreen.png)
 
@@ -28,7 +28,7 @@ Built by AVA INC for our own channel. You are welcome to build your own copy and
 - **A guide to connecting cameras,** in Settings: iPhone, USB webcam or a real camera, with the cameras the Mac sees right now.
 - **Checks before you start.** Camera, mic, screen, disk space, battery and macOS camera effects, each with a plain fix when something is wrong.
 - **Camera watchdog.** If the camera file stops growing during a take, the take stops at once and says so, instead of filming on without a camera.
-- **Finishing.** After every take, `ava-finish` takes the empty padding out of the camera file (about a third of it, with no change to the picture or sound), lines up the files by their sound, makes `video.mp4` and writes `words.json`, `chapters.txt`, `retakes.json` and `report.md`, all on the Mac.
+- **Finishing.** After every take, `vidlark-finish` takes the empty padding out of the camera file (about a third of it, with no change to the picture or sound), lines up the files by their sound, makes `video.mp4` and writes `words.json`, `chapters.txt`, `retakes.json` and `report.md`, all on the Mac.
 
 ## What you need
 
@@ -46,7 +46,7 @@ bash Tools/build.sh
 ```
 
 ```bash
-open "dist/AVA Recorder.app"
+open "dist/Vidlark.app"
 ```
 
 The first time, allow the camera and the microphone, then click the red **Record** row and allow screen recording in System Settings. Quit and open the app again. [HOW-TO-FILM.md](HOW-TO-FILM.md) walks through a filming day.
@@ -57,14 +57,14 @@ Plug the iPhone into the Mac with a cable, lock it, and stand it on a tripod in 
 
 ## Where recordings go
 
-`/Users/Shared/AVA Recordings/<date> <title>/recording-N/`. The folder is shared, so a second Mac user can record into it too. [PLAN.md](PLAN.md) lists every file and what is in it.
+`/Users/Shared/Vidlark Recordings/<date> <title>/recording-N/`. The folder is shared, so a second Mac user can record into it too. [PLAN.md](PLAN.md) lists every file and what is in it.
 
 ## Make it yours
 
 - **Name and bundle id:** `Tools/Info.plist`.
-- **Recording folder:** `Library.root` in `Sources/AVARecorder/Library.swift`.
-- **Colours and type:** `Sources/AVARecorder/Theme.swift`. [DESIGN.md](DESIGN.md) explains the look.
-- **Finishing steps:** `Sources/ava-finish/`.
+- **Recording folder:** `Library.root` in `Sources/Vidlark/Library.swift`.
+- **Colours and type:** `Sources/Vidlark/Theme.swift`. [DESIGN.md](DESIGN.md) explains the look.
+- **Finishing steps:** `Sources/vidlark-finish/`.
 
 Check your changes with:
 

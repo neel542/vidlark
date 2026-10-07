@@ -58,7 +58,7 @@ final class FaceTracker: NSObject, ObservableObject, AVCaptureVideoDataOutputSam
     let output = AVCaptureVideoDataOutput()
     /// The camera this tracker is attached to. Frames are switched on and off through it.
     weak var camera: CameraRecorder?
-    private let queue = DispatchQueue(label: "ava.face")
+    private let queue = DispatchQueue(label: "vidlark.face")
     private let lock = NSLock()
     private var running = false
     private var last: CFTimeInterval = 0
@@ -473,7 +473,7 @@ struct RecordingPillView: View {
         .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.white.opacity(0.09)))
     }
 
-    /// Brings the AVA Recorder window up on this desktop during the take, or puts it away again
+    /// Brings the Vidlark window up on this desktop during the take, or puts it away again
     /// and goes back to the shared window. The recording carries on either way: the app's own
     /// windows are never in it.
     private var recorderButton: some View {
@@ -498,7 +498,7 @@ struct RecordingPillView: View {
         }
         .buttonStyle(.plain)
         .disabled(!studio.isRolling)
-        .help(open ? "Put the recorder away. Recording carries on." : "Show the AVA Recorder window here. Recording carries on, and the window is not in the video.")
+        .help(open ? "Put the recorder away. Recording carries on." : "Show the Vidlark window here. Recording carries on, and the window is not in the video.")
     }
 
     /// Me or Screen: what the finished video shows from now on. One click switches; the finished
@@ -560,7 +560,7 @@ struct RecordingPillView: View {
     /// Why the screen cannot be shared, if it cannot.
     private var shareBlocked: String? {
         studio.shareProblem ?? (studio.screenAllowed ? nil
-            : "Screen recording is not allowed yet. Allow AVA Recorder in System Settings, Privacy, then open the app again.")
+            : "Screen recording is not allowed yet. Allow Vidlark in System Settings, Privacy, then open the app again.")
     }
 
     /// Asks before the screen goes into the video, with the Mac's sound as a choice.

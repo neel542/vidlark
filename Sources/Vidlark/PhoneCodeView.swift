@@ -70,7 +70,7 @@ struct PhoneCodeView: View {
                     .padding(.top, 6)
                 VStack(alignment: .leading, spacing: 14) {
                     Step(n: 1, text: "Point the phone's camera at the code, then tap the link that appears.")
-                    Step(n: 2, text: "The first time, the phone warns that the connection is not private. It is AVA's own link, only on your Wi-Fi. On an iPhone, tap Show Details, then \u{201C}visit this website\u{201D}, then Visit Website. On Android, tap Advanced, then Proceed.")
+                    Step(n: 2, text: "The first time, the phone warns that the connection is not private. It is Vidlark's own link, only on your Wi-Fi. On an iPhone, tap Show Details, then \u{201C}visit this website\u{201D}, then Visit Website. On Android, tap Advanced, then Proceed.")
                     Step(n: 3, text: listensOnly
                          ? "On the phone, tap Start microphone, then Allow. Mute, on the phone or on this Mac, turns its mic off completely."
                          : "On the phone, pick Wide 16:9 or Tall 9:16, then tap Start camera and Allow. The picture keeps that shape however the phone turns.")
@@ -125,7 +125,7 @@ struct PhoneCodeView: View {
         studio.phonesInUse.count > 1 || phone > 1 ? "Connect phone \(phone)" : "Connect a phone"
     }
 
-    /// The phone is only a microphone: AVA records its sound and not its picture.
+    /// The phone is only a microphone: Vidlark records its sound and not its picture.
     private var listensOnly: Bool { !studio.filmsWith(phone) && studio.extraMicIDs.contains(PhoneLink.micID(phone)) }
     private var withSound: Bool { studio.extraMicIDs.contains(PhoneLink.micID(phone)) }
 
@@ -134,7 +134,7 @@ struct PhoneCodeView: View {
         if listensOnly {
             return "It records sound only, like a wireless mic, saved as its own file. Keep it close to the person talking."
         }
-        return (studio.mainPhone == phone ? "It becomes the camera AVA films with."
+        return (studio.mainPhone == phone ? "It becomes the camera Vidlark films with."
             : "It films another angle, saved as its own file next to the main camera, so the angle can be picked in editing.")
             + (withSound ? " Its own sound is recorded too." : "")
     }

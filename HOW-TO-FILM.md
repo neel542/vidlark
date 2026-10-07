@@ -1,14 +1,14 @@
-# Filming with AVA Recorder
+# Filming with Vidlark
 
 ## Once, before the first video
 
-1. Open `dist/AVA Recorder.app`. Allow the camera and the microphone when macOS asks.
+1. Open `dist/Vidlark.app`. Allow the camera and the microphone when macOS asks.
 2. Click the red **Record** row and allow screen recording in System Settings. Quit and reopen the app.
 
 ## Each filming day
 
 1. Put the iPhone on the tripod with the rear camera facing the presenter, screen locked, in landscape. Plug it into the Mac with a USB-C cable (it charges during the take and is steadier than wireless). It shows up as a camera on its own, through Continuity Camera, which only works when the Mac user and the iPhone are signed in to the same Apple ID. Plug the mic receiver into the Mac.
-2. Open AVA Recorder. It fills the monitor. The **Sources** list shows what gets recorded, each with a lamp: click a row to change it, or **+ Add** for another camera or the screen. If something needs fixing, one note under the list says what and has the button that fixes it. Everything else is in **Settings** (the gear, or Command-Comma), where each option says in one sentence what it does. If the picture says **Camera resting to save power**, click it: the camera and mic switch off while the app sits unused in the background, and wake in about a second. The old rows, for reference:
+2. Open Vidlark. It fills the monitor. The **Sources** list shows what gets recorded, each with a lamp: click a row to change it, or **+ Add** for another camera or the screen. If something needs fixing, one note under the list says what and has the button that fixes it. Everything else is in **Settings** (the gear, or Command-Comma), where each option says in one sentence what it does. If the picture says **Camera resting to save power**, click it: the camera and mic switch off while the app sits unused in the background, and wake in about a second. The old rows, for reference:
    - Camera (its menu also has **Touch up the face**, which opens macOS Video Effects: switch on Studio Light once and it stays on)
    - Mic (say a few words so the meter moves)
    - Screen (what **Screen** shares during the take: the entire screen or one window. Every take starts on her face; the screen is only recorded once she presses Screen)
@@ -23,7 +23,7 @@
    - The square button stops the recording.
    - **Me | Screen** says what the video shows. Click **Me** and her camera grows out of the face circle to fill the whole screen; click **Screen** and it shrinks back into the circle. The motion shows the click worked. The screen recording includes it, so the finished `video.mp4` is exactly what was on the screen, and nothing has to be cut by hand.
    - Every take starts on her face. The first click on **Screen** opens **What to share**, like Google Meet's: the **Entire screen** or **A window** (for example one Chrome window), picked from pictures, with the last pick already picked, so it is one click on **Share**. Windows on other desktops are there too, like Chrome in full screen; picking one moves the Mac to it. From then on the screen or window is recorded until the take stops, and Me and Screen switch at once.
-   - **Back to the recorder** (the top row of the box) brings the AVA Recorder window up over whatever is on screen, without leaving the shared window's desktop. The recording carries on, and the window is never in the video. **Hide the recorder** puts it away.
+   - **Back to the recorder** (the top row of the box) brings the Vidlark window up over whatever is on screen, without leaving the shared window's desktop. The recording carries on, and the window is never in the video. **Hide the recorder** puts it away.
    - Sharing one window, only that window goes into the video, even if something covers it; the face circle and Me stay inside it and follow it if it moves.
    - **Mac sound** (under Me | Screen, while the screen is recorded): click it and pick **Off**, **Every app** or **Only** one app, like Chrome playing a video, so notifications stay out. Change it at any moment of the take.
    - The face button puts the face in the video, in the shape picked in the **In video** row. Only one face shows at a time: while the face is in the video, this box shrinks to just the time, the level and the buttons. The box never appears in the recording, and neither does any pop-up banner.
@@ -64,7 +64,7 @@ The **Live** row shows the shoot on any browser, with no login: every camera, th
 
 ## Where the files go
 
-`/Users/Shared/AVA Recordings/<date> <title>/recording-N/`
+`/Users/Shared/Vidlark Recordings/<date> <title>/recording-N/`
 
 | File | What it is |
 |---|---|

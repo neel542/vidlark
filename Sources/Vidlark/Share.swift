@@ -44,7 +44,7 @@ enum ShareTarget: Codable, Equatable {
     /// on another desktop count too (an app in full screen has a desktop of its own), as long as
     /// they have a name and belong to an app in the Dock; sharing one brings it forward first.
     static func windows(in content: SCShareableContent) -> [SCWindow] {
-        let skip: Set<String> = [Bundle.main.bundleIdentifier ?? "inc.ava.recorder", "com.apple.dock", "com.apple.WindowManager",
+        let skip: Set<String> = [Bundle.main.bundleIdentifier ?? "app.vidlark.mac", "com.apple.dock", "com.apple.WindowManager",
                                  "com.apple.controlcenter", "com.apple.notificationcenterui", "com.apple.Spotlight",
                                  "com.apple.systemuiserver", "com.apple.wallpaper.agent"]
         return content.windows
@@ -262,7 +262,7 @@ struct SharePickerView: View {
                 }
             }
         } catch {
-            failure = "Screen recording is not allowed yet. Allow AVA Recorder in System Settings, Privacy, then try again."
+            failure = "Screen recording is not allowed yet. Allow Vidlark in System Settings, Privacy, then try again."
             loading = false
         }
     }

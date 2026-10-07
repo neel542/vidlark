@@ -86,7 +86,7 @@ final class LiveTap: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, Fra
     init(name: String, frames: LiveFrames) {
         self.name = name
         self.frames = frames
-        queue = DispatchQueue(label: "ava.live.\(name)")
+        queue = DispatchQueue(label: "vidlark.live.\(name)")
         super.init()
         output.alwaysDiscardsLateVideoFrames = true
         output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange]
@@ -210,7 +210,7 @@ final class LiveServer: @unchecked Sendable {
     static let port: UInt16 = 8790
     private let frames: LiveFrames
     private let audio: LiveAudio
-    private let queue = DispatchQueue(label: "ava.live.server")
+    private let queue = DispatchQueue(label: "vidlark.live.server")
     private let lock = NSLock()
     private var listener: NWListener?
     private var secret: String
@@ -433,7 +433,7 @@ enum LivePage {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
-<title>AVA Live</title>
+<title>Vidlark Live</title>
 <style>
 :root {
   --body: #0E1110; --face: #151917; --raised: #1C211F; --well: #070908; --hair: rgba(255,255,255,.075);
@@ -542,7 +542,7 @@ const base = location.pathname.endsWith('/') ? location.pathname : location.path
 const tiles = {};
 let lastOK = 0, last = null;
 let pinned = null;
-try { pinned = localStorage.getItem('ava-pin'); } catch (e) {}
+try { pinned = localStorage.getItem('vidlark-pin'); } catch (e) {}
 
 const pinIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5"/><path d="M9 3h6l-1 6 4 4v2H6v-2l4-4z"/></svg>';
 const fullIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
@@ -562,7 +562,7 @@ function el(tag, cls, text) {
 
 function pin(id) {
   pinned = pinned === id ? null : id;
-  try { pinned ? localStorage.setItem('ava-pin', pinned) : localStorage.removeItem('ava-pin'); } catch (e) {}
+  try { pinned ? localStorage.setItem('vidlark-pin', pinned) : localStorage.removeItem('vidlark-pin'); } catch (e) {}
   if (last) render(last);
 }
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds the fixtures and ava-finish, runs it on every fixture and checks the results.
+# Builds the fixtures and vidlark-finish, runs it on every fixture and checks the results.
 # Set SKIP_FIXTURE=1 to reuse fixtures that are already built.
 set -uo pipefail
 
@@ -13,8 +13,8 @@ if [ "${SKIP_FIXTURE:-0}" != "1" ]; then
 fi
 source "$OUT/expected.env"
 
-(cd "$ROOT" && swift build --product ava-finish 2>&1 | tail -1) || { echo "build failed"; exit 1; }
-BIN="$ROOT/.build/debug/ava-finish"
+(cd "$ROOT" && swift build --product vidlark-finish 2>&1 | tail -1) || { echo "build failed"; exit 1; }
+BIN="$ROOT/.build/debug/vidlark-finish"
 
 PASS=0
 FAILED=0

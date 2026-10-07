@@ -1,4 +1,4 @@
-// AVA Recorder website: the menu on phones, copy buttons, the take in the hero, and the sync demo.
+// Vidlark website: the menu on phones, copy buttons, the take in the hero, and the sync demo.
 (function () {
   const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 

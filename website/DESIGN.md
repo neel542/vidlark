@@ -1,5 +1,5 @@
 ---
-name: AVA Recorder website
+name: Vidlark website
 description: A bright, colour-drenched home for a free Mac recorder, proven by acting out one real take.
 colors:
   green: "#1fd17c"
@@ -179,7 +179,7 @@ components:
     textColor: "#dfe9e3"
 ---
 
-# Design System: AVA Recorder website
+# Design System: Vidlark website
 
 This file describes the marketing website in `website/` only. The native Mac app has its own, separate system in the repository's root `DESIGN.md`; the two worlds share the record red and nothing else should be carried across without a decision.
 
@@ -366,5 +366,5 @@ A smaller supporting demo inside a panel: waveforms for each source, the late on
 - **Don't** put uppercase or letterspaced labels above headings; a heading stands on its own.
 - **Don't** use hard offset shadows or black shadows; shadows are soft, ink tinted and drop straight down.
 - **Don't** add another full-stage animation; the take is the one performance, and supporting demos stay small inside a panel.
-- **Don't** use AVA's orange video accent (#FF9900); it belongs to the edited videos, not this tool.
+- **Don't** use AVA INC's orange video accent (#FF9900); it belongs to the edited videos, not this tool.
 - **Don't** use em dashes anywhere in the copy.

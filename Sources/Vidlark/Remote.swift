@@ -519,7 +519,7 @@ enum RemoteTest {
             }
 
             // Learning, through the in-app monitor, with its own settings.
-            let suiteName = "inc.ava.recorder.remote-test"
+            let suiteName = "app.vidlark.mac.remote-test"
             guard let suite = UserDefaults(suiteName: suiteName) else {
                 check("Test settings suite opens", false)
                 finish(checks, dir)

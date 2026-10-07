@@ -912,7 +912,7 @@ enum RecordingsWindow {
         w.isReleasedWhenClosed = false
         w.setContentSize(NSSize(width: 1180, height: 780))
         w.center()
-        _ = w.setFrameAutosaveName("AVA Recordings")
+        _ = w.setFrameAutosaveName("Vidlark Recordings")
         closing = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { _ in
             // Let the page, its timer and its thumbnails go when the window closes.
             MainActor.assumeIsolated {

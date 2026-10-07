@@ -1,14 +1,14 @@
-// Light stand-in phones for the self test: each sends a made-up H.264 picture stream to AVA the
+// Light stand-in phones for the self test: each sends a made-up H.264 picture stream to Vidlark the
 // way the phone page does, with no browser and no camera, so a test hardly loads the Mac. Like the
-// page, it stands by when AVA says so, sends a beep as its sound when AVA asks for its mic, and
+// page, it stands by when Vidlark says so, sends a beep as its sound when Vidlark asks for its mic, and
 // shares the mute switch with the Mac.
 //   node Tools/fake-phone.js <seconds> [shape per phone: wide|tall ...] &
-//   open -g -W -n --env AVA_QUIET=1 --env AVA_CAMERA=phones "dist/AVA Recorder.app" --args --self-test 25
+//   open -g -W -n --env VIDLARK_QUIET=1 --env VIDLARK_CAMERA=phones "dist/Vidlark.app" --args --self-test 25
 // It reads the links from .selftest-phone.txt (one a line), as the self test writes them.
 // The test pictures are made once with ffmpeg and kept in the temporary folder.
 const fs = require("fs"), https = require("https"), os = require("os"), path = require("path"), { spawnSync } = require("child_process"), { performance } = require("perf_hooks");
 const secs = Number(process.argv[2] || 60), shapes = process.argv.slice(3);
-const linksFile = "/Users/Shared/AVA Recordings/.selftest-phone.txt";
+const linksFile = "/Users/Shared/Vidlark Recordings/.selftest-phone.txt";
 
 function parse(file) {
   const b = fs.readFileSync(file), nals = [];
@@ -40,7 +40,7 @@ function parse(file) {
 }
 
 function made(shape) {
-  const dir = path.join(os.tmpdir(), "ava-fake-phone"), file = path.join(dir, shape + ".h264");
+  const dir = path.join(os.tmpdir(), "vidlark-fake-phone"), file = path.join(dir, shape + ".h264");
   if (!fs.existsSync(file)) {
     fs.mkdirSync(dir, { recursive: true });
     const size = shape === "tall" ? "1080x1920" : "1920x1080";
@@ -111,7 +111,7 @@ async function phone(link, shape) {
   handle(await post(Buffer.alloc(0)));
   let formatSent = false;
   const t0 = performance.now(); let tick = 0;
-  // The camera: one picture every 1/30 s, timed on the Mac's clock, while AVA wants them.
+  // The camera: one picture every 1/30 s, timed on the Mac's clock, while Vidlark wants them.
   (async () => {
     while (performance.now() - t0 < secs * 1000) {
       tick++;

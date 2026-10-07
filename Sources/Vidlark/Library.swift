@@ -15,7 +15,7 @@ struct VideoItem: Codable, Identifiable, Equatable {
 }
 
 enum Library {
-    static let root = URL(fileURLWithPath: "/Users/Shared/AVA Recordings", isDirectory: true)
+    static let root = URL(fileURLWithPath: "/Users/Shared/Vidlark Recordings", isDirectory: true)
     private static var queueFile: URL { root.appendingPathComponent("queue.json") }
 
     static func makeDirectory(_ url: URL) throws {

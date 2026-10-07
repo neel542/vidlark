@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>How to use it: AVA Recorder, a free Mac recorder for videos</title>
-<meta name="description" content="Install AVA Recorder from GitHub, record your first video, add a phone camera or another mic, and watch live from another device. Free.">
+<title>How to use it: Vidlark, a free Mac recorder for videos</title>
+<meta name="description" content="Install Vidlark from GitHub, record your first video, add a phone camera or another mic, and watch live from another device. Free.">
 <meta name="theme-color" content="#ff74b0">
 <link rel="icon" href="/assets/mark.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,13 +26,13 @@
 
 <header class="nav">
   <div class="wrap">
-    <a class="brand" href="/"><img class="brand-mark" src="/assets/mark.svg" alt="" width="30" height="30">AVA Recorder</a>
+    <a class="brand" href="/"><img class="brand-mark" src="/assets/mark.svg" alt="" width="30" height="30">Vidlark</a>
     <span class="free-pill">Free</span>
     <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="menu" aria-label="Menu"><svg width="22" height="22"><use href="#i-menu"/></svg></button>
     <nav class="nav-links" id="menu" aria-label="Main">
       <a href="/features">Features</a>
       <a href="/how-to" aria-current="page">How to use it</a>
-      <a class="btn" href="https://github.com/neel542/Video-Recorder"><svg><use href="#i-github"/></svg>GitHub</a>
+      <a class="btn" href="https://github.com/neel542/vidlark"><svg><use href="#i-github"/></svg>GitHub</a>
     </nav>
   </div>
 </header>
@@ -57,7 +57,7 @@
       <a href="#mic"><i style="background:var(--green)"></i>Add a microphone</a>
       <a href="#live"><i style="background:var(--sky)"></i>Watch live</a>
       <a href="#files"><i style="background:var(--pink)"></i>Where files go</a>
-      <p class="toc-free">AVA Recorder is free. So are Xcode, Homebrew and every tool below.</p>
+      <p class="toc-free">Vidlark is free. So are Xcode, Homebrew and every tool below.</p>
     </nav>
 
     <div class="doc">
@@ -73,7 +73,7 @@
 
       <section id="install">
         <h2>Install</h2>
-        <p>AVA Recorder is built on your own Mac from its code on GitHub. Open the Terminal app and follow these steps in order.</p>
+        <p>Vidlark is built on your own Mac from its code on GitHub. Open the Terminal app and follow these steps in order.</p>
         <ol class="steps">
           <li><div>
             <p><b>Install Xcode's command line tools.</b> If they are already installed, Terminal says so.</p>
@@ -89,13 +89,13 @@
           </div></li>
           <li><div>
             <p><b>Download the code.</b></p>
-            <pre class="code"><code>git clone https://github.com/neel542/Video-Recorder.git
-cd Video-Recorder</code></pre>
+            <pre class="code"><code>git clone https://github.com/neel542/vidlark.git
+cd vidlark</code></pre>
           </div></li>
           <li><div>
             <p><b>Build the app and open it.</b> The build finds your certificate on its own.</p>
             <pre class="code"><code>bash Tools/build.sh
-open "dist/AVA Recorder.app"</code></pre>
+open "dist/Vidlark.app"</code></pre>
           </div></li>
           <li><div>
             <p><b>For transcripts, download the speech model</b> (about 550 MB). Without it, everything records and only the transcript and the retakes list are skipped.</p>
@@ -109,7 +109,7 @@ curl -L -o ~/.cache/whisper/ggml-large-v3-turbo-q5_0.bin https://huggingface.co/
         <h2>The first time</h2>
         <ol class="steps">
           <li><div><p><b>Allow the camera and the microphone</b> when macOS asks.</p></div></li>
-          <li><div><p><b>Allow screen recording.</b> When the app asks, switch on AVA Recorder in System Settings, under Privacy and Security, Screen and System Audio Recording. Then quit the app and open it again.</p></div></li>
+          <li><div><p><b>Allow screen recording.</b> When the app asks, switch on Vidlark in System Settings, under Privacy and Security, Screen and System Audio Recording. Then quit the app and open it again.</p></div></li>
         </ol>
       </section>
 
@@ -159,7 +159,7 @@ curl -L -o ~/.cache/whisper/ggml-large-v3-turbo-q5_0.bin https://huggingface.co/
       <section id="files">
         <h2>Where your files go</h2>
         <p>Every take gets its own folder:</p>
-        <pre class="code"><code>/Users/Shared/AVA Recordings/&lt;date&gt; &lt;title&gt;/recording-1/</code></pre>
+        <pre class="code"><code>/Users/Shared/Vidlark Recordings/&lt;date&gt; &lt;title&gt;/recording-1/</code></pre>
         <table class="table">
           <thead><tr><th>File</th><th>What it is</th></tr></thead>
           <tbody>
@@ -185,7 +185,7 @@ curl -L -o ~/.cache/whisper/ggml-large-v3-turbo-q5_0.bin https://huggingface.co/
     <h2>Free, from the first take.</h2>
     <p>No account, no subscription, no watermark and no time limit.</p>
     <div class="actions">
-      <a class="btn" href="https://github.com/neel542/Video-Recorder"><svg><use href="#i-github"/></svg>Get it on GitHub</a>
+      <a class="btn" href="https://github.com/neel542/vidlark"><svg><use href="#i-github"/></svg>Get it on GitHub</a>
       <a class="btn ghost" href="/features">See every feature<svg><use href="#i-arrow"/></svg></a>
     </div>
   </div>
@@ -196,7 +196,7 @@ curl -L -o ~/.cache/whisper/ggml-large-v3-turbo-q5_0.bin https://huggingface.co/
 <footer class="foot">
   <div class="wrap">
     <div>
-      <a class="brand" href="/"><img class="brand-mark" src="/assets/mark.svg" alt="" width="30" height="30">AVA Recorder</a>
+      <a class="brand" href="/"><img class="brand-mark" src="/assets/mark.svg" alt="" width="30" height="30">Vidlark</a>
       <p>A free Mac app that records your face, voice and screen in one take.</p>
     </div>
     <div>
@@ -205,7 +205,7 @@ curl -L -o ~/.cache/whisper/ggml-large-v3-turbo-q5_0.bin https://huggingface.co/
     </div>
     <div>
       <h3>Get it</h3>
-      <ul><li><a href="https://github.com/neel542/Video-Recorder">GitHub</a></li><li><a href="/how-to#install">Install steps</a></li></ul>
+      <ul><li><a href="https://github.com/neel542/vidlark">GitHub</a></li><li><a href="/how-to#install">Install steps</a></li></ul>
     </div>
     <p class="legal">© 2026 Neel Madhav. Free for everyone.</p>
   </div>

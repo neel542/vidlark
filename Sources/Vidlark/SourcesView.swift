@@ -428,7 +428,7 @@ private struct ExtraMicRow: View {
                 detail = "\(mic.name) · Tap Allow on the phone"; lamp = .warn; live = false
             } else if state.mic == .denied {
                 detail = "\(mic.name) · Mic not allowed on the phone"; lamp = .fail; live = false
-                note = "On the phone: Settings, Apps, Safari, Microphone, Allow. Then reload AVA's page."
+                note = "On the phone: Settings, Apps, Safari, Microphone, Allow. Then reload Vidlark's page."
             }
             menu.append(MenuChoice(title: state.muted ? "Unmute the phone's mic" : "Mute the phone's mic", selected: false) {
                 studio.setPhoneMuted(n, !state.muted)

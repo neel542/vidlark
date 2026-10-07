@@ -111,8 +111,8 @@ final class CameraRecorder: NSObject {
     let session = AVCaptureSession()
     private let movie = AVCaptureMovieFileOutput()
     private let levelTap = AVCaptureAudioDataOutput()
-    private let queue = DispatchQueue(label: "ava.camera")
-    private let tapQueue = DispatchQueue(label: "ava.camera.level")
+    private let queue = DispatchQueue(label: "vidlark.camera")
+    private let tapQueue = DispatchQueue(label: "vidlark.camera.level")
     private var videoInput: AVCaptureDeviceInput?
     private var audioInput: AVCaptureDeviceInput?
     private var lastLevel: CFTimeInterval = 0
@@ -135,7 +135,7 @@ final class CameraRecorder: NSObject {
     private var phoneTake: PhoneTake?
     /// The mic's sound format, for the iPhone take's file. Phone queue only.
     private var micFormat: CMFormatDescription?
-    private let phoneQueue = DispatchQueue(label: "ava.camera.phone")
+    private let phoneQueue = DispatchQueue(label: "vidlark.camera.phone")
     /// The frame outputs that get the iPhone's decoded pictures, and whether the mic goes to the
     /// iPhone take. Under `phoneLock`.
     private var phoneTargets: [PhoneTarget] = []
@@ -739,7 +739,7 @@ enum FrameDrops {
 /// These layers only get copies of frames, so nothing on screen can touch the session.
 final class CameraFeed: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, FrameTaking {
     let output = AVCaptureVideoDataOutput()
-    private let queue = DispatchQueue(label: "ava.preview")
+    private let queue = DispatchQueue(label: "vidlark.preview")
     private let lock = NSLock()
     private let layers = NSHashTable<AVSampleBufferDisplayLayer>.weakObjects()
     /// The layers that can be seen right now. Only these get frames: a hidden layer that kept
@@ -852,7 +852,7 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
     private var display: SCDisplay?
     /// Kept so a shared window that moves can be followed.
     private var config: SCStreamConfiguration?
-    private let queue = DispatchQueue(label: "ava.screen")
+    private let queue = DispatchQueue(label: "vidlark.screen")
     private var started = false
     private var wantsAudio = false
     private var audioFormat: CMFormatDescription?

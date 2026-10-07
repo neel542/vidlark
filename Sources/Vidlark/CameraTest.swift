@@ -45,8 +45,8 @@ enum CameraTest {
                  { r, o, _ in r.setFrames(o, on: true) }),
                 ("countdown beeps", { _, _, _ in Beeps.count() }, { _, _, _ in Beeps.go() }),
             ]
-            // AVA_CASES=plain,beep runs only the cases whose names contain one of those words.
-            let only = ProcessInfo.processInfo.environment["AVA_CASES"]?.split(separator: ",")
+            // VIDLARK_CASES=plain,beep runs only the cases whose names contain one of those words.
+            let only = ProcessInfo.processInfo.environment["VIDLARK_CASES"]?.split(separator: ",")
             for (name, first, second) in cases where only.map({ $0.contains { name.contains($0) } }) ?? true {
                 NSApp.windows.forEach { $0.orderOut(nil) }
                 let recorder = CameraRecorder()
@@ -468,7 +468,7 @@ enum ScreenCameraTest {
                 Case(name: "old preview window hidden mid-take", size: full, filter: withoutMe, window: true, hide: true),
                 Case(name: "fed preview window hidden mid-take", size: full, filter: withoutMe, window: true, hide: true, feed: true),
             ]
-            let only = ProcessInfo.processInfo.environment["AVA_CASES"]?.split(separator: ",")
+            let only = ProcessInfo.processInfo.environment["VIDLARK_CASES"]?.split(separator: ",")
             var results: [Outcome] = []
             let sink = Sink()
             for c in cases where only.map({ $0.contains { c.name.contains($0) } }) ?? true {
