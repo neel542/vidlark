@@ -7,8 +7,8 @@ FetchContent_MakeAvailable(webview2)
 set(WEBVIEW2_DIR ${webview2_SOURCE_DIR}/build/native)
 
 # Recording: the movie writer now; camera, mics and screen next.
-add_library(capture STATIC capture/writer.cpp)
-target_link_libraries(capture PUBLIC mfplat mfreadwrite mfuuid mf ole32)
+add_library(capture STATIC capture/writer.cpp capture/camera.cpp capture/mic.cpp)
+target_link_libraries(capture PUBLIC mfplat mfreadwrite mfuuid mf ole32 avrt)
 
 # Writes a test movie with the writer, for CI (no camera there).
 add_executable(vidlark-writer-test tests/writer_test.cpp)

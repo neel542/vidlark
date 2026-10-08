@@ -37,14 +37,15 @@ add_library(finish_core STATIC
   finish/chapters.cpp
   finish/transcript.cpp
   finish/report.cpp
-  finish/compose.cpp)
-target_include_directories(finish_core PUBLIC finish)
+  finish/compose.cpp
+  core/library.cpp)
+target_include_directories(finish_core PUBLIC finish core)
 target_link_libraries(finish_core PUBLIC nlohmann_json::nlohmann_json)
 
 add_executable(vidlark-finish finish/main.cpp)
 target_link_libraries(vidlark-finish PRIVATE finish_core $<$<BOOL:${WIN32}>:shell32>)
 
-add_executable(vidlark-tests tests/unit.cpp tests/test_audio.cpp tests/test_text.cpp)
+add_executable(vidlark-tests tests/unit.cpp tests/test_audio.cpp tests/test_text.cpp tests/test_library.cpp)
 target_link_libraries(vidlark-tests PRIVATE finish_core)
 enable_testing()
 add_test(NAME unit COMMAND vidlark-tests)

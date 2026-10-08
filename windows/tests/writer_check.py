@@ -21,6 +21,30 @@ def probe(ffprobe, path):
     return float(data["format"].get("duration", 0)), streams
 
 
+def boxes(path):
+    """The top-level MP4 boxes of a file, e.g. ftyp moov moof mdat moof mdat, to see how it was cut."""
+    names = []
+    try:
+        with open(path, "rb") as f:
+            size_total = os.path.getsize(path)
+            at = 0
+            while at + 8 <= size_total and len(names) < 40:
+                f.seek(at)
+                head = f.read(16)
+                size = int.from_bytes(head[0:4], "big")
+                kind = head[4:8].decode("latin-1")
+                if size == 1:
+                    size = int.from_bytes(head[8:16], "big")
+                if size < 8:
+                    names.append(f"{kind}(to end)")
+                    break
+                names.append(kind)
+                at += size
+            return f"{size_total} bytes: " + " ".join(names)
+    except OSError as error:
+        return str(error)
+
+
 def main():
     writer, finisher = (os.path.abspath(p) for p in sys.argv[1:3])
     ffprobe = shutil.which("ffprobe") or sys.exit("ffprobe not found")
@@ -50,7 +74,7 @@ def main():
     result = subprocess.run([writer, crashed, "12", "--crash-after", "8"], capture_output=True, text=True)
     check("the crash run ends abruptly", result.returncode == 3, f"exit {result.returncode}")
     info = probe(ffprobe, crashed)
-    check("a file cut off by a crash can still be read", info is not None)
+    check("a file cut off by a crash can still be read", info is not None, boxes(crashed))
     if info:
         duration, streams = info
         check("it keeps all but the last 2 seconds or so", duration >= 5.5, f"{duration:.3f} s of 8 s")

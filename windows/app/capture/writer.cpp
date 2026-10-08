@@ -85,24 +85,44 @@ ComPtr<IMFSample> sampleWith(const BYTE* data, DWORD size, LONGLONG time, LONGLO
 }  // namespace
 
 MovieWriter::MovieWriter(const std::filesystem::path& path, std::optional<VideoFormat> video, std::optional<AudioFormat> audio) {
-    ComPtr<IMFAttributes> attributes;
-    check(MFCreateAttributes(&attributes, 4), "making the writer's settings");
-    // Fragmented MP4: each piece is complete on disk once written, so a crash loses at most the last one.
-    attributes->SetGUID(MF_TRANSCODE_CONTAINERTYPE, MFTranscodeContainerType_FMPEG4);
-    attributes->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE);
-    attributes->SetUINT32(MF_SINK_WRITER_DISABLE_THROTTLING, TRUE);
-    check(MFCreateSinkWriterFromURL(path.c_str(), nullptr, attributes.Get(), &writer_), "starting the file");
-
+    ComPtr<IMFMediaType> videoOut, audioOut;
+    UINT32 bitrate = 0;
     if (video) {
         videoFormat_ = *video;
         frameDuration_ = 10'000'000LL / std::max<UINT32>(1, videoFormat_.fps);
-        UINT32 bitrate = videoFormat_.bitrate
-                             ? videoFormat_.bitrate
-                             : static_cast<UINT32>(0.12 * videoFormat_.width * videoFormat_.height * videoFormat_.fps);
-        check(writer_->AddStream(videoType(MFVideoFormat_H264, videoFormat_, bitrate).Get(), &videoStream_), "adding the picture");
+        bitrate = videoFormat_.bitrate ? videoFormat_.bitrate
+                                       : static_cast<UINT32>(0.12 * videoFormat_.width * videoFormat_.height * videoFormat_.fps);
+        videoOut = videoType(MFVideoFormat_H264, videoFormat_, bitrate);
+    }
+    if (audio) {
+        audioFormat_ = *audio;
+        audioOut = audioType(MFAudioFormat_AAC, audioFormat_);
+    }
+
+    // Fragmented MP4: each piece is complete on disk once written, so a crash loses at most the last one.
+    // The sink is made here, not by the sink writer, so it can be told to cut a piece at every key frame.
+    ComPtr<IMFByteStream> file;
+    check(MFCreateFile(MF_ACCESSMODE_READWRITE, MF_OPENMODE_DELETE_IF_EXIST, MF_FILEFLAGS_NONE, path.c_str(), &file), "making the file");
+    ComPtr<IMFMediaSink> sink;
+    check(MFCreateFMPEG4MediaSink(file.Get(), videoOut.Get(), audioOut.Get(), &sink), "starting the file");
+    ComPtr<IMFAttributes> sinkSettings;
+    if (SUCCEEDED(sink.As(&sinkSettings))) {
+        sinkSettings->SetUINT64(MF_MPEG4SINK_MAX_CODED_SEQUENCES_PER_FRAGMENT, 1);
+    }
+
+    ComPtr<IMFAttributes> attributes;
+    check(MFCreateAttributes(&attributes, 2), "making the writer's settings");
+    attributes->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE);
+    attributes->SetUINT32(MF_SINK_WRITER_DISABLE_THROTTLING, TRUE);
+    check(MFCreateSinkWriterFromMediaSink(sink.Get(), attributes.Get(), &writer_), "starting the writer");
+
+    // The sink's streams are in the order given: the picture first, when there is one.
+    DWORD next = 0;
+    if (video) {
+        videoStream_ = next++;
         check(writer_->SetInputMediaType(videoStream_, videoType(MFVideoFormat_NV12, videoFormat_, 0).Get(), nullptr),
               "setting the picture's format");
-        // A key frame every 2 seconds: the fragments are cut at key frames.
+        // A key frame every 2 seconds: the pieces are cut at key frames.
         ComPtr<ICodecAPI> codec;
         if (SUCCEEDED(writer_->GetServiceForStream(videoStream_, GUID_NULL, IID_PPV_ARGS(&codec)))) {
             VARIANT value;
@@ -110,13 +130,10 @@ MovieWriter::MovieWriter(const std::filesystem::path& path, std::optional<VideoF
             value.vt = VT_UI4;
             value.ulVal = videoFormat_.fps * 2;
             codec->SetValue(&CODECAPI_AVEncMPVGOPSize, &value);
-            value.ulVal = eAVEncCommonRateControlMode_UnconstrainedVBR;
-            codec->SetValue(&CODECAPI_AVEncCommonRateControlMode, &value);
         }
     }
     if (audio) {
-        audioFormat_ = *audio;
-        check(writer_->AddStream(audioType(MFAudioFormat_AAC, audioFormat_).Get(), &audioStream_), "adding the sound");
+        audioStream_ = next++;
         check(writer_->SetInputMediaType(audioStream_, audioType(MFAudioFormat_PCM, audioFormat_).Get(), nullptr),
               "setting the sound's format");
     }
