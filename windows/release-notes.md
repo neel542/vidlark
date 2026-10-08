@@ -1,5 +1,15 @@
 **This is a beta.** Vidlark for Windows is new. It records your face, your voice and your screen, but it has only been tried on a few PCs so far. Tell us what goes wrong, and keep a copy of any take that matters.
 
+## New in this version
+
+Fixes found before the first test on a real laptop:
+
+- A camera or microphone plugged in after Vidlark opens now shows up in the lists.
+- If the camera stops sending pictures, Record turns off and Vidlark says what to check. It opens the camera again when it comes back.
+- If finishing a take goes wrong, Vidlark says so instead of closing. The take's files are kept.
+- The recording box has no pop-up hints, and the question asked when you close Vidlark during a take stays out of the video.
+- The recording box is the right size when the shared screen is scaled differently from the main one.
+
 ## Download and open it
 
 1. Download **Vidlark-Windows.zip** below.
