@@ -5,19 +5,19 @@
 
   // THE WINDOWS DOWNLOAD. While this is empty, every Windows download button says "coming soon".
   // When the Windows version is on GitHub Releases, paste its link here, for example
-  // "https://github.com/neel542/vidlark/releases/latest/download/Vidlark-Windows.zip",
+  // the release's Vidlark-Windows.zip download link,
   // and every Windows button, label and note on the site switches to "ready".
-  const windowsDownload = "";
+  const windowsDownload = "https://github.com/neel542/vidlark/releases/download/windows-v0.1/Vidlark-Windows.zip";
 
   if (windowsDownload) {
     document.querySelectorAll("[data-windows-download]").forEach((link) => {
       link.href = windowsDownload;
       link.removeAttribute("aria-disabled");
       const label = link.querySelector("span");
-      if (label) label.textContent = "Download for Windows";
+      if (label) label.textContent = "Download for Windows (beta)";
     });
     document.querySelectorAll("[data-windows-status]").forEach((chip) => {
-      chip.textContent = "Ready now";
+      chip.textContent = "Beta";
       chip.classList.remove("soon");
     });
     document.querySelectorAll("[data-windows-soon]").forEach((note) => { note.hidden = true; });
