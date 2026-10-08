@@ -307,7 +307,7 @@ code, .mono { font-family: var(--mono); font-size: 0.86em; }
 @media (max-width: 480px) { .no-list { grid-template-columns: 1fr; } }
 
 /* Demo video slot */
-.demo { position: relative; aspect-ratio: 16 / 9; border-radius: var(--radius); overflow: hidden; background: var(--night); border: 1.5px solid var(--ink); box-shadow: 0 34px 70px -34px rgba(14, 31, 22, 0.8); margin-top: 44px; }
+.demo { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius); overflow: hidden; background: var(--night); border: 1.5px solid var(--ink); box-shadow: 0 34px 70px -34px rgba(14, 31, 22, 0.8); margin-top: 44px; }
 .demo video { display: block; width: 100%; height: 100%; background: var(--night); }
 @media (max-width: 600px) { .take-base { margin: 0 -3%; } }
 
