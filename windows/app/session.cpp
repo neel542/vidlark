@@ -76,6 +76,7 @@ struct Session::Take {
     RECT work{};                        // that screen without the taskbar
     ULONGLONG screenAt = 0;             // when Screen follows the first moment of Me after sharing
     ULONGLONG lastFollow = 0;
+    RECT followed{};                    // where the shared window was last time
     struct Extra {
         std::unique_ptr<capture::Mic> mic;
         std::unique_ptr<capture::MovieWriter> writer;
@@ -448,11 +449,16 @@ void Session::tick() {
     if (switchToScreen) show(true);
     if (follow) {
         RECT area{};
+        bool moved = false;
         {
             std::lock_guard lock(takeMutex_);
-            if (take_ && take_->screen) area = take_->screen->area();
+            if (take_ && take_->screen) {
+                area = take_->screen->area();
+                moved = !EqualRect(&area, &take_->followed);
+                take_->followed = area;
+            }
         }
-        if (!IsRectEmpty(&area)) overlay_->cover(area, work);
+        if (moved && !IsRectEmpty(&area)) overlay_->cover(area, work);
     }
 
     nlohmann::json message = {{"type", "tick"}};
