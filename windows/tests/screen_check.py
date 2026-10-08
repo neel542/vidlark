@@ -121,7 +121,8 @@ def main():
             check("the first is the mic (one channel), the second the computer's sound (two)",
                   audio[0].get("channels") == 1 and audio[1].get("channels") == 2,
                   f"{audio[0].get('channels')} and {audio[1].get('channels')} channels")
-        print(f"        {report.get('pictures')} pictures written, {report.get('newPictures')} new from the screen;"
+        print(f"        {report.get('pictures')} pictures written, {report.get('newPictures')} new from the screen,"
+              f" {report.get('convertMs', 0):.1f} ms to turn each into NV12;"
               f" computer's sound {'heard' if report.get('hearsComputer') else 'not available here (silent track)'}")
         check("about 30 pictures a second", abs(report.get("pictures", 0) - SECONDS * 30) <= SECONDS * 3,
               f"{report.get('pictures')} in {SECONDS} s")

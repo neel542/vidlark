@@ -326,26 +326,28 @@ void ScreenRecorder::step(LONGLONG now) {
             winrt::check_hresult(access->GetInterface(__uuidof(ID3D11Texture2D), texture.put_void()));
             D3D11_TEXTURE2D_DESC desc{};
             texture->GetDesc(&desc);
-            if (!capture_->copy || [&] {
-                    D3D11_TEXTURE2D_DESC have{};
-                    capture_->copy->GetDesc(&have);
-                    return have.Width != desc.Width || have.Height != desc.Height;
-                }()) {
-                D3D11_TEXTURE2D_DESC made = desc;
-                made.Usage = D3D11_USAGE_DEFAULT;
-                made.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-                made.CPUAccessFlags = 0;
-                made.MiscFlags = 0;
-                made.MipLevels = 1;
-                made.ArraySize = 1;
-                made.SampleDesc = {1, 0};
-                capture_->copy.Reset();
-                check(device_->CreateTexture2D(&made, nullptr, &capture_->copy), "keeping the screen picture");
+            // The frame is read where it is when a shader may read it; otherwise it is copied first.
+            ID3D11Texture2D* readable = texture.get();
+            if (!(desc.BindFlags & D3D11_BIND_SHADER_RESOURCE)) {
+                D3D11_TEXTURE2D_DESC have{};
+                if (capture_->copy) capture_->copy->GetDesc(&have);
+                if (!capture_->copy || have.Width != desc.Width || have.Height != desc.Height) {
+                    D3D11_TEXTURE2D_DESC made = desc;
+                    made.Usage = D3D11_USAGE_DEFAULT;
+                    made.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+                    made.CPUAccessFlags = 0;
+                    made.MiscFlags = 0;
+                    made.MipLevels = 1;
+                    made.ArraySize = 1;
+                    made.SampleDesc = {1, 0};
+                    capture_->copy.Reset();
+                    check(device_->CreateTexture2D(&made, nullptr, &capture_->copy), "keeping the screen picture");
+                }
+                ComPtr<ID3D11DeviceContext> context;
+                device_->GetImmediateContext(&context);
+                context->CopyResource(capture_->copy.Get(), texture.get());
+                readable = capture_->copy.Get();
             }
-            ComPtr<ID3D11DeviceContext> context;
-            device_->GetImmediateContext(&context);
-            context->CopyResource(capture_->copy.Get(), texture.get());
-            frame.Close();
 
             // The part shown: the whole screen, or the window's place on it.
             const LONG cw = std::min<LONG>(size.Width, static_cast<LONG>(desc.Width));
@@ -357,7 +359,11 @@ void ScreenRecorder::step(LONGLONG now) {
                 RECT inside{};
                 if (IntersectRect(&inside, &shifted, &from) && inside.right - inside.left > 8 && inside.bottom - inside.top > 8) from = inside;
             }
-            converter_->convert(capture_->copy.Get(), from, picture_);
+            const LONGLONG began = MFGetSystemTime();
+            converter_->convert(readable, from, picture_);
+            convertTime_ += MFGetSystemTime() - began;
+            converted_++;
+            frame.Close();
             fresh = true;
 
             // The screen changed size (a new resolution): the pool follows.

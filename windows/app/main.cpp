@@ -103,6 +103,8 @@ void closeBox() {
 
 void showPanel() {
     ShowWindow(window, SW_RESTORE);
+    // While the screen is shared, the panel sits over the stage that holds her camera for Me.
+    SetWindowPos(window, box ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
     SetForegroundWindow(window);
 }
 
@@ -297,6 +299,7 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
             ShowWindow(window, SW_MINIMIZE);
         } else if (type == "share-failed" || type == "stopped") {
             closeBox();
+            SetWindowPos(window, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
             if (IsIconic(window)) showPanel();
         }
         const std::wstring wide = app::wide(*text);

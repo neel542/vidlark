@@ -215,6 +215,7 @@ int wmain(int argc, wchar_t** argv) {
     report["mergeProblem"] = mergeProblem;
     report["pictures"] = recorder->pictures();
     report["newPictures"] = recorder->newPictures();
+    report["convertMs"] = recorder->convertMs();
     report["problem"] = recorder->problem();
     report["overlayProblem"] = overlay.problem();
     overlay.hide();

@@ -66,14 +66,17 @@ void recordingSize(LONG w, LONG h, UINT& outW, UINT& outH) {
 
 namespace {
 
-// One triangle that covers the whole target; each pixel shader works out its own colour.
-// rgbAt takes four samples inside each output pixel, so a big screen shrinks without shimmer.
+// One triangle that covers the whole target; each pixel shader works out its own colour. rgbAt averages
+// the part of the source one output pixel (or a 2 x 2 block of them, for colour) covers: one bilinear
+// sample when that is at most 2 x 2 source pixels, four spread across it when the screen shrinks more.
 const char* converterShaders = R"(
 Texture2D source : register(t0);
 SamplerState smooth : register(s0);
 cbuffer Params : register(b0) {
     float4 dest;   // where the picture goes, in output pixels: left, top, right, bottom
     float4 from;   // the part of the source shown, in texture coordinates: left, top, right, bottom
+    float2 size;   // the source texture, in pixels
+    float2 unused;
 };
 
 float4 vs(uint id : SV_VertexID) : SV_Position {
@@ -81,11 +84,13 @@ float4 vs(uint id : SV_VertexID) : SV_Position {
     return float4(p * float2(2, -2) + float2(-1, 1), 0, 1);
 }
 
-float3 rgbAt(float2 pixel) {
+float3 rgbAt(float2 pixel, float footprint) {
     if (pixel.x < dest.x || pixel.y < dest.y || pixel.x >= dest.z || pixel.y >= dest.w) return float3(0, 0, 0);
     float2 span = (from.zw - from.xy) / (dest.zw - dest.xy);
     float2 uv = from.xy + (pixel - dest.xy) * span;
-    float2 q = span * 0.25;
+    float2 covered = span * size * footprint;
+    if (max(covered.x, covered.y) <= 2.01) return source.SampleLevel(smooth, uv, 0).rgb;
+    float2 q = span * footprint * 0.25;
     float3 c = source.SampleLevel(smooth, uv + float2(-q.x, -q.y), 0).rgb
              + source.SampleLevel(smooth, uv + float2( q.x, -q.y), 0).rgb
              + source.SampleLevel(smooth, uv + float2(-q.x,  q.y), 0).rgb
@@ -94,14 +99,12 @@ float3 rgbAt(float2 pixel) {
 }
 
 float psLuma(float4 pos : SV_Position) : SV_Target {
-    float3 c = rgbAt(pos.xy);
+    float3 c = rgbAt(pos.xy, 1.0);
     return (16.0 + 219.0 * dot(c, float3(0.2126, 0.7152, 0.0722))) / 255.0;
 }
 
 float2 psChroma(float4 pos : SV_Position) : SV_Target {
-    float2 luma = pos.xy * 2.0;
-    float3 c = (rgbAt(luma + float2(-0.5, -0.5)) + rgbAt(luma + float2(0.5, -0.5))
-              + rgbAt(luma + float2(-0.5, 0.5)) + rgbAt(luma + float2(0.5, 0.5))) * 0.25;
+    float3 c = rgbAt(pos.xy * 2.0, 2.0);
     float u = 128.0 + 224.0 * dot(c, float3(-0.1146, -0.3854, 0.5));
     float v = 128.0 + 224.0 * dot(c, float3(0.5, -0.4542, -0.0458));
     return float2(u, v) / 255.0;
@@ -111,6 +114,8 @@ float2 psChroma(float4 pos : SV_Position) : SV_Target {
 struct Params {
     float dest[4];
     float from[4];
+    float size[2];
+    float unused[2];
 };
 
 ComPtr<ID3D11Texture2D> texture(ID3D11Device* device, UINT w, UINT h, DXGI_FORMAT format, bool readable) {
@@ -176,6 +181,8 @@ void Nv12Converter::convert(ID3D11Texture2D* source, const RECT& from, std::vect
     params.from[1] = float(from.top) / desc.Height;
     params.from[2] = float(from.right) / desc.Width;
     params.from[3] = float(from.bottom) / desc.Height;
+    params.size[0] = float(desc.Width);
+    params.size[1] = float(desc.Height);
     context_->UpdateSubresource(params_.Get(), 0, nullptr, &params, 0, 0);
 
     context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

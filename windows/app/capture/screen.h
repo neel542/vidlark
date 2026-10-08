@@ -67,6 +67,8 @@ public:
     // Pictures written so far, and how many were new from the screen rather than repeats of a still one.
     long long pictures() const { return pictures_; }
     long long newPictures() const { return newPictures_; }
+    // How long turning one screen picture into NV12 takes on average, in milliseconds.
+    double convertMs() const { return converted_ ? double(convertTime_) / converted_ / 10'000.0 : 0; }
     // Ends the file properly at this moment. Called by the destructor if not called before.
     void stop();
 
@@ -101,6 +103,8 @@ private:
     std::atomic<LONGLONG> lastSoundPacket_{0};
     std::atomic<bool> soundOn_{false};
     std::atomic<long long> pictures_{0}, newPictures_{0};
+    LONGLONG convertTime_ = 0;
+    long long converted_ = 0;
     std::vector<BYTE> pattern_;
     Microsoft::WRL::ComPtr<ID3D11Texture2D> patternTexture_;
     int tick_ = 0;
