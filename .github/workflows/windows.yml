@@ -54,6 +54,20 @@ jobs:
           $env:Path = "$PWD\dist\Vidlark\tools;$env:Path"
           python windows\tests\writer_check.py build\app\Release\vidlark-writer-test.exe build\Release\vidlark-finish.exe
 
+      - name: Screen test (screen.mov from the real screen, the stage and bubble, a crash, video.mp4)
+        shell: pwsh
+        run: |
+          $env:Path = "$PWD\dist\Vidlark\tools;$env:Path"
+          $env:VIDLARK_CHECK_OUT = "$PWD\screen-check"
+          python windows\tests\screen_check.py build\app\Release\vidlark-screen-test.exe build\app\Release\vidlark-writer-test.exe build\Release\vidlark-finish.exe
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screen-check
+          path: screen-check
+          if-no-files-found: ignore
+
       - uses: actions/cache@v4
         with:
           path: models

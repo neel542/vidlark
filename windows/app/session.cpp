@@ -127,26 +127,9 @@ struct Session::Take {
 };
 
 namespace {
-// Writes sound at the take's running position, with silence for any gap, never going back in time:
-// the file's sound always runs from 0 without holes.
+// The main mic and each extra mic are one channel at 48 kHz.
 void placeSound(capture::MovieWriter& writer, long long& written, const int16_t* samples, UINT32 frames, LONGLONG time, LONGLONG t0) {
-    const long long at = (time - t0) * capture::Mic::rate / second;  // where these samples belong, in samples
-    if (at + frames <= 0) return;                                     // all before the take started
-    UINT32 skip = 0;
-    if (at < 0) skip = static_cast<UINT32>(-at);
-    const long long start = std::max<long long>(at, 0);
-    if (start > written + capture::Mic::rate / 100) {
-        // A gap of more than 10 ms: fill it with silence.
-        long long gap = start - written;
-        while (gap > 0) {
-            const UINT32 chunk = static_cast<UINT32>(std::min<long long>(gap, capture::Mic::rate));
-            writer.writeSilence(chunk, written * second / capture::Mic::rate);
-            written += chunk;
-            gap -= chunk;
-        }
-    }
-    writer.writeAudio(samples + skip, frames - skip, written * second / capture::Mic::rate);
-    written += frames - skip;
+    capture::placeSound(writer, 0, written, samples, frames, 1, time, t0, capture::Mic::rate);
 }
 }  // namespace
 

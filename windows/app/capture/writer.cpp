@@ -84,8 +84,12 @@ ComPtr<IMFSample> sampleWith(const BYTE* data, DWORD size, LONGLONG time, LONGLO
 
 }  // namespace
 
-MovieWriter::MovieWriter(const std::filesystem::path& path, std::optional<VideoFormat> video, std::optional<AudioFormat> audio) {
-    ComPtr<IMFMediaType> videoOut, audioOut;
+MovieWriter::MovieWriter(const std::filesystem::path& path, std::optional<VideoFormat> video, std::optional<AudioFormat> audio)
+    : MovieWriter(path, video, audio ? std::vector<AudioFormat>{*audio} : std::vector<AudioFormat>{}) {}
+
+MovieWriter::MovieWriter(const std::filesystem::path& path, std::optional<VideoFormat> video, const std::vector<AudioFormat>& audio) {
+    ComPtr<IMFMediaType> videoOut;
+    std::vector<ComPtr<IMFMediaType>> audioOut;
     UINT32 bitrate = 0;
     if (video) {
         videoFormat_ = *video;
@@ -94,17 +98,22 @@ MovieWriter::MovieWriter(const std::filesystem::path& path, std::optional<VideoF
                                        : static_cast<UINT32>(0.12 * videoFormat_.width * videoFormat_.height * videoFormat_.fps);
         videoOut = videoType(MFVideoFormat_H264, videoFormat_, bitrate);
     }
-    if (audio) {
-        audioFormat_ = *audio;
-        audioOut = audioType(MFAudioFormat_AAC, audioFormat_);
-    }
+    audioFormats_ = audio;
+    for (const auto& format : audioFormats_) audioOut.push_back(audioType(MFAudioFormat_AAC, format));
 
     // Fragmented MP4: each piece is complete on disk once written, so a crash loses at most the last one.
     // The sink is made here, not by the sink writer, so it can be told to cut a piece at every key frame.
     ComPtr<IMFByteStream> file;
     check(MFCreateFile(MF_ACCESSMODE_READWRITE, MF_OPENMODE_DELETE_IF_EXIST, MF_FILEFLAGS_NONE, path.c_str(), &file), "making the file");
     ComPtr<IMFMediaSink> sink;
-    check(MFCreateFMPEG4MediaSink(file.Get(), videoOut.Get(), audioOut.Get(), &sink), "starting the file");
+    check(MFCreateFMPEG4MediaSink(file.Get(), videoOut.Get(), audioOut.empty() ? nullptr : audioOut[0].Get(), &sink), "starting the file");
+    // Further sound tracks are added to the sink after the first.
+    for (size_t i = 1; i < audioOut.size(); i++) {
+        DWORD count = 0;
+        sink->GetStreamSinkCount(&count);
+        ComPtr<IMFStreamSink> added;
+        check(sink->AddStreamSink(count, audioOut[i].Get(), &added), "adding a second sound track");
+    }
     ComPtr<IMFAttributes> sinkSettings;
     if (SUCCEEDED(sink.As(&sinkSettings))) {
         sinkSettings->SetUINT64(MF_MPEG4SINK_MAX_CODED_SEQUENCES_PER_FRAGMENT, 1);
@@ -116,7 +125,7 @@ MovieWriter::MovieWriter(const std::filesystem::path& path, std::optional<VideoF
     attributes->SetUINT32(MF_SINK_WRITER_DISABLE_THROTTLING, TRUE);
     check(MFCreateSinkWriterFromMediaSink(sink.Get(), attributes.Get(), &writer_), "starting the writer");
 
-    // The sink's streams are in the order given: the picture first, when there is one.
+    // The sink's streams are in the order given: the picture first, when there is one, then each sound track.
     DWORD next = 0;
     if (video) {
         videoStream_ = next++;
@@ -132,10 +141,10 @@ MovieWriter::MovieWriter(const std::filesystem::path& path, std::optional<VideoF
             codec->SetValue(&CODECAPI_AVEncMPVGOPSize, &value);
         }
     }
-    if (audio) {
-        audioStream_ = next++;
-        check(writer_->SetInputMediaType(audioStream_, audioType(MFAudioFormat_PCM, audioFormat_).Get(), nullptr),
-              "setting the sound's format");
+    for (const auto& format : audioFormats_) {
+        const DWORD stream = next++;
+        check(writer_->SetInputMediaType(stream, audioType(MFAudioFormat_PCM, format).Get(), nullptr), "setting the sound's format");
+        audioStreams_.push_back(stream);
     }
     check(writer_->BeginWriting(), "starting to write");
 }
@@ -167,20 +176,45 @@ void MovieWriter::writeVideo(IMFSample* sample) {
     check(writer_->WriteSample(videoStream_, sample), "writing a picture");
 }
 
-void MovieWriter::writeAudio(const int16_t* samples, UINT32 frames, LONGLONG time) {
-    if (audioStream_ == kNone || frames == 0) return;
-    const DWORD size = frames * audioFormat_.channels * 2;
-    const LONGLONG duration = 10'000'000LL * frames / audioFormat_.rate;
+void MovieWriter::writeAudio(const int16_t* samples, UINT32 frames, LONGLONG time, size_t track) {
+    if (track >= audioStreams_.size() || frames == 0) return;
+    const AudioFormat& format = audioFormats_[track];
+    const DWORD size = frames * format.channels * 2;
+    const LONGLONG duration = 10'000'000LL * frames / format.rate;
     auto sample = sampleWith(reinterpret_cast<const BYTE*>(samples), size, time, duration);
-    check(writer_->WriteSample(audioStream_, sample.Get()), "writing sound");
+    check(writer_->WriteSample(audioStreams_[track], sample.Get()), "writing sound");
 }
 
-void MovieWriter::writeSilence(UINT32 frames, LONGLONG time) {
-    if (audioStream_ == kNone || frames == 0) return;
-    const DWORD size = frames * audioFormat_.channels * 2;
-    const LONGLONG duration = 10'000'000LL * frames / audioFormat_.rate;
+void MovieWriter::writeSilence(UINT32 frames, LONGLONG time, size_t track) {
+    if (track >= audioStreams_.size() || frames == 0) return;
+    const AudioFormat& format = audioFormats_[track];
+    const DWORD size = frames * format.channels * 2;
+    const LONGLONG duration = 10'000'000LL * frames / format.rate;
     auto sample = sampleWith(nullptr, size, time, duration);
-    check(writer_->WriteSample(audioStream_, sample.Get()), "writing silence");
+    check(writer_->WriteSample(audioStreams_[track], sample.Get()), "writing silence");
+}
+
+void placeSound(MovieWriter& writer, size_t track, long long& written, const int16_t* samples, UINT32 frames,
+                UINT32 channels, LONGLONG time, LONGLONG t0, UINT32 rate) {
+    constexpr LONGLONG second = 10'000'000;
+    const long long at = (time - t0) * rate / second;  // where these samples belong, in samples
+    if (at + frames <= 0) return;                       // all before the start
+    UINT32 skip = 0;
+    if (at < 0) skip = static_cast<UINT32>(-at);
+    const long long start = std::max<long long>(at, 0);
+    // A gap of more than 10 ms: fill it with silence.
+    if (start > written + rate / 100) padSound(writer, track, written, start, rate);
+    writer.writeAudio(samples + static_cast<size_t>(skip) * channels, frames - skip, written * second / rate, track);
+    written += frames - skip;
+}
+
+void padSound(MovieWriter& writer, size_t track, long long& written, long long until, UINT32 rate) {
+    constexpr LONGLONG second = 10'000'000;
+    while (written < until) {
+        const UINT32 chunk = static_cast<UINT32>(std::min<long long>(until - written, rate / 2));
+        writer.writeSilence(chunk, written * second / rate, track);
+        written += chunk;
+    }
 }
 
 void MovieWriter::finish() {
