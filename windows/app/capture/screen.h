@@ -4,6 +4,10 @@
 // sound as camera.mov, which is how the finisher lines the two files up), the second the computer's own
 // sound (WASAPI loopback), silence while it is switched off. Fragmented like camera.mov, so a crash keeps
 // all but the last moment. Vidlark's own windows are kept out by SetWindowDisplayAffinity, not here.
+//
+// Media Foundation's fragmented MP4 holds one sound track only (its streams are fixed when it is made), so
+// during the take the computer's sound goes to a file of its own, screen-sound.m4a, and mergeSound puts it
+// into screen.mov after Stop with ffmpeg, copying, not compressing again. After a crash both files stay.
 
 #include "gpu.h"
 #include "mic.h"
@@ -38,6 +42,11 @@ public:
 
     // Whether this PC can record its screen, and if not, why, in plain words.
     static bool supported(std::string* why = nullptr);
+    // Where the computer's sound waits during the take: screen-sound.m4a next to screen.mov.
+    static std::filesystem::path soundFile(const std::filesystem::path& screen);
+    // After Stop: the computer's sound into screen.mov as its second sound track, and its own file removed.
+    // True when that is done or there was nothing to do; false with the reason when ffmpeg could not.
+    static bool mergeSound(const std::filesystem::path& screen, std::string* problem = nullptr);
 
     // The PC's clock (MFGetSystemTime, 100 ns units) at time 0 of screen.mov.
     LONGLONG startTime() const { return t0_; }
@@ -74,7 +83,8 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Device> device_;
     std::unique_ptr<Nv12Converter> converter_;
     std::unique_ptr<Capture> capture_;
-    std::unique_ptr<MovieWriter> writer_;
+    std::unique_ptr<MovieWriter> writer_;       // screen.mov: the picture and the mic
+    std::unique_ptr<MovieWriter> soundWriter_;  // screen-sound.m4a: the computer's sound
     std::unique_ptr<Mic> loopback_;
     VideoFormat format_;
     RECT monitorRect_{};

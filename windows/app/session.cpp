@@ -89,7 +89,7 @@ struct Session::Take {
 namespace {
 // The main mic and each extra mic are one channel at 48 kHz.
 void placeSound(capture::MovieWriter& writer, long long& written, const int16_t* samples, UINT32 frames, LONGLONG time, LONGLONG t0) {
-    capture::placeSound(writer, 0, written, samples, frames, 1, time, t0, capture::Mic::rate);
+    capture::placeSound(writer, written, samples, frames, 1, time, t0, capture::Mic::rate);
 }
 }  // namespace
 
@@ -505,6 +505,12 @@ void Session::stop() {
 }
 
 void Session::runFinisher(fs::path folder) {
+    // The computer's sound into screen.mov first, so the folder holds the same files as a Mac take.
+    if (fs::exists(capture::ScreenRecorder::soundFile(folder / L"screen.mov"))) {
+        post_({{"type", "finishing"}, {"line", "Putting the computer's sound into screen.mov"}});
+        std::string problem;
+        if (!capture::ScreenRecorder::mergeSound(folder / L"screen.mov", &problem)) post_({{"type", "finishing"}, {"line", problem}});
+    }
     const fs::path tool = exeDir() / L"vidlark-finish.exe";
     std::wstring command = L"\"" + tool.wstring() + L"\" \"" + folder.wstring() + L"\"";
     // Without the speech model there is no transcript to write, so the take finishes without one.

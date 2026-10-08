@@ -1,4 +1,4 @@
-// vidlark-writer-test <out> <seconds> [--crash-after <seconds>] [--audio-only] [--two-sound]
+// vidlark-writer-test <out> <seconds> [--crash-after <seconds>] [--audio-only]
 // Writes a movie of a moving test picture and a pattern of noise bursts with capture::MovieWriter, the
 // way the app writes camera.mov, so CI can check the files on a Windows machine that has no camera.
 // --crash-after ends the process abruptly part way through, like a crash, to check the take survives.
@@ -21,12 +21,11 @@ int wmain(int argc, wchar_t** argv) {
     const std::filesystem::path out = argv[1];
     const double seconds = _wtof(argv[2]);
     double crashAfter = -1;
-    bool audioOnly = false, twoSound = false;
+    bool audioOnly = false;
     for (int i = 3; i < argc; i++) {
         std::wstring arg = argv[i];
         if (arg == L"--crash-after" && i + 1 < argc) crashAfter = _wtof(argv[++i]);
         if (arg == L"--audio-only") audioOnly = true;
-        if (arg == L"--two-sound") twoSound = true;  // a second, two-channel sound track, as screen.mov has
     }
 
     CoInitializeEx(nullptr, COINIT_MULTITHREADED);
@@ -34,10 +33,7 @@ int wmain(int argc, wchar_t** argv) {
     try {
         capture::VideoFormat video{1280, 720, 30, 0};
         capture::AudioFormat audio{48000, 1, 192000};
-        std::vector<capture::AudioFormat> tracks{audio};
-        if (twoSound) tracks.push_back(capture::AudioFormat{48000, 2, 192000});
-        capture::MovieWriter writer(out, audioOnly ? std::nullopt : std::optional(video), tracks);
-        std::vector<int16_t> stereo;
+        capture::MovieWriter writer(out, audioOnly ? std::nullopt : std::optional(video), audio);
 
         std::vector<BYTE> frame(video.width * video.height * 3 / 2);
         std::mt19937 pattern(7), noise(11);
@@ -84,11 +80,6 @@ int wmain(int argc, wchar_t** argv) {
                     sound[i] = static_cast<int16_t>((unit(noise) * 2 - 1) * level * 32000);
                 }
                 writer.writeAudio(sound.data(), chunk, written * 10'000'000 / audio.rate);
-                if (twoSound) {
-                    stereo.assign(static_cast<size_t>(chunk) * 2, 0);
-                    for (UINT32 i = 0; i < chunk; i++) stereo[i * 2] = stereo[i * 2 + 1] = static_cast<int16_t>(sound[i] / 2);
-                    writer.writeAudio(stereo.data(), chunk, written * 10'000'000 / audio.rate, 1);
-                }
                 written += chunk;
             }
         }

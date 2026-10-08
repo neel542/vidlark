@@ -3,7 +3,8 @@
 
 Runs vidlark-screen-test, which records the main screen into screen.mov with the app's own screen
 recorder and its stage and face bubble windows, then checks the file:
-  - length, size, H.264, and two sound tracks (the mic, then the computer's sound)
+  - length, size, H.264, and two sound tracks (the mic, then the computer's sound, which waits in
+    screen-sound.m4a during the take and is copied into screen.mov after Stop)
   - the picture: her made-up camera (green) across the screen for Me, then in the bubble for Screen;
     a window kept out of the capture (magenta) never shows; a window let in (blue) does
   - a recording cut off by a crash can still be read
@@ -86,6 +87,8 @@ def main():
         print(result.stdout, result.stderr)
         sys.exit(1)
     print("        " + json.dumps(report))
+    check("the computer's sound went into screen.mov after Stop, and its own file is gone",
+          report.get("merged") is True and not os.path.exists(os.path.join(take, "screen-sound.m4a")), report.get("mergeProblem", ""))
     captured = report["capture"] == "screen"
     if captured:
         print("        Windows.Graphics.Capture ran: this is the real screen.")
@@ -171,8 +174,12 @@ def main():
     if info:
         duration = float(info["format"].get("duration", 0) or 0)
         audio = [s for s in info["streams"] if s["codec_type"] == "audio"]
-        check("it keeps all but the last 2 seconds or so, with both sound tracks", duration >= 3.5 and len(audio) == 2,
-              f"{duration:.3f} s of 6 s, {len(audio)} sound tracks")
+        check("it keeps all but the last 2 seconds or so, with the mic", duration >= 3.5 and len(audio) == 1,
+              f"{duration:.3f} s of 6 s, {len(audio)} sound track")
+    # The computer's sound waits in its own file during the take, so after a crash it is there too.
+    sound = probe(ffprobe, os.path.join(root, "crashed-sound.m4a"))
+    check("so is the computer's sound beside it, crashed-sound.m4a", sound is not None
+          and float(sound["format"].get("duration", 0) or 0) >= 3.5)
 
     # A whole take: camera.mov from the writer test (the same bursts) and this screen.mov.
     result = subprocess.run([writer, os.path.join(take, "camera.mov"), str(SECONDS)], capture_output=True, text=True)

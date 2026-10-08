@@ -7,7 +7,8 @@
 //   - a magenta window kept out of the capture (WDA_EXCLUDEFROMCAPTURE, as Vidlark's own windows are) and
 //     a blue window that is not, both top left.
 //   - the first sound track gets the same noise bursts as vidlark-writer-test's camera.mov, so the
-//     finisher can line the two files up; the second is the computer's sound, if this PC has any.
+//     finisher can line the two files up; the second is the computer's sound, if this PC has any. That
+//     goes into screen.mov after Stop (ScreenRecorder::mergeSound), as in the app.
 // At the end it prints one line of JSON saying what it did, where the windows were and what went wrong.
 // --pattern records a test picture instead of the screen. Without it, the test picture is used only when
 // Windows.Graphics.Capture cannot run here, and the JSON says why.
@@ -209,6 +210,9 @@ int wmain(int argc, wchar_t** argv) {
     stopFeeds = true;
     mic.join();
     camera.join();
+    std::string mergeProblem;
+    report["merged"] = capture::ScreenRecorder::mergeSound(out, &mergeProblem);
+    report["mergeProblem"] = mergeProblem;
     report["pictures"] = recorder->pictures();
     report["newPictures"] = recorder->newPictures();
     report["problem"] = recorder->problem();

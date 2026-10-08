@@ -86,14 +86,6 @@ def main():
           and info[1].get("audio", {}).get("codec_name") == "aac" and abs(info[0] - 5) < 0.25,
           f"{info[0]:.3f} s" if info else result.stderr.strip())
 
-    two = os.path.join(root, "two-sound.mov")
-    result = subprocess.run([writer, two, "4", "--two-sound"], capture_output=True, text=True)
-    out = subprocess.run([ffprobe, "-v", "error", "-show_entries", "stream=codec_type,channels", "-of", "json", two],
-                         capture_output=True, text=True)
-    sounds = [s for s in json.loads(out.stdout or "{}").get("streams", []) if s["codec_type"] == "audio"] if out.returncode == 0 else []
-    check("a movie with two sound tracks (mic, then two-channel), as screen.mov has", result.returncode == 0 and len(sounds) == 2
-          and sounds[1].get("channels") == 2, result.stderr.strip() or json.dumps(sounds))
-
     with open(os.path.join(take, "events.jsonl"), "w", encoding="utf-8") as out:
         out.write(json.dumps({"t": 0, "type": "start", "wall": "2026-10-08T09:30:00Z", "title": "Writer test", "screen": ""}) + "\n")
         out.write(json.dumps({"t": 5.9, "type": "stop"}) + "\n")

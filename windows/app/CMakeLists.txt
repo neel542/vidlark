@@ -9,7 +9,7 @@ set(WEBVIEW2_DIR ${webview2_SOURCE_DIR}/build/native)
 # Recording: the movie writer, camera, mics, the screen (Windows.Graphics.Capture through C++/WinRT), and
 # the stage and face bubble windows that put her camera on the recorded screen.
 add_library(capture STATIC capture/writer.cpp capture/camera.cpp capture/mic.cpp capture/gpu.cpp capture/screen.cpp overlay.cpp)
-target_link_libraries(capture PUBLIC mfplat mfreadwrite mfuuid mf ole32 avrt d3d11 dxgi d3dcompiler dcomp dwmapi shcore windowsapp)
+target_link_libraries(capture PUBLIC finish_core mfplat mfreadwrite mfuuid mf ole32 avrt d3d11 dxgi d3dcompiler dcomp dwmapi shcore windowsapp)
 # C++/WinRT's headers come with the Windows SDK; Visual Studio usually has them on the path already.
 if(CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION)
   get_filename_component(kits_root "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows Kits\\Installed Roots;KitsRoot10]" ABSOLUTE)

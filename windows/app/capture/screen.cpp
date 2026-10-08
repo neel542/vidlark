@@ -6,6 +6,8 @@
 #include <dxgi.h>
 #include <mfapi.h>
 
+#include "support.h"
+
 #include <winrt/base.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Metadata.h>
@@ -90,6 +92,37 @@ struct ScreenRecorder::Capture {
         return frame;
     }
 };
+
+std::filesystem::path ScreenRecorder::soundFile(const std::filesystem::path& screen) {
+    return screen.parent_path() / (screen.stem().wstring() + L"-sound.m4a");
+}
+
+bool ScreenRecorder::mergeSound(const std::filesystem::path& screen, std::string* problem) {
+    namespace fs = std::filesystem;
+    const fs::path sound = soundFile(screen);
+    std::error_code ec;
+    if (!fs::exists(sound, ec) || !fs::exists(screen, ec)) return true;
+    const auto ffmpeg = vl::tools::find("ffmpeg");
+    if (!ffmpeg) {
+        if (problem) *problem = "ffmpeg is missing, so the computer's sound stays in " + vl::utf8(sound.filename());
+        return false;
+    }
+    const fs::path merged = screen.parent_path() / (screen.stem().wstring() + L"-merging.mov");
+    const auto result = vl::runTool(*ffmpeg, {"-nostdin", "-v", "error", "-y", "-i", vl::utf8(screen), "-i", vl::utf8(sound),
+                                              "-map", "0:v", "-map", "0:a", "-map", "1:a", "-c", "copy", "-f", "mp4", vl::utf8(merged)});
+    if (result.status != 0) {
+        fs::remove(merged, ec);
+        if (problem) *problem = "the computer's sound could not go into screen.mov: " + result.lastErrorLine();
+        return false;
+    }
+    if (!MoveFileExW(merged.c_str(), screen.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        fs::remove(merged, ec);
+        if (problem) *problem = "screen.mov could not be replaced, so the computer's sound stays in " + vl::utf8(sound.filename());
+        return false;
+    }
+    fs::remove(sound, ec);
+    return true;
+}
 
 bool ScreenRecorder::supported(std::string* why) {
     try {
@@ -189,8 +222,8 @@ ScreenRecorder::ScreenRecorder(const Options& options) : options_(options) {
         note(std::string("the computer's sound cannot be recorded on this PC (") + error.what() + "), so its track is silent");
     }
 
-    writer_ = std::make_unique<MovieWriter>(options.file, format_,
-                                            std::vector<AudioFormat>{AudioFormat{rate, 1, 192000}, AudioFormat{rate, 2, 192000}});
+    writer_ = std::make_unique<MovieWriter>(options.file, format_, AudioFormat{rate, 1, 192000});
+    soundWriter_ = std::make_unique<MovieWriter>(soundFile(options.file), std::nullopt, AudioFormat{rate, 2, 192000});
     t0_ = MFGetSystemTime();
     lastSoundPacket_ = t0_;
     if (capture_) {
@@ -200,6 +233,10 @@ ScreenRecorder::ScreenRecorder(const Options& options) : options_(options) {
             loopback_.reset();
             capture_.reset();
             writer_.reset();
+            soundWriter_.reset();
+            std::error_code ec;
+            std::filesystem::remove(options.file, ec);
+            std::filesystem::remove(soundFile(options.file), ec);
             throw std::runtime_error("the screen could not be recorded: " + plain(error));
         }
     }
@@ -397,7 +434,7 @@ void ScreenRecorder::addMic(const int16_t* samples, UINT32 frames, LONGLONG time
     std::lock_guard guard(writeLock_);
     if (stopped_ || !writer_) return;
     try {
-        placeSound(*writer_, 0, micWritten_, samples, frames, 1, time, t0_, rate);
+        placeSound(*writer_, micWritten_, samples, frames, 1, time, t0_, rate);
     } catch (const std::exception& error) {
         note(error.what());
     }
@@ -411,9 +448,9 @@ void ScreenRecorder::onComputerSound(const int16_t* samples, UINT32 frames, LONG
         samples = quiet.data();
     }
     std::lock_guard guard(writeLock_);
-    if (stopped_ || !writer_) return;
+    if (stopped_ || !soundWriter_) return;
     try {
-        placeSound(*writer_, 1, soundWritten_, samples, frames, 2, time, t0_, rate);
+        placeSound(*soundWriter_, soundWritten_, samples, frames, 2, time, t0_, rate);
     } catch (const std::exception& error) {
         note(error.what());
     }
@@ -424,7 +461,7 @@ void ScreenRecorder::onComputerSound(const int16_t* samples, UINT32 frames, LONG
 void ScreenRecorder::keepComputerSoundGoing(LONGLONG now) {
     if (now - lastSoundPacket_ < second * 3 / 10) return;
     const long long until = (now - t0_ - second / 10) * rate / second;
-    if (until > soundWritten_ + rate / 5) padSound(*writer_, 1, soundWritten_, until, rate);
+    if (until > soundWritten_ + rate / 5) padSound(*soundWriter_, soundWritten_, until, rate);
 }
 
 void ScreenRecorder::stop() {
@@ -439,9 +476,10 @@ void ScreenRecorder::stop() {
     try {
         // Every track runs to the moment of Stop: the last picture once more, and silence after the last sound.
         if (havePicture_ && end > lastPicture_ + second / 1000) writer_->writeVideo(picture_.data(), static_cast<LONG>(format_.width), end);
-        padSound(*writer_, 0, micWritten_, end * rate / second, rate);
-        padSound(*writer_, 1, soundWritten_, end * rate / second, rate);
+        padSound(*writer_, micWritten_, end * rate / second, rate);
+        padSound(*soundWriter_, soundWritten_, end * rate / second, rate);
         writer_->finish();
+        soundWriter_->finish();
     } catch (const std::exception& error) {
         note(error.what());
     }
