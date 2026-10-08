@@ -451,7 +451,14 @@ TEST("buildReport says what was skipped when the transcript and chapters were no
     CHECK(hasLine(again, "Failed: whisper-cli failed: out of memory"));
     CHECK(hasLine(again, "None: there were no app switches to build chapters from. chapters.txt is empty."));
     CHECK(hasLine(again, "The word \"retake\" was not said."));
-    CHECK(hasLine(again, "Not made (finished with --no-video)."));
+    // Wanted, no screen, not made and no problem: the picked mic could not be used, so camera.mov is the video.
+    CHECK(hasLine(again, "No screen in this take, so camera.mov is the video."));
+    {
+        auto noVideo = r;
+        noVideo.videoWanted = false;
+        noVideo.screenDuration = 30.0;
+        CHECK(hasLine(vl::buildReport(noVideo), "Not made (finished with --no-video)."));
+    }
     r.candidateChapters = 2;
     r.videoProblem = "ffmpeg failed";
     again = vl::buildReport(r);
