@@ -201,6 +201,10 @@ private struct VideoSettings: View {
             } below: {
                 ShapePicker(studio: studio)
             }
+            SettingRow("Keep my face framed in the video",
+                       "When the finished video shows your camera across the whole screen, the picture follows your face like a camera operator: still while you talk, a smooth glide when you move.") {
+                Switch(on: studio.frameFace) { studio.frameFace = $0 }
+            }
             SettingRow("Ask what to share each time",
                        "On: pressing Screen during a take shows the screens and windows, with your last pick ready. Off: it shares your last pick straight away.") {
                 Switch(on: studio.askBeforeSharing) { studio.askBeforeSharing = $0 }

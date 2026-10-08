@@ -7,12 +7,10 @@ import Foundation
 // the screen is shared) it is camera.mov, cropped the same way her camera filled the screen.
 // The sound is the mic from camera.mov, or another mic picked for the video (lined up by the
 // finisher), plus the Mac's sound when it was ticked.
-
-/// One click of Me or Screen, in camera time.
-struct ShowChange {
-    var t: Double
-    var screen: Bool
-}
+//
+// With face framing (Framing.swift), wherever the video shows camera.mov across the frame its crop
+// follows her face. That includes each Me inside screen.mov when the screen was lined up by sound:
+// there the camera is laid over screen.mov's copy of it, meeting it at the same crop at both ends.
 
 struct ComposeResult {
     var seconds: Double
@@ -20,6 +18,26 @@ struct ComposeResult {
     var height: Int
     /// When the video changes from camera.mov to screen.mov, if it starts on camera.mov.
     var cameraUntil: Double?
+    var framing: FramingOutcome?
+}
+
+/// What the finisher knows for framing: her face in camera.mov, and the clicks of Me and Screen.
+struct FramingInput {
+    var faces: FaceTrack
+    var shows: [ShowChange]
+    /// screen.mov is lined up by sound, so each Me inside it can be shown from camera.mov too.
+    var meToo: Bool
+}
+
+struct FramingOutcome {
+    /// Looks that found a face, and all looks.
+    var looksWithFace: Int
+    var looks: Int
+    /// Glides of the crop while the video shows the camera.
+    var glides: Int
+    /// Seconds of video showing camera.mov across the frame, and how many Me stretches of screen.mov that includes.
+    var cameraSeconds: Double
+    var meStretches: Int
 }
 
 /// How long the change from camera.mov to screen.mov takes.
@@ -28,7 +46,7 @@ let handoverSeconds = 0.25
 /// `sharedLate`: a camera-first take, so screen.mov starts with her camera across the screen and
 /// the change can wait a moment for it.
 func composeVideo(camera: URL, screen: URL, screenOffset: Double, sharedLate: Bool, sound: (url: URL, offset: Double)? = nil,
-                  out: URL) async throws -> ComposeResult {
+                  framing: FramingInput? = nil, out: URL) async throws -> ComposeResult {
     let cameraAsset = AVURLAsset(url: camera)
     let screenAsset = AVURLAsset(url: screen)
     guard let cameraVideo = try await cameraAsset.loadTracks(withMediaType: .video).first else {
@@ -81,29 +99,82 @@ func composeVideo(camera: URL, screen: URL, screenOffset: Double, sharedLate: Bo
     // A screen that starts within a moment of the camera is the screen from the start.
     let cut = screenFrom < 1 ? 0 : screenFrom + (sharedLate ? 0.3 : 0)
 
-    let cameraLayer = AVMutableVideoCompositionLayerInstruction(assetTrack: cameraTrack)
-    cameraLayer.setTransform(try await fitting(cameraVideo, into: canvas, fill: true), at: .zero)
-    let screenLayer = AVMutableVideoCompositionLayerInstruction(assetTrack: screenTrack)
-    screenLayer.setTransform(try await fitting(screenVideo, into: canvas, fill: false), at: .zero)
-    if cut == 0 {
-        cameraLayer.setOpacity(0, at: .zero)
-        screenLayer.setOpacity(1, at: .zero)
-    } else {
-        // The screen fades in over camera.mov, which stays whole underneath until it has.
-        let fade = CMTimeRange(start: CMTime(seconds: cut, preferredTimescale: 600), duration: CMTime(seconds: handoverSeconds, preferredTimescale: 600))
-        cameraLayer.setOpacity(1, at: .zero)
-        screenLayer.setOpacity(0, at: .zero)
-        screenLayer.setOpacityRamp(fromStartOpacity: 0, toEndOpacity: 1, timeRange: fade)
-        cameraLayer.setOpacity(0, at: fade.end)
+    // Where the video shows camera.mov across the frame, and where in the picture its crop sits.
+    let (upright, cameraSize) = try await uprightTransform(cameraVideo)
+    let fill = fillCrop(pictureAspect: cameraSize.width / max(cameraSize.height, 1), canvasAspect: canvas.width / max(canvas.height, 1))
+    var path = CropPath(width: fill.w, height: fill.h, home: fill.home, start: fill.home, moves: [])
+    if let framing {
+        path = framePath(framing.faces.looks, width: framing.faces.width, height: framing.faces.height, crop: (fill.w, fill.h), home: fill.home)
     }
-    // If the screen stops a moment before the camera, the camera covers the last moment.
-    if screenTo < end.seconds - 0.05 {
-        cameraLayer.setOpacity(1, at: CMTime(seconds: screenTo, preferredTimescale: 600))
+    let meToo = framing?.meToo == true && !path.still
+    let stretches = cameraStretches(end: end.seconds, screenFrom: screenFrom, screenTo: screenTo, cut: cut,
+                                    shows: framing?.shows ?? [], meToo: meToo)
+
+    // The camera lies over the screen and shows only in its stretches, fading where it meets screen.mov.
+    let cameraLayer = AVMutableVideoCompositionLayerInstruction(assetTrack: cameraTrack)
+    func time(_ seconds: Double) -> CMTime { CMTime(seconds: seconds, preferredTimescale: 600) }
+    cameraLayer.setOpacity(stretches.first?.from == 0 ? 1 : 0, at: .zero)
+    for stretch in stretches {
+        if stretch.fadeIn > 0 {
+            cameraLayer.setOpacityRamp(fromStartOpacity: 0, toEndOpacity: 1, timeRange: CMTimeRange(start: time(stretch.from), duration: time(stretch.fadeIn)))
+        } else if stretch.from > 0 {
+            cameraLayer.setOpacity(1, at: time(stretch.from))
+        }
+        if stretch.fadeOut > 0 {
+            cameraLayer.setOpacityRamp(fromStartOpacity: 1, toEndOpacity: 0,
+                                       timeRange: CMTimeRange(start: time(stretch.to - stretch.fadeOut), duration: time(stretch.fadeOut)))
+        } else if stretch.to < end.seconds - 0.001 {
+            cameraLayer.setOpacity(0, at: time(stretch.to))
+        }
+    }
+
+    // The crop, frame by frame at 30 a second: held where it holds, and a straight step from each
+    // frame to the next while it glides, so every frame of a glide sits exactly on its curve.
+    let k = max(canvas.width / cameraSize.width, canvas.height / cameraSize.height)
+    func place(_ p: CropPoint) -> CGAffineTransform {
+        upright.concatenating(CGAffineTransform(scaleX: k, y: k))
+            .concatenating(CGAffineTransform(translationX: -p.x * cameraSize.width * k, y: -p.y * cameraSize.height * k))
+    }
+    var index = 0
+    func crop(at t: Double) -> CropPoint {
+        while index < stretches.count, t > stretches[index].to { index += 1 }
+        guard index < stretches.count, t >= stretches[index].from else { return path.home }
+        return framedCrop(path, at: t, in: stretches[index])
+    }
+    let frames = Int((end.seconds * 30).rounded(.up))
+    var previous = crop(at: 0)
+    var moving = false
+    cameraLayer.setTransform(place(previous), at: .zero)
+    if frames > 0 {
+        for f in 1...frames {
+            let p = crop(at: Double(f) / 30)
+            let step = CMTimeRange(start: CMTime(value: CMTimeValue(f - 1) * 20, timescale: 600), duration: CMTime(value: 20, timescale: 600))
+            if hypot((p.x - previous.x) * cameraSize.width * k, (p.y - previous.y) * cameraSize.height * k) > 0.01 {
+                cameraLayer.setTransformRamp(fromStart: place(previous), toEnd: place(p), timeRange: step)
+                moving = true
+            } else if moving {
+                cameraLayer.setTransform(place(p), at: step.start)
+                moving = false
+            }
+            previous = p
+        }
+    }
+
+    let screenLayer = AVMutableVideoCompositionLayerInstruction(assetTrack: screenTrack)
+    screenLayer.setTransform(try await fitting(screenVideo, into: canvas), at: .zero)
+    screenLayer.setOpacity(1, at: .zero)
+
+    var outcome: FramingOutcome?
+    if let framing {
+        let shown = stretches.reduce(0) { $0 + $1.to - $1.from }
+        let glides = path.moves.filter { move in move.d > 0 && stretches.contains { move.t + move.d > $0.from && move.t < $0.to } }.count
+        outcome = FramingOutcome(looksWithFace: framing.faces.looks.filter { !$0.faces.isEmpty }.count, looks: framing.faces.looks.count,
+                                 glides: glides, cameraSeconds: shown, meStretches: stretches.filter(\.homeAtStart).count)
     }
 
     let instruction = AVMutableVideoCompositionInstruction()
     instruction.timeRange = CMTimeRange(start: .zero, duration: end)
-    instruction.layerInstructions = [screenLayer, cameraLayer]
+    instruction.layerInstructions = [cameraLayer, screenLayer]
     let video = AVMutableVideoComposition()
     video.renderSize = canvas
     video.frameDuration = CMTime(value: 1, timescale: 30)
@@ -118,7 +189,7 @@ func composeVideo(camera: URL, screen: URL, screenOffset: Double, sharedLate: Bo
     try await export.export(to: out, as: .mp4)
     withExtendedLifetime(soundAsset) {}
     return ComposeResult(seconds: end.seconds, width: Int(canvas.width), height: Int(canvas.height),
-                         cameraUntil: cut > 0 ? cut : nil)
+                         cameraUntil: cut > 0 ? cut : nil, framing: outcome)
 }
 
 /// video.mp4 for a take with no screen: camera.mov's picture as it is, with another mic's sound
@@ -180,18 +251,19 @@ private func orientedSize(_ track: AVAssetTrack) async throws -> CGSize {
     return CGSize(width: abs(box.width), height: abs(box.height))
 }
 
-/// Puts a track the right way up and scales it to cover (`fill`) or fit the canvas.
-private func fitting(_ track: AVAssetTrack, into canvas: CGSize, fill: Bool) async throws -> CGAffineTransform {
+/// The transform that puts a track's picture the right way up with its corner at the origin, and its upright size.
+private func uprightTransform(_ track: AVAssetTrack) async throws -> (CGAffineTransform, CGSize) {
     let (natural, preferred) = try await track.load(.naturalSize, .preferredTransform)
     let box = CGRect(origin: .zero, size: natural).applying(preferred)
-    let upright = preferred.concatenating(CGAffineTransform(translationX: -box.minX, y: -box.minY))
-    let size = CGSize(width: abs(box.width), height: abs(box.height))
-    let k = fill ? max(canvas.width / size.width, canvas.height / size.height)
-                 : min(canvas.width / size.width, canvas.height / size.height)
-    let width = size.width * k, height = size.height * k
-    let x = (canvas.width - width) / 2
-    // Filling, keep a little more of the top than the bottom: faces sit in the upper half.
-    let y = fill ? (canvas.height - height) * 0.4 : (canvas.height - height) / 2
+    return (preferred.concatenating(CGAffineTransform(translationX: -box.minX, y: -box.minY)),
+            CGSize(width: abs(box.width), height: abs(box.height)))
+}
+
+/// Puts a track the right way up and scales it to fit the canvas, centred.
+private func fitting(_ track: AVAssetTrack, into canvas: CGSize) async throws -> CGAffineTransform {
+    let (upright, size) = try await uprightTransform(track)
+    let k = min(canvas.width / size.width, canvas.height / size.height)
+    let x = (canvas.width - size.width * k) / 2, y = (canvas.height - size.height * k) / 2
     return upright.concatenating(CGAffineTransform(scaleX: k, y: k)).concatenating(CGAffineTransform(translationX: x, y: y))
 }
 

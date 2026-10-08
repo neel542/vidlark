@@ -1,6 +1,7 @@
 import Foundation
 
-// vidlark-finish <recording folder> [--no-transcribe] [--no-chapters] [--no-video] [--model <path to ggml model>]
+// vidlark-finish <recording folder> [--no-transcribe] [--no-chapters] [--no-video] [--no-framing] [--model <path to ggml model>]
+// vidlark-finish --faces <movie> <faces.json>: looks for faces in the whole movie and writes them (for checks).
 // stdout carries only progress for the app: "STEP n/total ...", then "DONE <report.md>" or "FAIL <reason>".
 
 setvbuf(stdout, nil, _IOLBF, 0)
@@ -17,11 +18,12 @@ func fail(_ reason: String) -> Never {
     finish(1)
 }
 
-let usage = "usage: vidlark-finish <recording folder> [--no-transcribe] [--no-chapters] [--no-video] [--model <path>]"
+let usage = "usage: vidlark-finish <recording folder> [--no-transcribe] [--no-chapters] [--no-video] [--no-framing] [--model <path>]"
 var folderArg: String?
 var transcribeWanted = true
 var chaptersWanted = true
 var videoAllowed = true
+var framingWanted = true
 var modelOverride: String?
 var argIndex = 1
 let argv = CommandLine.arguments
@@ -31,6 +33,21 @@ while argIndex < argv.count {
     case "--no-transcribe": transcribeWanted = false
     case "--no-chapters": chaptersWanted = false
     case "--no-video": videoAllowed = false
+    case "--no-framing": framingWanted = false
+    case "--faces":
+        // vidlark-finish --faces <movie> <faces.json>: the whole movie, as the finisher would look at it.
+        guard argIndex + 2 < argv.count else { fail(usage) }
+        do {
+            let started = Date()
+            let track = try detectFaces(in: URL(fileURLWithPath: argv[argIndex + 1]), spans: [[0, .greatestFiniteMagnitude]])
+            try writeText(track.json(), to: URL(fileURLWithPath: argv[argIndex + 2]))
+            print("FACES \(track.looks.count) looks, \(track.looks.filter { !$0.faces.isEmpty }.count) with a face, \(String(format: "%.2f", Date().timeIntervalSince(started))) s")
+            exit(0)
+        } catch let error as FinishError {
+            fail(error.message)
+        } catch {
+            fail(error.localizedDescription)
+        }
     case "--model":
         argIndex += 1
         guard argIndex < argv.count else { fail(usage) }
@@ -97,6 +114,17 @@ do {
     let tidy = tidyCameraMovies(in: folder)
     for (name, why) in tidy.skipped.sorted(by: { $0.key < $1.key }) {
         FileHandle.standardError.write("\(name) left as it was: \(why)\n".data(using: .utf8)!)
+    }
+
+    // Her face, for the framing of the finished video: looked for on a thread of its own from now,
+    // while the sound is taken out and lined up, only where the video can show the camera across
+    // the frame. A take whose video never shows it needs no looking at all.
+    try? FileManager.default.removeItem(at: file("faces.json"))
+    var faceJob: FaceJob?
+    if videoWanted, hasScreen, framingWanted, let events {
+        let spans = framingSpans(end: events.stopTime ?? .greatestFiniteMagnitude, shared: events.screenShared,
+                                 cameraFirst: events.cameraFirst, shows: events.shows)
+        if !spans.isEmpty { faceJob = FaceJob(camera: file("camera.mov"), spans: spans) }
     }
 
     // 1. Audio
@@ -295,6 +323,7 @@ do {
     // 6. The finished video, following each click of Me or Screen
     var composed: ComposeResult?
     var composeProblem: String?
+    var framingProblem: String?
     // The sound of the video: the mic picked before the take, when it could be lined up.
     var videoSound: (url: URL, offset: Double)?
     var videoSoundNote: String?
@@ -310,9 +339,25 @@ do {
         let offset = sync.offset, late = events?.cameraFirst == true
         let cameraURL = file("camera.mov"), screenURL = file("screen.mov"), out = file("video.mp4")
         let sound = videoSound
+        var framing: FramingInput?
+        if let faceJob {
+            switch faceJob.wait() {
+            case .success(let faces):
+                // Only a record for editing and checks: the video is framed even if it cannot be written.
+                try? writeText(faces.json(), to: file("faces.json"))
+                framing = FramingInput(faces: faces, shows: events?.shows ?? [], meToo: sync.method == "audio")
+            case .failure(let error):
+                framingProblem = (error as? FinishError)?.message ?? error.localizedDescription
+            }
+            if ProcessInfo.processInfo.environment["VIDLARK_FINISH_TIMES"] != nil {
+                FileHandle.standardError.write("faces: \(String(format: "%.2f", faceJob.seconds)) s, waited from \(String(format: "%.2f", Date().timeIntervalSince(faceJob.started))) s\n".data(using: .utf8)!)
+            }
+        }
+        let framingInput = framing
         do {
             if hasScreen {
-                composed = try waitFor { try await composeVideo(camera: cameraURL, screen: screenURL, screenOffset: offset, sharedLate: late, sound: sound, out: out) }
+                composed = try waitFor { try await composeVideo(camera: cameraURL, screen: screenURL, screenOffset: offset, sharedLate: late, sound: sound,
+                                                                framing: framingInput, out: out) }
             } else if let sound {
                 composed = try waitFor { try await cameraWithSound(camera: cameraURL, sound: sound, out: out) }
             }
@@ -335,7 +380,8 @@ do {
         sync: sync, extraCameras: extraCameras, extraMics: extraMics, videoMic: videoSound == nil ? nil : pickedMic,
         videoSoundNote: videoSoundNote, transcript: transcript, retakes: retakes,
         chapters: chapters, chapterSource: chapterSource, candidateChapters: candidates, chaptersWanted: chaptersWanted,
-        events: events, video: composed, videoProblem: composeProblem, videoWanted: videoWanted))
+        events: events, video: composed, videoProblem: composeProblem, videoWanted: videoWanted,
+        framingWanted: framingWanted, framingProblem: framingProblem))
     try writeText(report, to: file("report.md"))
 
     if case .failed(let reason) = transcript {

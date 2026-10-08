@@ -105,6 +105,11 @@ final class Studio: ObservableObject {
     @Published var makeVideo = UserDefaults.standard.object(forKey: "makeVideo") as? Bool ?? true {
         didSet { if !Snapshots.active { UserDefaults.standard.set(makeVideo, forKey: "makeVideo") } }
     }
+    /// Where video.mp4 shows her camera across the frame, the finisher crops it to follow her face.
+    /// Off runs `vidlark-finish --no-framing`: the old crop, a little above the middle.
+    @Published var frameFace = UserDefaults.standard.object(forKey: "frameFace") as? Bool ?? true {
+        didSet { if !Snapshots.active { UserDefaults.standard.set(frameFace, forKey: "frameFace") } }
+    }
     @Published var cameraQuality = CameraQuality(rawValue: UserDefaults.standard.string(forKey: "cameraQuality") ?? "") ?? .best {
         didSet { if !Snapshots.active { UserDefaults.standard.set(cameraQuality.rawValue, forKey: "cameraQuality") }; applyInputs() }
     }
@@ -252,6 +257,7 @@ final class Studio: ObservableObject {
     @Published private(set) var sharing = false
     private var takeWantsTranscript = true
     private var takeWantsVideo = true
+    private var takeWantsFraming = true
     /// macOS Studio Light: brightens her face and softens the background, inside the camera itself.
     @Published private(set) var touchUpOn = false
     @Published private(set) var liveFailure: String?
@@ -1045,6 +1051,7 @@ final class Studio: ObservableObject {
         shareProblem = nil
         takeWantsTranscript = writeTranscript
         takeWantsVideo = makeVideo
+        takeWantsFraming = frameFace
         phase = .starting
         elapsed = 0
         cardElapsed = 0
@@ -1722,7 +1729,7 @@ final class Studio: ObservableObject {
         let process = Process()
         process.executableURL = tool
         process.arguments = [folder.path] + (takeWantsTranscript ? [] : ["--no-transcribe", "--no-chapters"])
-            + (takeWantsVideo ? [] : ["--no-video"])
+            + (takeWantsVideo ? [] : ["--no-video"]) + (takeWantsFraming ? [] : ["--no-framing"])
         let out = Pipe()
         process.standardOutput = out
         process.standardError = FileHandle(forWritingAtPath: "/dev/null")

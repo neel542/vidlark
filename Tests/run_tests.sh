@@ -132,6 +132,20 @@ sys.exit(0 if d["method"]=="audio" and abs(d["screenOffsetSec"]-want) <= 0.020 e
 check "before the share the video is the camera" looks_like_in shared 10 camera.mov 10 same
 check "after the share the video is the screen" looks_like_in shared 30 camera.mov 30 different
 check "report says when the screen was shared" grep -q "shared 00:19 into the take" "$OUT/shared/report.md"
+# The test camera has no face: faces.json says so, and the opening keeps the old crop.
+check "faces.json written for the camera-first opening, with no face in it" py 'import json,sys; d=json.load(open(sys.argv[1]+"/faces.json"))
+print("        %d looks over %s, %d with a face" % (len(d["looks"]), d["spans"], sum(1 for l in d["looks"] if l["faces"])))
+sys.exit(0 if d["looks"] and not any(l["faces"] for l in d["looks"]) and d["spans"][0][0] == 0 else 1)' "$OUT/shared"
+check "report says no face was found" grep -q "^No face was found in the camera picture" "$OUT/shared/report.md"
+
+# --no-framing: no looking for faces at all
+rm -rf "$OUT/noframing" && mkdir -p "$OUT/noframing"
+cp "$OUT/shared/camera.mov" "$OUT/shared/screen.mov" "$OUT/shared/events.jsonl" "$OUT/noframing/"
+run noframing --no-transcribe --no-framing
+check "exit 0 and DONE line" done_ok noframing
+check "no faces.json" test ! -e "$OUT/noframing/faces.json"
+check "report says face framing was off" grep -q "^Face framing was off" "$OUT/noframing/report.md"
+check "before the share the video is the camera, as with framing" looks_like_in noframing 10 camera.mov 10 same
 
 # Me and Screen: the video starts on the camera, shows the screen at 10 s and the camera again at 25 s
 rm -rf "$OUT/switches" && mkdir -p "$OUT/switches"
@@ -217,6 +231,8 @@ check "FAIL line names camera.mov" grep -q "^FAIL camera.mov could not be read" 
 # missing folder
 run missing --no-transcribe
 check "missing folder fails" bash -c "[ \"\$(cat '$OUT/missing.exit')\" != 0 ] && grep -q '^FAIL folder not found' '$OUT/missing.stdout'"
+
+check "framing rules on made-up face tracks (Tests/framing)" bash -c "bash '$HERE/framing/run.sh' > '$OUT/framing.log' 2>&1 || { grep FAIL '$OUT/framing.log'; tail -1 '$OUT/framing.log'; exit 1; }; tail -1 '$OUT/framing.log' | sed 's/^/        /'"
 
 check "no em dashes in any output" no_em_dash "$OUT"/*/report.md "$OUT"/*/chapters.txt "$OUT"/*.stdout
 

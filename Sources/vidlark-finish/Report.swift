@@ -29,6 +29,8 @@ struct ReportInput {
     var video: ComposeResult?
     var videoProblem: String?
     var videoWanted = false
+    var framingWanted = true
+    var framingProblem: String?
 }
 
 private func length(_ seconds: Double?) -> String {
@@ -235,6 +237,10 @@ func buildReport(_ r: ReportInput) -> String {
                 out.append("- \(clock(change.t)) \(change.screen ? "Screen" : "Me")")
             }
         }
+        if let line = framingLine(r, video) {
+            out.append("")
+            out.append(line)
+        }
     } else if let problem = r.videoProblem {
         out.append("Not made, because \(problem). camera.mov and screen.mov are whole, so the video can still be edited from them.")
     } else if r.videoWanted == false && r.screenDuration == nil {
@@ -257,4 +263,20 @@ func buildReport(_ r: ReportInput) -> String {
     out.append("- report.md (this file)")
     out.append("")
     return out.joined(separator: "\n")
+}
+
+/// One line on face framing: what it did where the video shows her camera across the frame.
+private func framingLine(_ r: ReportInput, _ video: ComposeResult) -> String? {
+    if let problem = r.framingProblem {
+        return "Face framing was skipped (\(problem)), so where the video shows her camera across the frame it is cropped a little above the middle."
+    }
+    guard let framing = video.framing else {
+        return r.framingWanted ? nil : "Face framing was off, so where the video shows her camera across the frame it is cropped a little above the middle."
+    }
+    guard framing.looksWithFace > 0 else {
+        return "No face was found in the camera picture, so where the video shows her camera across the frame it is cropped a little above the middle."
+    }
+    let share = Int((Double(framing.looksWithFace) / Double(max(framing.looks, 1)) * 100).rounded())
+    let moves = framing.glides == 0 ? "it held still throughout" : framing.glides == 1 ? "it glided once" : "it glided \(framing.glides) times"
+    return "Face framing: where the video shows her camera across the frame (\(clock(framing.cameraSeconds)) in all), the picture follows her face like a camera operator; \(moves). Her face was found in \(share)% of the looks (faces.json)."
 }
