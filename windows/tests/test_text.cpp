@@ -344,7 +344,7 @@ TEST("buildReport writes every section as the Swift does") {
                                  "- mic-2.m4a (iPhone): lined up by sound, offset 0.250 seconds (camera time = mic time + offset), "
                                  "confidence 0.85 (high)\n"
                                  "  - Muted at 00:40, on the phone: the file is silent until it was unmuted\n"
-                                 "  - Unmuted at 00:50, from the Mac\n"
+                                 "  - Unmuted at 00:50, from the " + std::string(vl::computerName) + "\n"
                                  "\n"
                                  "## Transcript\n"
                                  "\n"
@@ -366,7 +366,7 @@ TEST("buildReport writes every section as the Swift does") {
                                  "\n"
                                  "- 01:01 (61.3 s): so the next step is [RETAKE]\n"
                                  "\n"
-                                 "## Mac sound\n"
+                                 "## " + std::string(vl::computerName) + " sound\n"
                                  "\n"
                                  "The second sound track of screen.mov. Off means silence there.\n"
                                  "\n"
@@ -404,7 +404,7 @@ TEST("buildReport writes every section as the Swift does") {
     const std::string other = vl::buildReport(r);
     CHECK(hasLine(other, "- Extra camera (camera-2.mov): unknown"));
     CHECK(hasLine(other, "- camera-2.mov: not measured, because it has no sound to match. sync.json says offset 0."));
-    CHECK(hasLine(other, "- mic-2.m4a (iPhone): lined up by the Mac's clock, offset 1.500 seconds, because its sound was too quiet. "
+    CHECK(hasLine(other, "- mic-2.m4a (iPhone): lined up by the " + std::string(vl::computerName) + "'s clock, offset 1.500 seconds, because its sound was too quiet. "
                          "Check the lip sync by eye."));
     CHECK(hasLine(other, "The camera and the screen started at the same moment."));
     CHECK(hasLine(other, "- Offset: 0.000 seconds (camera time = screen time + offset), saved in sync.json"));
