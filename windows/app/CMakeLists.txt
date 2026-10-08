@@ -17,14 +17,16 @@ target_link_libraries(vidlark-writer-test PRIVATE capture)
 add_executable(Vidlark WIN32
   main.cpp
   devices.cpp
+  session.cpp
   app.manifest
   app.rc)
 target_include_directories(Vidlark PRIVATE ${WEBVIEW2_DIR}/include)
 target_link_libraries(Vidlark PRIVATE
   nlohmann_json::nlohmann_json
   capture
+  finish_core
   ${WEBVIEW2_DIR}/x64/WebView2LoaderStatic.lib
-  version mfplat mf mfuuid ole32 shell32 dwmapi)
+  version mfplat mf mfuuid ole32 shell32 dwmapi windowscodecs)
 
 # The screens, and the finisher, sit next to Vidlark.exe.
 add_dependencies(Vidlark vidlark-finish)

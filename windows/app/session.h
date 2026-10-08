@@ -9,6 +9,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <functional>
@@ -49,6 +50,8 @@ private:
     std::unique_ptr<capture::Camera> camera_;
     std::unique_ptr<capture::Mic> mic_;
     std::string cameraName_, micName_;
+    capture::VideoFormat format_;  // the open camera's, kept so the camera thread never reads camera_
+    std::atomic<bool> previewReady_{false};  // set once format_ is filled in
     std::mutex takeMutex_;
     std::unique_ptr<Take> take_;
     std::atomic<bool> recording_{false};

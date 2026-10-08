@@ -9,10 +9,10 @@
 <body>
 <main class="panel">
   <header class="top">
-    <div class="title">
+    <label class="title">
       <span class="engraved">Video</span>
-      <h1 id="video-title">No video picked</h1>
-    </div>
+      <input id="video-title" type="text" placeholder="What is this video called?" maxlength="120" autocomplete="off" spellcheck="false">
+    </label>
     <nav class="tabs" aria-label="Pages">
       <button type="button" disabled title="Comes in a later build">Live</button>
       <button type="button" disabled title="Comes in a later build">Recordings</button>
@@ -21,24 +21,40 @@
   </header>
 
   <section class="picture" aria-label="Camera picture">
-    <div class="glass">
-      <p class="empty">The camera picture shows here once recording is built.</p>
+    <div class="glass" id="glass">
+      <img id="preview" alt="Camera picture" hidden>
+      <p class="empty" id="picture-note">Opening the camera…</p>
+      <div class="countdown" id="countdown" hidden></div>
     </div>
-    <p class="preview-note"><span class="lamp warn"></span>Windows preview: this build shows what your PC can record from. Recording comes next.</p>
+    <p class="preview-note"><span class="lamp warn"></span>Windows preview: the camera and mics record. Screen recording comes next.</p>
   </section>
 
   <aside class="side">
     <h2 class="engraved">Sources</h2>
-    <ul class="sources" id="sources">
-      <li class="source"><span class="lamp off"></span><div><b>Camera</b><span class="name">Looking…</span></div></li>
-      <li class="source"><span class="lamp off"></span><div><b>Microphone</b><span class="name">Looking…</span></div></li>
-      <li class="source"><span class="lamp off"></span><div><b>Screen</b><span class="name">Looking…</span></div></li>
-    </ul>
-    <button type="button" class="refresh" id="refresh">Look again</button>
+    <div class="source">
+      <span class="lamp off" id="camera-lamp"></span>
+      <label><b>Camera</b><select id="camera"></select><span class="detail" id="camera-detail"></span></label>
+    </div>
+    <div class="source">
+      <span class="lamp off" id="mic-lamp"></span>
+      <label><b>Microphone</b><select id="mic"></select></label>
+    </div>
+    <div class="meter" id="meter" aria-label="Microphone level"></div>
+    <details class="extras" id="extras-box" hidden>
+      <summary>More microphones</summary>
+      <p class="hint">Each ticked mic records to its own file.</p>
+      <div id="extras"></div>
+    </details>
+    <div class="source dim">
+      <span class="lamp off"></span>
+      <div><b>Screen</b><span class="detail" id="screen-detail">Comes in the next build</span></div>
+    </div>
+
+    <div class="status" id="status" role="status" aria-live="polite"></div>
 
     <div class="rec">
-      <div class="timecode" aria-label="Time recorded">00:00</div>
-      <button type="button" class="record" disabled aria-label="Record" title="Recording comes in the next build"></button>
+      <div class="timecode" id="timecode" aria-label="Time recorded">00:00</div>
+      <button type="button" class="record" id="record" disabled aria-label="Record"></button>
     </div>
   </aside>
 </main>

@@ -47,6 +47,13 @@ int wmain(int argc, wchar_t** argv) {
         for (long long n = 0; n < totalFrames || audioOnly; n++) {
             const double t = double(n) / video.fps;
             if (t >= seconds) break;
+            // A crash test runs at the camera's own speed, as a real take does, so the encoder keeps up.
+            if (crashAfter >= 0) {
+                static const ULONGLONG started = GetTickCount64();
+                const ULONGLONG due = started + static_cast<ULONGLONG>(t * 1000);
+                const ULONGLONG now = GetTickCount64();
+                if (due > now) Sleep(static_cast<DWORD>(due - now));
+            }
             if (crashAfter >= 0 && t >= crashAfter) {
                 std::fprintf(stderr, "crashing at %.2f s\n", t);
                 TerminateProcess(GetCurrentProcess(), 3);

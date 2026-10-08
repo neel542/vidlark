@@ -2,16 +2,19 @@
 // C++ side through web messages. Recording itself (camera, mics, screen, sound) is done here in C++.
 
 #include "devices.h"
+#include "session.h"
 
 #include <windows.h>
 #include <dwmapi.h>
 #include <mfapi.h>
+#include <shellapi.h>
 #include <shlobj.h>
 #include <wrl.h>
 #include <WebView2.h>
 
 #include <algorithm>
 #include <filesystem>
+#include <memory>
 #include <string>
 
 using Microsoft::WRL::Callback;
@@ -24,9 +27,19 @@ constexpr wchar_t windowClass[] = L"VidlarkWindow";
 constexpr wchar_t uiHost[] = L"app.vidlark.local";
 constexpr COLORREF graphite = RGB(0x0E, 0x11, 0x10);
 
+constexpr UINT postMessageId = WM_APP + 1;  // a message for the panel, from any thread
+constexpr UINT_PTR tickTimer = 1;
+
 HWND window = nullptr;
 ComPtr<ICoreWebView2Controller> controller;
 ComPtr<ICoreWebView2> webview;
+std::unique_ptr<app::Session> session;
+
+// The panel can only be told things on the window's own thread, so other threads hand messages over.
+void post(nlohmann::json message) {
+    auto* text = new std::string(message.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace));
+    if (!window || !PostMessageW(window, postMessageId, 0, reinterpret_cast<LPARAM>(text))) delete text;
+}
 
 fs::path exeDir() {
     std::wstring buffer(32768, L'\0');
@@ -53,7 +66,23 @@ void received(const nlohmann::json& message) {
         send({{"type", "devices"},
               {"cameras", app::cameras()},
               {"microphones", app::microphones()},
-              {"screens", app::screens()}});
+              {"screens", app::screens()},
+              {"recording", session && session->recording()}});
+        if (type == "hello" && session && !session->recording()) session->open("", "");
+    } else if (type == "open" && session) {
+        session->open(message.value("camera", ""), message.value("microphone", ""));
+    } else if (type == "record" && session) {
+        std::string title = message.value("title", "");
+        std::vector<std::string> extras;
+        for (const auto& id : message.value("extraMics", nlohmann::json::array())) {
+            if (id.is_string()) extras.push_back(id.get<std::string>());
+        }
+        session->record(title.empty() ? std::nullopt : std::optional<std::string>(title), extras);
+    } else if (type == "stop" && session) {
+        session->stop();
+    } else if (type == "show-take") {
+        const std::wstring folder = app::wide(message.value("folder", ""));
+        if (!folder.empty()) ShellExecuteW(window, L"open", L"explorer.exe", (L"\"" + folder + L"\"").c_str(), nullptr, SW_SHOWNORMAL);
     }
 }
 
@@ -112,6 +141,7 @@ void startWebView() {
                                             .Get(),
                                         &token);
                                     fitWebView();
+                                    SetTimer(window, tickTimer, 50, nullptr);
                                     webview->Navigate((std::wstring(L"https://") + uiHost + L"/index.html").c_str());
                                     return S_OK;
                                 })
@@ -132,6 +162,22 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
     case WM_SIZE:
         fitWebView();
         return 0;
+    case postMessageId: {
+        std::unique_ptr<std::string> text(reinterpret_cast<std::string*>(lParam));
+        if (webview) webview->PostWebMessageAsJson(app::wide(*text).c_str());
+        return 0;
+    }
+    case WM_TIMER:
+        if (wParam == tickTimer && session) session->tick();
+        return 0;
+    case WM_CLOSE:
+        if (session && session->recording() &&
+            MessageBoxW(hwnd, L"A take is recording. Stop it and close Vidlark?", L"Vidlark", MB_YESNO | MB_ICONQUESTION) != IDYES) {
+            return 0;
+        }
+        if (session) session->stop();
+        DestroyWindow(hwnd);
+        return 0;
     case WM_GETMINMAXINFO: {
         auto* limits = reinterpret_cast<MINMAXINFO*>(lParam);
         UINT dpi = GetDpiForWindow(hwnd);
@@ -139,6 +185,8 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
         return 0;
     }
     case WM_DESTROY:
+        KillTimer(hwnd, tickTimer);
+        session.reset();
         controller = nullptr;
         webview = nullptr;
         PostQuitMessage(0);
@@ -171,6 +219,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
                              nullptr, nullptr, instance, nullptr);
     BOOL dark = TRUE;
     DwmSetWindowAttribute(window, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &dark, sizeof dark);
+    session = std::make_unique<app::Session>(post);
     ShowWindow(window, show);
     UpdateWindow(window);
     startWebView();
