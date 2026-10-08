@@ -1,11 +1,12 @@
 #include "session.h"
 
 #include "devices.h"
+#include "picture.h"
 #include "transcript.h"
 
+#include <dwmapi.h>
 #include <mfapi.h>
 #include <shlobj.h>
-#include <wincodec.h>
 
 #include <algorithm>
 #include <cmath>
@@ -24,20 +25,6 @@ fs::path exeDir() {
     std::wstring buffer(32768, L'\0');
     buffer.resize(GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size())));
     return fs::path(buffer).parent_path();
-}
-
-std::string base64(const BYTE* data, size_t size) {
-    static const char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    std::string out;
-    out.reserve((size + 2) / 3 * 4);
-    for (size_t i = 0; i < size; i += 3) {
-        const UINT32 n = (UINT32(data[i]) << 16) | (i + 1 < size ? UINT32(data[i + 1]) << 8 : 0) | (i + 2 < size ? data[i + 2] : 0);
-        out += table[(n >> 18) & 63];
-        out += table[(n >> 12) & 63];
-        out += i + 1 < size ? table[(n >> 6) & 63] : '=';
-        out += i + 2 < size ? table[n & 63] : '=';
-    }
-    return out;
 }
 
 // A small BGRA copy of an NV12 picture, for the panel's preview.
@@ -62,42 +49,6 @@ std::vector<BYTE> smallBGRA(const BYTE* nv12, LONG pitch, UINT32 w, UINT32 h, UI
     return out;
 }
 
-std::string jpeg(const std::vector<BYTE>& bgra, UINT32 w, UINT32 h) {
-    static thread_local ComPtr<IWICImagingFactory> factory;
-    if (!factory && FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory)))) return {};
-    ComPtr<IWICBitmap> bitmap;
-    if (FAILED(factory->CreateBitmapFromMemory(w, h, GUID_WICPixelFormat32bppBGRA, w * 4, static_cast<UINT>(bgra.size()),
-                                               const_cast<BYTE*>(bgra.data()), &bitmap))) return {};
-    ComPtr<IStream> stream;
-    if (FAILED(CreateStreamOnHGlobal(nullptr, TRUE, &stream))) return {};
-    ComPtr<IWICBitmapEncoder> encoder;
-    if (FAILED(factory->CreateEncoder(GUID_ContainerFormatJpeg, nullptr, &encoder))) return {};
-    encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache);
-    ComPtr<IWICBitmapFrameEncode> frame;
-    ComPtr<IPropertyBag2> options;
-    if (FAILED(encoder->CreateNewFrame(&frame, &options))) return {};
-    PROPBAG2 quality{};
-    quality.pstrName = const_cast<LPOLESTR>(L"ImageQuality");
-    VARIANT value;
-    VariantInit(&value);
-    value.vt = VT_R4;
-    value.fltVal = 0.72f;
-    options->Write(1, &quality, &value);
-    frame->Initialize(options.Get());
-    frame->SetSize(w, h);
-    WICPixelFormatGUID format = GUID_WICPixelFormat24bppBGR;
-    frame->SetPixelFormat(&format);
-    if (FAILED(frame->WriteSource(bitmap.Get(), nullptr)) || FAILED(frame->Commit()) || FAILED(encoder->Commit())) return {};
-    STATSTG stat{};
-    stream->Stat(&stat, STATFLAG_NONAME);
-    HGLOBAL memory = nullptr;
-    GetHGlobalFromStream(stream.Get(), &memory);
-    const BYTE* bytes = static_cast<const BYTE*>(GlobalLock(memory));
-    std::string out = base64(bytes, static_cast<size_t>(stat.cbSize.QuadPart));
-    GlobalUnlock(memory);
-    return out;
-}
-
 }  // namespace
 
 fs::path recordingsRoot() {
@@ -116,6 +67,15 @@ struct Session::Take {
     LONGLONG t0 = 0;              // the PC's clock when the take started
     long long soundWritten = 0;   // main mic samples in camera.mov so far
     bool sawPicture = false;
+    // The screen, once it is shared.
+    std::unique_ptr<capture::ScreenRecorder> screen;
+    bool sharing = false;               // from Share until the screen records, or fails to
+    bool showingScreen = false;         // Me (false) or Screen (true)
+    bool computerSound = false;
+    HWND sharedWindow = nullptr;        // one window, followed as it moves; none for a whole screen
+    RECT work{};                        // that screen without the taskbar
+    ULONGLONG screenAt = 0;             // when Screen follows the first moment of Me after sharing
+    ULONGLONG lastFollow = 0;
     struct Extra {
         std::unique_ptr<capture::Mic> mic;
         std::unique_ptr<capture::MovieWriter> writer;
@@ -133,13 +93,16 @@ void placeSound(capture::MovieWriter& writer, long long& written, const int16_t*
 }
 }  // namespace
 
-Session::Session(Post post) : post_(std::move(post)) {}
+Session::Session(Post post, RunOnWindowThread onWindowThread)
+    : post_(std::move(post)), onWindowThread_(std::move(onWindowThread)), overlay_(std::make_unique<Overlay>()) {}
 
 Session::~Session() {
     if (recording_) stop();
+    if (sharer_.joinable()) sharer_.join();
     if (finisher_.joinable()) finisher_.join();
     camera_.reset();
     mic_.reset();
+    overlay_.reset();
 }
 
 void Session::open(const std::string& cameraId, const std::string& micId) {
@@ -238,7 +201,7 @@ void Session::record(const std::optional<std::string>& title, const std::vector<
                           {"extraCameras", nlohmann::json::array()}, {"extraMics", extraMics}, {"videoMic", ""},
                           {"computer", "Windows"}, {"cameraClock", camera_->clockSource()}},
                          started);
-        take->log->write({{"type", "show"}, {"what", "me"}}, started);
+        take->log->write({{"type", "show"}, {"what", "camera"}}, started);
     } catch (const std::exception& error) {
         post_({{"type", "problem"}, {"message", std::string("The take could not start: ") + error.what()}});
         return;
@@ -250,10 +213,38 @@ void Session::record(const std::optional<std::string>& title, const std::vector<
         recording_ = true;
     }
     post_({{"type", "recording"}, {"folder", vl::utf8(lastTake_)}});
+    post_(takeState());
 }
 
 void Session::onFrame(IMFSample* sample, LONGLONG time) {
-    sendPreview(sample);
+    // The panel's preview, about 15 pictures a second, and the stage and bubble while they show her.
+    const LONGLONG now = MFGetSystemTime();
+    const bool preview = previewReady_ && now - lastPreview_ >= second / 15 && !sharingScreen_;
+    const bool stage = overlay_->wantsCamera();
+    if (previewReady_ && (preview || stage)) {
+        ComPtr<IMFMediaBuffer> buffer;
+        if (SUCCEEDED(sample->ConvertToContiguousBuffer(&buffer))) {
+            ComPtr<IMF2DBuffer> flat;
+            BYTE* data = nullptr;
+            LONG pitch = 0;
+            DWORD length = 0;
+            const bool twoD = SUCCEEDED(buffer.As(&flat)) && SUCCEEDED(flat->Lock2D(&data, &pitch));
+            const bool locked = twoD || SUCCEEDED(buffer->Lock(&data, nullptr, &length));
+            if (locked) {
+                if (!twoD) pitch = static_cast<LONG>(format_.width);
+                if (stage) overlay_->camera(data, pitch, format_.width, format_.height);
+                if (preview) {
+                    lastPreview_ = now;
+                    sendPreview(data, pitch);
+                }
+                if (twoD) {
+                    flat->Unlock2D();
+                } else {
+                    buffer->Unlock();
+                }
+            }
+        }
+    }
     std::lock_guard lock(takeMutex_);
     if (!recording_ || !take_ || !take_->camera) return;
     const LONGLONG at = time - take_->t0;
@@ -275,38 +266,195 @@ void Session::onSound(const int16_t* samples, UINT32 frames, LONGLONG time, bool
         placeSound(*take_->camera, take_->soundWritten, samples, frames, time, take_->t0);
     } catch (...) {
     }
+    // The same mic goes into screen.mov's first sound track: that is how the two files line up.
+    if (take_->screen) take_->screen->addMic(samples, frames, time);
 }
 
-void Session::sendPreview(IMFSample* sample) {
-    // About 15 pictures a second is plenty for the panel.
-    if (!previewReady_) return;
-    const LONGLONG now = MFGetSystemTime();
-    if (now - lastPreview_ < second / 15) return;
-    lastPreview_ = now;
-    ComPtr<IMFMediaBuffer> buffer;
-    if (FAILED(sample->ConvertToContiguousBuffer(&buffer))) return;
-    ComPtr<IMF2DBuffer> flat;
-    BYTE* data = nullptr;
-    LONG pitch = 0;
-    DWORD length = 0;
-    const bool twoD = SUCCEEDED(buffer.As(&flat)) && SUCCEEDED(flat->Lock2D(&data, &pitch));
-    if (!twoD) {
-        if (FAILED(buffer->Lock(&data, nullptr, &length))) return;
-    }
+void Session::sendPreview(const BYTE* data, LONG pitch) {
     const auto f = format_;
-    if (!twoD) pitch = static_cast<LONG>(f.width);
     const UINT32 outW = 640, outH = std::max<UINT32>(2, 640 * f.height / std::max<UINT32>(1, f.width)) & ~1u;
     auto bgra = smallBGRA(data, pitch, f.width, f.height, outW, outH);
-    if (twoD) {
-        flat->Unlock2D();
-    } else {
-        buffer->Unlock();
-    }
-    std::string picture = jpeg(bgra, outW, outH);
+    std::string picture = jpegBase64(bgra, outW, outH);
     if (!picture.empty()) post_({{"type", "preview"}, {"jpeg", picture}});
 }
 
+nlohmann::json Session::takeState() {
+    nlohmann::json state = {{"type", "take"}, {"recording", recording_.load()}, {"bubble", bubbleOn_}};
+    std::lock_guard lock(takeMutex_);
+    if (recording_ && take_) {
+        state["sharing"] = take_->sharing;
+        state["hasScreen"] = take_->screen != nullptr;
+        state["showing"] = take_->showingScreen ? "screen" : "camera";
+        state["sound"] = take_->computerSound;
+        state["hearsComputer"] = take_->screen ? take_->screen->hearsComputer() : true;
+    }
+    return state;
+}
+
+void Session::shareScreen(const nlohmann::json& target, bool computerSound) {
+    Take* take = nullptr;
+    {
+        std::lock_guard lock(takeMutex_);
+        if (!recording_ || !take_ || take_->screen || take_->sharing) return;
+        take = take_.get();
+    }
+    // What to record: a whole screen, or one window cut out of the screen it is on.
+    HWND window = nullptr;
+    HMONITOR monitor = nullptr;
+    std::string name;
+    const std::string kind = target.value("kind", "screen"), id = target.value("id", "");
+    if (kind == "window") {
+        try {
+            window = reinterpret_cast<HWND>(static_cast<uintptr_t>(std::stoull(id)));
+        } catch (...) {
+            window = nullptr;
+        }
+        if (!window || !IsWindow(window)) {
+            post_({{"type", "share-failed"}, {"message", "That window is not open any more. Open it, or share the entire screen."}});
+            return;
+        }
+        if (IsIconic(window)) ShowWindow(window, SW_RESTORE);
+        SetForegroundWindow(window);
+        monitor = MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST);
+        name = windowName(window);
+    } else {
+        monitor = monitorById(id);
+        name = screenName(monitor);
+    }
+    MONITORINFO info{sizeof info};
+    GetMonitorInfoW(monitor, &info);
+    RECT area = info.rcMonitor;
+    if (window) {
+        if (FAILED(DwmGetWindowAttribute(window, DWMWA_EXTENDED_FRAME_BOUNDS, &area, sizeof area))) GetWindowRect(window, &area);
+    }
+    {
+        std::lock_guard lock(takeMutex_);
+        take->sharing = true;
+        take->computerSound = computerSound;
+        take->sharedWindow = window;
+        take->work = info.rcWork;
+        sharingScreen_ = true;
+    }
+    post_({{"type", "sharing"}, {"name", name}, {"work", {info.rcWork.left, info.rcWork.top, info.rcWork.right, info.rcWork.bottom}}});
+    post_(takeState());
+
+    // Her camera across the screen first, so screen.mov opens on her and the finished video can change
+    // from camera.mov to it without a jump.
+    overlay_->setBubble(bubbleOn_);
+    overlay_->cover(area, info.rcWork);
+    overlay_->showMe(false);
+
+    if (sharer_.joinable()) sharer_.join();
+    sharer_ = std::thread([this, take, monitor, window, name, computerSound] { startScreen(take, monitor, window, name, computerSound); });
+}
+
+void Session::startScreen(Take* take, HMONITOR monitor, HWND window, std::string name, bool computerSound) {
+    CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    // At most a second for the stage to show her camera.
+    for (int i = 0; i < 50 && !overlay_->ready(); i++) Sleep(20);
+    take->log->write({{"type", "screen-start"}, {"screen", "screen.mov"}, {"screenName", name}, {"macSound", computerSound}});
+    std::unique_ptr<capture::ScreenRecorder> recorder;
+    std::string problem;
+    try {
+        capture::ScreenRecorder::Options options;
+        options.file = take->folder / L"screen.mov";
+        options.monitor = monitor;
+        options.window = window;
+        options.sound = computerSound;
+        recorder = std::make_unique<capture::ScreenRecorder>(options);
+    } catch (const std::exception& error) {
+        problem = error.what();
+    }
+    if (recorder) {
+        if (!recorder->hearsComputer()) take->log->write({{"type", "screen-error"}, {"message", "sound: " + recorder->problem()}});
+        std::lock_guard lock(takeMutex_);
+        take->screen = std::move(recorder);
+        take->sharing = false;
+        take->screenAt = GetTickCount64() + 600;
+        take->log->write({{"type", "sound"}, {"on", computerSound}, {"from", "every app"}});
+        take->log->write({{"type", "bubble"}, {"visible", bubbleOn_}});
+    } else {
+        take->log->write({{"type", "screen-error"}, {"message", problem}});
+        std::lock_guard lock(takeMutex_);
+        take->sharing = false;
+        sharingScreen_ = false;
+    }
+    CoUninitialize();
+    if (problem.empty()) {
+        post_({{"type", "shared"}, {"name", name}});
+    } else {
+        onWindowThread_([this] { overlay_->hide(); });
+        post_({{"type", "share-failed"}, {"message", "The screen could not be recorded: " + problem}});
+    }
+    post_(takeState());
+}
+
+void Session::show(bool screen) {
+    {
+        std::lock_guard lock(takeMutex_);
+        if (!recording_ || !take_ || !take_->screen || take_->showingScreen == screen) return;
+        take_->showingScreen = screen;
+        take_->screenAt = 0;
+        take_->log->write({{"type", "show"}, {"what", screen ? "screen" : "camera"}});
+    }
+    if (screen) {
+        overlay_->showScreen(true);
+    } else {
+        overlay_->showMe(true);
+    }
+    post_(takeState());
+}
+
+void Session::setSound(bool on) {
+    {
+        std::lock_guard lock(takeMutex_);
+        if (!recording_ || !take_ || !take_->screen || take_->computerSound == on) return;
+        take_->computerSound = on;
+        take_->screen->setSound(on);
+        take_->log->write({{"type", "sound"}, {"on", on}, {"from", "every app"}});
+    }
+    post_(takeState());
+}
+
+void Session::setBubble(bool on) {
+    if (bubbleOn_ == on) return;
+    bubbleOn_ = on;
+    overlay_->setBubble(on);
+    {
+        std::lock_guard lock(takeMutex_);
+        if (recording_ && take_ && take_->screen) take_->log->write({{"type", "bubble"}, {"visible", on}});
+    }
+    post_(takeState());
+}
+
 void Session::tick() {
+    // Sharing has shown her camera across the screen for a moment: now the screen, as the Mac does.
+    bool switchToScreen = false;
+    HWND follow = nullptr;
+    RECT work{};
+    {
+        std::lock_guard lock(takeMutex_);
+        if (recording_ && take_ && take_->screen) {
+            const ULONGLONG now = GetTickCount64();
+            if (take_->screenAt && now >= take_->screenAt) switchToScreen = true;
+            // One shared window: the stage and bubble follow it, twice a second.
+            if (take_->sharedWindow && now - take_->lastFollow >= 500) {
+                take_->lastFollow = now;
+                follow = take_->sharedWindow;
+                work = take_->work;
+            }
+        }
+    }
+    if (switchToScreen) show(true);
+    if (follow) {
+        RECT area{};
+        {
+            std::lock_guard lock(takeMutex_);
+            if (take_ && take_->screen) area = take_->screen->area();
+        }
+        if (!IsRectEmpty(&area)) overlay_->cover(area, work);
+    }
+
     nlohmann::json message = {{"type", "tick"}};
     if (mic_) {
         message["level"] = mic_->levelDb();
@@ -321,16 +469,27 @@ void Session::tick() {
 }
 
 void Session::stop() {
+    // A screen still starting finishes starting first, so it is stopped with the rest.
+    if (sharer_.joinable()) sharer_.join();
     std::unique_ptr<Take> take;
     {
         std::lock_guard lock(takeMutex_);
         if (!recording_) return;
         recording_ = false;
+        sharingScreen_ = false;
         take = std::move(take_);
     }
     // Extra mics stop first, outside the lock their own callbacks take.
     for (auto& extra : take->extras) extra->mic.reset();
     take->log->write({{"type", "stop"}});
+    if (take->screen) {
+        take->screen->stop();
+        if (!take->screen->problem().empty() && take->screen->hearsComputer()) {
+            take->log->write({{"type", "screen-error"}, {"message", take->screen->problem()}});
+        }
+        take->screen.reset();
+    }
+    overlay_->hide();
     try {
         take->camera->finish();
         for (auto& extra : take->extras) extra->writer->finish();
@@ -340,6 +499,7 @@ void Session::stop() {
     const fs::path folder = take->folder;
     take.reset();
     post_({{"type", "stopped"}, {"folder", vl::utf8(folder)}});
+    post_(takeState());
     if (finisher_.joinable()) finisher_.join();
     finisher_ = std::thread([this, folder] { runFinisher(folder); });
 }

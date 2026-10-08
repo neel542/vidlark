@@ -30,6 +30,7 @@ target_link_libraries(vidlark-screen-test PRIVATE capture nlohmann_json::nlohman
 add_executable(Vidlark WIN32
   main.cpp
   devices.cpp
+  picture.cpp
   session.cpp
   app.manifest
   app.rc)
