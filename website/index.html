@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=3">
+<link rel="stylesheet" href="/assets/site.css?v=4">
 </head>
 <body>
 <!--
@@ -187,6 +187,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         <li><svg><use href="#i-check"/></svg><span><b>Wide 16:9</b> for YouTube or <b>tall 9:16</b> for Shorts and Reels.</span></li>
         <li><svg><use href="#i-check"/></svg><span>Every angle is lined up by sound, so you pick the angle while editing.</span></li>
       </ul>
+      <div class="aspect" aria-hidden="true">
+        <div class="aspect-stage"><div class="aspect-frame"><svg viewBox="0 0 160 100" preserveAspectRatio="xMidYMid slice"><use href="#person"/></svg></div></div>
+        <p class="aspect-label"><span class="a-wide">Wide 16:9</span><span class="a-tall">Tall 9:16</span></p>
+      </div>
     </div>
     <div>
       <div class="shot"><img src="/assets/img/phone-code-connected.webp" alt="The Connect a phone window: a QR code, three steps, and Connected, Wide 16:9, 1080p, 30 frames a second" width="1480" height="1000" loading="lazy"></div>
@@ -206,7 +210,14 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       </ul>
     </div>
     <div>
-      <div class="shot tall"><img src="/assets/img/sources-mics.webp" alt="The app's Sources list with a camera, a phone, and four microphones, each with its own level meter" width="800" height="942" loading="lazy"></div>
+      <div class="shot-stack">
+        <div class="shot tall"><img src="/assets/img/sources-mics.webp" alt="The app's Sources list with a camera, a phone, and four microphones, each with its own level meter" width="800" height="942" loading="lazy"></div>
+        <div class="mic-strip" aria-hidden="true">
+          <div class="mic-row"><b>USB mic</b><span class="mic-meter"></span><em>Video's sound</em></div>
+          <div class="mic-row"><b>Phone mic</b><span class="mic-meter"></span></div>
+          <div class="mic-row"><b>AirPods</b><span class="mic-meter"></span></div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -325,6 +336,6 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   </div>
 </footer>
 
-<script src="/assets/site.js?v=3" defer></script>
+<script src="/assets/site.js?v=4" defer></script>
 </body>
 </html>

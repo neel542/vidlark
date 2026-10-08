@@ -359,6 +359,9 @@ The site's one authored motion, in the home hero. A drawn laptop shows a slide; 
 ### The Sound Line-Up
 A smaller supporting demo inside a panel: waveforms for each source, the late ones sliding into line over 1.2s, a grey lamp turning Signal Green with "Lined up". It loops only while visible and holds the lined-up state for reduced motion.
 
+### Motion across the page
+One material idea: things are recorded into view. The app's screens (product shots, the demo slot, the sync panel) open from a circle once, like the record dot and the face circle, then drop the clip. Lists (files, promises, facts, points, features, steps, Get Vidlark cards) land one by one, at most eight steps of 70 ms. Band headings rise once. Each band also acts out its own claim, only while it is on screen: the four face shapes take turns (sun band), one frame switches between Wide 16:9 and Tall 9:16 with the same cover crop as the phone page (sky band), and a dark strip of three live mic meters rests on the Sources screenshot (pink band). A thin ink line under the nav fills with scroll where `animation-timeline` is supported. Feedback answers back: a picked choice pops, Send shows a blinking lime dot while it works, the chosen How to use it guide slides in. Everything is visible without JavaScript; the `.motion` class turns motion on only when reduced motion is not asked for, and then the loops hold still (meters at fixed levels, shapes and frame static).
+
 ## Do's and Don'ts
 
 ### Do:

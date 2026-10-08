@@ -533,3 +533,107 @@ code, .mono { font-family: var(--mono); font-size: 0.86em; }
 .sent { max-width: 760px; padding: clamp(28px, 4vw, 48px); border-radius: var(--radius); background: var(--green); border: 1.5px solid var(--ink); box-shadow: var(--shadow); display: grid; gap: 14px; justify-items: start; }
 .sent p { font-size: 1.2rem; }
 .sent .btn { margin-top: 8px; }
+
+/* ---------- Motion ----------
+   One material idea runs through the page: things are recorded into view. The app's screens open
+   from a circle, like the record dot and the face circle; lists land one after another, like files
+   in a take's folder; and each band acts out its own claim (face shapes, Wide and Tall, live mics).
+   Everything is visible without JavaScript; `.motion` is set only when motion is welcome. */
+
+.btn:active { transform: translateY(0) scale(0.98); transition-duration: 0.1s; }
+
+/* Headings rise once, the first time they are seen. */
+.motion .rise { transition: transform 0.7s var(--ease-out), opacity 0.5s var(--ease-out); }
+.motion .rise:not(.in) { opacity: 0; transform: translateY(0.45em); }
+
+/* Lists land one by one: files, promises, facts, steps, features. */
+.motion .land { transition: transform 0.6s var(--ease-out), opacity 0.45s var(--ease-out); transition-delay: calc(var(--i, 0) * 70ms); }
+.motion .land:not(.in) { opacity: 0; transform: translateY(18px) scale(0.98); }
+
+/* The app's screens open from a circle. The circle is dropped when it has finished. */
+.motion .iris { transition: clip-path 0.9s var(--ease-io), transform 0.9s var(--ease-out), filter 0.9s var(--ease-out); }
+.motion .iris:not(.in) { clip-path: circle(0% at 50% 55%); transform: scale(0.94); filter: saturate(0.4); }
+.motion .iris.in:not(.settled) { clip-path: circle(110% at 50% 55%); }
+
+/* The hero's headline arrives word by word. */
+.hero h1 .w { display: inline-block; }
+.motion .hero h1 .w { animation: word-in 0.8s var(--ease-out) both; animation-delay: calc(var(--i) * 60ms); }
+.motion .hero .lead, .motion .hero .actions, .motion .hero .facts, .motion .hero .needs { animation: soft-in 0.7s var(--ease-out) both; }
+.motion .hero .lead { animation-delay: 0.35s; }
+.motion .hero .actions { animation-delay: 0.45s; }
+.motion .hero .facts { animation-delay: 0.55s; }
+.motion .hero .needs { animation-delay: 0.62s; }
+.motion .hero .take { animation: take-in 1s var(--ease-out) 0.2s both; }
+@keyframes word-in { from { opacity: 0; transform: translateY(0.5em) rotate(2deg); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes soft-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes take-in { from { opacity: 0; transform: translateY(30px) scale(0.96) rotate(-1deg); } to { opacity: 1; transform: none; } }
+
+/* The page's own timeline: a thin line under the nav that fills as you scroll, where supported. */
+@supports (animation-timeline: scroll()) {
+  .motion .nav::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 3px; background: var(--ink);
+    transform-origin: 0 50%; animation: page-progress linear both; animation-timeline: scroll(root);
+  }
+  @keyframes page-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+}
+
+/* Me and Screen: the four face shapes take turns. */
+.shape i { transition: transform 0.45s var(--ease-out), box-shadow 0.45s var(--ease-out); }
+.shape-row.cycling .shape { transition: opacity 0.3s; }
+.shape-row.cycling .shape:not(.on) { opacity: 0.55; }
+.shape.on i { transform: translateY(-6px) scale(1.12); box-shadow: 0 0 0 3px var(--ink), 0 16px 26px -12px rgba(14, 31, 22, 0.75); }
+
+/* Phones: one frame switching between Wide 16:9 and Tall 9:16, cropped like the phone page. */
+.aspect { display: flex; align-items: center; gap: 18px; margin-top: 30px; }
+.aspect-stage { width: 132px; height: 132px; display: grid; place-items: center; flex: none; }
+.aspect-frame {
+  width: 132px; height: 132px; border-radius: 14px; overflow: hidden; background: var(--ink);
+  box-shadow: 0 0 0 1.5px var(--ink), 0 14px 26px -14px rgba(14, 31, 22, 0.8);
+  clip-path: inset(25.4% 0 25.4% 0 round 12px); transition: clip-path 0.7s var(--ease-io);
+}
+.aspect-frame svg { width: 100%; height: 100%; display: block; }
+.aspect.tall .aspect-frame { clip-path: inset(0 25.4% 0 25.4% round 12px); }
+.aspect-label { position: relative; font-weight: 800; font-size: 1.15rem; letter-spacing: -0.015em; min-width: 9ch; height: 1.4em; }
+.aspect-label span { position: absolute; left: 0; top: 0; white-space: nowrap; transition: opacity 0.35s, transform 0.5s var(--ease-out); }
+.aspect .a-tall, .aspect.tall .a-wide { opacity: 0; transform: translateY(8px); }
+.aspect.tall .a-tall { opacity: 1; transform: none; }
+
+/* Microphones: a strip of live meters resting on the Sources screenshot. */
+.shot-stack { position: relative; max-width: 420px; margin-inline: auto; }
+.mic-strip {
+  position: absolute; left: -44px; bottom: 34px; width: min(300px, 82%); display: grid; gap: 8px; padding: 12px 14px;
+  background: rgba(16, 20, 18, 0.96); color: #ecf1ee; border-radius: 16px; border: 1.5px solid var(--ink);
+  box-shadow: 0 24px 44px -20px rgba(14, 31, 22, 0.9); font-size: 0.8rem; font-weight: 700;
+}
+.mic-row { display: grid; grid-template-columns: 76px 1fr; align-items: center; gap: 4px 10px; }
+.mic-row em { grid-column: 2; font-style: normal; font-size: 0.68rem; color: var(--ink); background: var(--green); border-radius: 999px; padding: 1px 8px; justify-self: start; }
+.mic-meter { display: flex; gap: 2px; height: 10px; }
+.mic-meter i { flex: 1; border-radius: 1.5px; background: var(--green); opacity: 0.18; transition: opacity 0.08s; }
+.mic-meter i.amber { background: var(--sun); }
+.mic-meter i.on { opacity: 1; }
+.motion .mic-strip:not(.in) { opacity: 0; transform: translate(-24px, 16px) rotate(-3deg); }
+.motion .mic-strip { transition: opacity 0.6s var(--ease-out) 0.35s, transform 0.8s var(--ease-out) 0.35s; }
+@media (max-width: 600px) { .mic-strip { left: -6px; bottom: -26px; } .shot-stack { margin-bottom: 40px; } }
+
+/* How to use it: the chosen guide slides in. */
+.motion .platform-panel.entering { animation: panel-in 0.35s var(--ease-out) both; }
+@keyframes panel-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* Feedback: a picked choice answers back, and Send shows it is working. */
+.motion .opt input:checked + span { animation: pick 0.28s var(--ease-out); }
+@keyframes pick { 40% { transform: scale(1.07); } }
+.form-foot .btn[disabled] span::after { content: ""; display: inline-block; width: 0.5em; height: 0.5em; margin-left: 0.5em; border-radius: 50%; background: var(--lime); animation: blink 0.8s ease-in-out infinite; vertical-align: middle; }
+@keyframes blink { 50% { opacity: 0.2; } }
+.motion .sent:not([hidden]) { animation: take-in 0.6s var(--ease-out) both; }
+
+/* The step numbers fill green as each step lands. */
+.motion .steps > li.land::before { transition: background 0.4s var(--ease-out), transform 0.5s var(--ease-out); transition-delay: calc(var(--i, 0) * 70ms + 0.15s); }
+.motion .steps > li.land:not(.in)::before { background: var(--paper); transform: scale(0.6); }
+
+/* Who built it: the initials tile turns in. */
+.motion .maker-mark.rise:not(.in) { transform: rotate(-24deg) scale(0.7); }
+.motion .maker-mark.rise { transition: transform 0.8s var(--ease-out), opacity 0.5s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .shape i, .aspect-frame, .aspect-label span, .mic-meter i { transition: none; }
+}

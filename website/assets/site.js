@@ -142,7 +142,14 @@
         tab.setAttribute("aria-selected", String(on));
         tab.tabIndex = on ? 0 : -1;
       });
-      panels.forEach((panel) => { panel.hidden = panel.dataset.platform !== name; });
+      panels.forEach((panel) => {
+        const show = panel.dataset.platform === name;
+        if (show && panel.hidden) {
+          panel.classList.add("entering");
+          panel.addEventListener("animationend", () => panel.classList.remove("entering"), { once: true });
+        }
+        panel.hidden = !show;
+      });
     };
     // A link to /how-to#windows, or to any heading inside a guide, opens that guide.
     const fromHash = () => {
@@ -254,4 +261,104 @@
       button.querySelector("span").textContent = "Send feedback";
     });
   }
+
+  // Motion. Things are recorded into view: screens open from a circle, lists land one by one, and
+  // each band acts out its claim. Nothing is hidden unless this runs, and none of it runs for anyone
+  // who asked for less motion. Loops run only while they can be seen.
+  const motion = !still && "IntersectionObserver" in window;
+  const whileSeen = (element, start, stop) => {
+    let on = false;
+    new IntersectionObserver((entries) => entries.forEach((e) => {
+      if (e.isIntersecting && !on) { on = true; start(); }
+      if (!e.isIntersecting && on) { on = false; stop(); }
+    }), { threshold: 0.25 }).observe(element);
+  };
+
+  if (motion) {
+    document.documentElement.classList.add("motion");
+
+    const heading = document.querySelector(".hero h1");
+    if (heading) {
+      const words = heading.textContent.trim().split(/\s+/);
+      heading.setAttribute("aria-label", heading.textContent.trim());
+      heading.replaceChildren(...words.flatMap((word, i) => {
+        const span = document.createElement("span");
+        span.className = "w";
+        span.setAttribute("aria-hidden", "true");
+        span.style.setProperty("--i", i);
+        span.textContent = word;
+        return i < words.length - 1 ? [span, document.createTextNode(" ")] : [span];
+      }));
+    }
+
+    // A screen clipped to a dot does not count as seen, so a screen is watched through its parent.
+    const reveals = new Map();
+    const seen = new IntersectionObserver((entries) => entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      (reveals.get(e.target) || [e.target]).forEach((element) => element.classList.add("in"));
+      seen.unobserve(e.target);
+    }), { threshold: 0.12, rootMargin: "0px 0px -6% 0px" });
+    const watch = (selector, kind) => document.querySelectorAll(selector).forEach((element) => {
+      if (element.closest(".hero")) return;
+      element.classList.add(kind);
+      if (kind !== "iris") return seen.observe(element);
+      const parent = element.parentElement;
+      reveals.set(parent, [...(reveals.get(parent) || []), element]);
+      seen.observe(parent);
+    });
+    watch(".band h2:not(.panel-title), .head > p, .page-head > .wrap > p, .close p, .close .actions, .maker-mark", "rise");
+    watch(".shot, .demo, .sync", "iris");
+    watch(".mic-strip", "rise");
+    document.querySelectorAll(".iris").forEach((element) => {
+      element.addEventListener("transitionend", (e) => {
+        if (e.propertyName === "clip-path" && element.classList.contains("in")) element.classList.add("settled");
+      });
+    });
+    // List items land in order, at most eight steps of delay, so long lists do not keep you waiting.
+    [".filegrid > li", ".no-list > li", ".facts-row > li", ".points > li", ".feat-list > li", ".steps > li", ".get > .get-card"].forEach((selector) => {
+      document.querySelectorAll(selector).forEach((item) => {
+        const index = [...item.parentElement.children].indexOf(item);
+        item.style.setProperty("--i", Math.min(index, 8));
+        item.classList.add("land");
+        seen.observe(item);
+      });
+    });
+  }
+
+  // Me and Screen: the four face shapes take turns.
+  const shapes = document.querySelector(".shape-row");
+  if (shapes && motion) {
+    const all = [...shapes.querySelectorAll(".shape")];
+    let at = 0, timer = null;
+    const step = () => { all.forEach((shape, i) => shape.classList.toggle("on", i === at)); at = (at + 1) % all.length; };
+    whileSeen(shapes, () => { shapes.classList.add("cycling"); step(); timer = setInterval(step, 1500); },
+                      () => { clearInterval(timer); shapes.classList.remove("cycling"); all.forEach((s) => s.classList.remove("on")); });
+  }
+
+  // Phones: the frame switches between Wide 16:9 and Tall 9:16.
+  const aspect = document.querySelector(".aspect");
+  if (aspect && motion) {
+    let timer = null;
+    whileSeen(aspect, () => { timer = setInterval(() => aspect.classList.toggle("tall"), 2600); },
+                      () => { clearInterval(timer); });
+  }
+
+  // Microphones: three live meters, each with its own voice. Held at fixed levels for less motion.
+  document.querySelectorAll(".mic-strip").forEach((strip) => {
+    const meters = [...strip.querySelectorAll(".mic-meter")].map((meter) => {
+      const segments = Array.from({ length: 14 }, (_, i) => {
+        const segment = document.createElement("i");
+        if (i >= 11) segment.className = "amber";
+        meter.appendChild(segment);
+        return segment;
+      });
+      return segments;
+    });
+    const show = (levels) => meters.forEach((segments, m) => segments.forEach((s, i) => s.classList.toggle("on", i < levels[m])));
+    if (!motion) { show([9, 6, 4]); return; }
+    let t = 0, timer = null;
+    const voice = (phase, loud) => Math.max(0, Math.round(loud * Math.abs(Math.sin(t / 3.3 + phase) * Math.sin(t / 7.9 + phase * 2)) + Math.random() * 2.2));
+    whileSeen(strip, () => { timer = setInterval(() => { t++; show([voice(0, 12), voice(1.7, 9), voice(3.1, 7)]); }, 110); },
+                     () => { clearInterval(timer); show([0, 0, 0]); });
+  });
 })();
