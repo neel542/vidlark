@@ -1,0 +1,11 @@
+Vidlark for Windows includes these programs, unchanged, in its tools folder.
+
+FFmpeg (ffmpeg.exe, ffprobe.exe and the av*.dll and sw*.dll libraries)
+  The LGPL build of FFmpeg 9.0.2 from https://github.com/BtbN/FFmpeg-Builds
+  (release autobuild-2026-10-07-13-07). FFmpeg is licensed under the GNU Lesser General Public
+  License version 2.1 or later; see ffmpeg-LICENSE.txt. Source code: https://ffmpeg.org/download.html
+
+whisper.cpp (whisper-cli.exe, whisper.dll, ggml*.dll)
+  From https://github.com/ggml-org/whisper.cpp (release b5454), MIT License, by the ggml authors.
+
+The speech model is downloaded separately, from https://huggingface.co/ggerganov/whisper.cpp

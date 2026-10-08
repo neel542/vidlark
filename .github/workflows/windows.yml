@@ -21,27 +21,60 @@ jobs:
       - name: Unit tests
         run: build\Release\vidlark-tests.exe
 
-      - name: Install ffmpeg for the end-to-end test
-        run: choco install ffmpeg -y --no-progress
+      # The tools the download ships, checked against fixed fingerprints. Every test below uses them.
+      - name: Fetch ffmpeg and whisper
+        shell: pwsh
+        run: |
+          $tools = "dist\Vidlark\tools"
+          New-Item -ItemType Directory -Force $tools, downloads | Out-Null
+          function Fetch($url, $file, $sha) {
+            Invoke-WebRequest $url -OutFile "downloads\$file"
+            $got = (Get-FileHash "downloads\$file" -Algorithm SHA256).Hash.ToLower()
+            if ($got -ne $sha) { throw "$file has the wrong fingerprint: $got" }
+          }
+          Fetch "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-07-13-07/ffmpeg-n9.0.2-22-g46d8f462ee-win64-lgpl-shared-9.0.zip" ffmpeg.zip 7b3207b46b1472142aaef0f45a1093bfa861aa43dae605567ac6244d8f3296a4
+          Fetch "https://github.com/ggml-org/whisper.cpp/releases/download/b5454/whisper-bin-x64.zip" whisper.zip 6ba69e3482d7826214f90a6a9c84ca07782aec1e1d0c6a7c30c994fd5d816ccb
+          Expand-Archive downloads\ffmpeg.zip downloads\ffmpeg
+          Expand-Archive downloads\whisper.zip downloads\whisper
+          $ff = Get-ChildItem downloads\ffmpeg | Select-Object -First 1
+          Copy-Item "$($ff.FullName)\bin\*" $tools -Exclude ffplay.exe
+          Copy-Item "$($ff.FullName)\LICENSE.txt" "$tools\ffmpeg-LICENSE.txt"
+          Copy-Item downloads\whisper\Release\whisper-cli.exe, downloads\whisper\Release\whisper.dll, downloads\whisper\Release\ggml*.dll $tools
+          Get-ChildItem $tools | Format-Table Name, Length
 
       - name: End-to-end test of vidlark-finish
         shell: pwsh
         run: |
-          $env:Path = "C:\ProgramData\chocolatey\bin;$env:Path"
+          $env:Path = "$PWD\dist\Vidlark\tools;$env:Path"
           python windows\tests\e2e.py build\Release\vidlark-finish.exe
 
       - name: Writer test (camera.mov, a crash, mic-N.m4a)
         shell: pwsh
         run: |
-          $env:Path = "C:\ProgramData\chocolatey\bin;$env:Path"
+          $env:Path = "$PWD\dist\Vidlark\tools;$env:Path"
           python windows\tests\writer_check.py build\app\Release\vidlark-writer-test.exe build\Release\vidlark-finish.exe
+
+      - uses: actions/cache@v4
+        with:
+          path: models
+          key: whisper-tiny-en
+
+      - name: Transcript test (a real voice, with the tiny English model)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path models\ggml-tiny.en.bin)) {
+            New-Item -ItemType Directory -Force models | Out-Null
+            Invoke-WebRequest https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin -OutFile models\ggml-tiny.en.bin
+          }
+          $env:Path = "$PWD\dist\Vidlark\tools;$env:Path"
+          python windows\tests\transcript_check.py build\Release\vidlark-finish.exe models\ggml-tiny.en.bin windows\tests\jfk.wav
 
       - name: Package
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force dist | Out-Null
-          Copy-Item build\app\Release\Vidlark.exe, build\app\Release\vidlark-finish.exe dist\
-          Copy-Item -Recurse build\app\Release\ui dist\ui
+          Copy-Item build\app\Release\Vidlark.exe, build\app\Release\vidlark-finish.exe dist\Vidlark\
+          Copy-Item -Recurse build\app\Release\ui dist\Vidlark\ui
+          Copy-Item windows\THIRD-PARTY-NOTICES.txt, LICENSE dist\Vidlark\
 
       - uses: actions/upload-artifact@v4
         with:
