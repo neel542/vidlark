@@ -1,6 +1,7 @@
 #include "session.h"
 
 #include "devices.h"
+#include "transcript.h"
 
 #include <mfapi.h>
 #include <shlobj.h>
@@ -363,6 +364,9 @@ void Session::stop() {
 void Session::runFinisher(fs::path folder) {
     const fs::path tool = exeDir() / L"vidlark-finish.exe";
     std::wstring command = L"\"" + tool.wstring() + L"\" \"" + folder.wstring() + L"\"";
+    // Without the speech model there is no transcript to write, so the take finishes without one.
+    const bool transcribe = vl::findModel(std::nullopt).path.has_value();
+    if (!transcribe) command += L" --no-transcribe";
     SECURITY_ATTRIBUTES inherit{sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
     HANDLE readEnd = nullptr, writeEnd = nullptr;
     CreatePipe(&readEnd, &writeEnd, &inherit, 0);
@@ -397,8 +401,9 @@ void Session::runFinisher(fs::path folder) {
     CloseHandle(process.hThread);
     CloseHandle(readEnd);
     const bool ok = last.rfind("DONE", 0) == 0;
-    post_({{"type", "finished"}, {"ok", ok}, {"message", ok ? "Every file is ready." : last.rfind("FAIL ", 0) == 0 ? last.substr(5) : last},
-           {"folder", vl::utf8(folder)}});
+    std::string message = ok ? "Every file is ready." : last.rfind("FAIL ", 0) == 0 ? last.substr(5) : last;
+    if (ok && !transcribe) message += " There is no transcript yet: the speech model is not downloaded.";
+    post_({{"type", "finished"}, {"ok", ok}, {"message", message}, {"folder", vl::utf8(folder)}});
 }
 
 }  // namespace app

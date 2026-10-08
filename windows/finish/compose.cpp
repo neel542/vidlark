@@ -73,22 +73,21 @@ Probe probe(const fs::path& ffprobe, const fs::path& file) {
     return p;
 }
 
-// The best H.264 encoder this ffmpeg has. H.264 plays everywhere; HEVC needs a paid add-on on Windows.
-std::vector<std::string> videoEncoder(const fs::path& ffmpeg) {
-    static std::vector<std::string> chosen;
-    if (!chosen.empty()) return chosen;
+// The H.264 encoders this ffmpeg has, best first. H.264 plays everywhere; HEVC needs a paid add-on on
+// Windows. Windows' own encoder (h264_mf) is tried on the graphics chip first, then in software.
+std::vector<std::vector<std::string>> videoEncoders(const fs::path& ffmpeg) {
+    static std::vector<std::vector<std::string>> found;
+    if (!found.empty()) return found;
     auto list = runTool(ffmpeg, {"-hide_banner", "-v", "error", "-encoders"}).out;
     auto has = [&](const std::string& name) { return list.find(" " + name + " ") != std::string::npos; };
-    if (has("libx264")) {
-        chosen = {"-c:v", "libx264", "-preset", "veryfast", "-crf", "20"};
-    } else if (has("h264_mf")) {
-        chosen = {"-c:v", "h264_mf", "-b:v", "10M", "-hw_encoding", "1"};
-    } else if (has("h264_videotoolbox")) {
-        chosen = {"-c:v", "h264_videotoolbox", "-b:v", "10M"};
-    } else {
-        throw FinishError("this ffmpeg has no H.264 encoder");
+    if (has("libx264")) found.push_back({"-c:v", "libx264", "-preset", "veryfast", "-crf", "20"});
+    if (has("h264_mf")) {
+        found.push_back({"-c:v", "h264_mf", "-hw_encoding", "1", "-b:v", "10M"});
+        found.push_back({"-c:v", "h264_mf", "-b:v", "10M"});
     }
-    return chosen;
+    if (has("h264_videotoolbox")) found.push_back({"-c:v", "h264_videotoolbox", "-b:v", "10M"});
+    if (found.empty()) throw FinishError("this ffmpeg has no H.264 encoder");
+    return found;
 }
 
 std::string seconds(double value) { return format("%.4f", value); }
@@ -210,10 +209,22 @@ ComposeResult composeVideo(const fs::path& ffmpeg, const fs::path& ffprobe, cons
     args.insert(args.end(), inputs.begin(), inputs.end());
     args.insert(args.end(), {"-/filter_complex", utf8(script), "-map", "[v]"});
     if (!voices.empty()) args.insert(args.end(), {"-map", "[a]", "-c:a", "aac", "-b:a", "192k"});
-    auto encoder = videoEncoder(ffmpeg);
-    args.insert(args.end(), encoder.begin(), encoder.end());
-    args.insert(args.end(), {"-pix_fmt", "yuv420p", "-r", "30", "-t", seconds(end), "-movflags", "+faststart", utf8(out)});
-    run(ffmpeg, args, out);
+    const auto common = args;
+    std::string problem;
+    bool made = false;
+    for (const auto& encoder : videoEncoders(ffmpeg)) {
+        args = common;
+        args.insert(args.end(), encoder.begin(), encoder.end());
+        args.insert(args.end(), {"-pix_fmt", "yuv420p", "-r", "30", "-t", seconds(end), "-movflags", "+faststart", utf8(out)});
+        try {
+            run(ffmpeg, args, out);
+            made = true;
+            break;
+        } catch (const FinishError& error) {
+            problem = error.what();  // the next encoder may work where this one could not
+        }
+    }
+    if (!made) throw FinishError(problem);
 
     ComposeResult result;
     result.seconds = end;

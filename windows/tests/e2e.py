@@ -119,6 +119,9 @@ def main():
     check("screen lined up by sound within 10 ms", sync["method"] == "audio" and error_ms <= 10)
     video = os.path.join(take, "video.mp4")
     check("video.mp4 written", os.path.isfile(video))
+    if not os.path.isfile(video):
+        report_text = open(os.path.join(take, "report.md"), encoding="utf-8").read()
+        print("        report.md says:\n" + "\n".join("          " + line for line in report_text.splitlines() if "ideo" in line))
     if os.path.isfile(video):
         probe = json.loads(run([ffprobe, "-v", "error", "-show_entries", "format=duration:stream=codec_type,codec_name,width,height",
                                 "-of", "json", video]).stdout)
