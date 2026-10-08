@@ -1,0 +1,143 @@
+name: Windows
+
+on:
+  push:
+    branches: [windows]
+    # A tag like windows-v0.1 builds, tests and publishes a beta (the release job below).
+    tags: ["windows-v*"]
+    paths: ["windows/**", ".github/workflows/windows.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S windows -B build -A x64
+
+      - name: Build
+        id: build
+        run: cmake --build build --config Release --parallel
+
+      - name: Unit tests
+        run: build\Release\vidlark-tests.exe
+
+      # The tools the download ships, checked against fixed fingerprints. Every test below uses them.
+      - name: Fetch ffmpeg and whisper
+        shell: pwsh
+        run: |
+          $tools = "dist\Vidlark\tools"
+          New-Item -ItemType Directory -Force $tools, downloads | Out-Null
+          function Fetch($url, $file, $sha) {
+            Invoke-WebRequest $url -OutFile "downloads\$file"
+            $got = (Get-FileHash "downloads\$file" -Algorithm SHA256).Hash.ToLower()
+            if ($got -ne $sha) { throw "$file has the wrong fingerprint: $got" }
+          }
+          Fetch "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-07-13-07/ffmpeg-n9.0.2-22-g46d8f462ee-win64-lgpl-shared-9.0.zip" ffmpeg.zip 7b3207b46b1472142aaef0f45a1093bfa861aa43dae605567ac6244d8f3296a4
+          Fetch "https://github.com/ggml-org/whisper.cpp/releases/download/b5454/whisper-bin-x64.zip" whisper.zip 6ba69e3482d7826214f90a6a9c84ca07782aec1e1d0c6a7c30c994fd5d816ccb
+          Expand-Archive downloads\ffmpeg.zip downloads\ffmpeg
+          Expand-Archive downloads\whisper.zip downloads\whisper
+          $ff = Get-ChildItem downloads\ffmpeg | Select-Object -First 1
+          Copy-Item "$($ff.FullName)\bin\*" $tools -Exclude ffplay.exe
+          Copy-Item "$($ff.FullName)\LICENSE.txt" "$tools\ffmpeg-LICENSE.txt"
+          Copy-Item downloads\whisper\Release\whisper-cli.exe, downloads\whisper\Release\whisper.dll, downloads\whisper\Release\ggml*.dll $tools
+          Get-ChildItem $tools | Format-Table Name, Length
+
+      - name: End-to-end test of vidlark-finish
+        shell: pwsh
+        run: |
+          $env:Path = "$PWD\dist\Vidlark\tools;$env:Path"
+          python windows\tests\e2e.py build\Release\vidlark-finish.exe
+
+      - name: Writer test (camera.mov, a crash, mic-N.m4a)
+        shell: pwsh
+        run: |
+          $env:Path = "$PWD\dist\Vidlark\tools;$env:Path"
+          python windows\tests\writer_check.py build\app\Release\vidlark-writer-test.exe build\Release\vidlark-finish.exe
+
+      - name: Screen test (screen.mov from the real screen, the stage and bubble, a crash, video.mp4)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $env:Path = "$PWD\dist\Vidlark\tools;$env:Path"
+          $env:VIDLARK_CHECK_OUT = "$PWD\screen-check"
+          python windows\tests\screen_check.py build\app\Release\vidlark-screen-test.exe build\app\Release\vidlark-writer-test.exe build\Release\vidlark-finish.exe
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screen-check
+          path: screen-check
+          if-no-files-found: ignore
+
+      - uses: actions/cache@v4
+        with:
+          path: models
+          key: whisper-tiny-en
+
+      - name: Transcript test (a real voice, with the tiny English model)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path models\ggml-tiny.en.bin)) {
+            New-Item -ItemType Directory -Force models | Out-Null
+            Invoke-WebRequest https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin -OutFile models\ggml-tiny.en.bin
+          }
+          $env:Path = "$PWD\dist\Vidlark\tools;$env:Path"
+          python windows\tests\transcript_check.py build\Release\vidlark-finish.exe models\ggml-tiny.en.bin windows\tests\jfk.wav
+
+      - name: Package
+        shell: pwsh
+        run: |
+          Copy-Item build\app\Release\Vidlark.exe, build\app\Release\vidlark-finish.exe dist\Vidlark\
+          Copy-Item -Recurse build\app\Release\ui dist\Vidlark\ui
+          Copy-Item windows\THIRD-PARTY-NOTICES.txt, LICENSE dist\Vidlark\
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vidlark-windows
+          path: dist
+
+  # Only for tags named windows-v*: the tested build, zipped as Vidlark-Windows.zip, on a GitHub prerelease.
+  # The zip keeps that name in every release, so the download link never changes.
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/windows-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: vidlark-windows
+          path: dist
+
+      - name: Check what goes in the download
+        run: |
+          for file in Vidlark.exe vidlark-finish.exe ui/index.html ui/box.html ui/app.js ui/box.js ui/app.css \
+                      tools/ffmpeg.exe tools/ffprobe.exe tools/whisper-cli.exe THIRD-PARTY-NOTICES.txt LICENSE; do
+            test -e "dist/Vidlark/$file" || { echo "missing from the download: $file"; exit 1; }
+          done
+
+      - name: Zip
+        run: |
+          cd dist
+          zip -r -9 ../Vidlark-Windows.zip Vidlark
+          cd ..
+          unzip -l Vidlark-Windows.zip | tail -1
+
+      - name: Publish the beta
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${GITHUB_REF_NAME#windows-v}"
+          version="${version%-beta}"
+          gh release create "$GITHUB_REF_NAME" Vidlark-Windows.zip \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --prerelease \
+            --title "Vidlark for Windows $version beta" \
+            --notes-file windows/release-notes.md

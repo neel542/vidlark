@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vidlark recording</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="box-body">
+<main class="box" aria-label="Recording">
+  <div class="box-row">
+    <span class="lamp fail breathing" aria-hidden="true"></span>
+    <span class="box-time" id="time" aria-label="Time recorded">00:00</span>
+    <div class="meter box-meter" id="meter" aria-label="Microphone level"></div>
+    <button type="button" class="box-stop" id="stop" aria-label="Stop recording" title="Stop recording"></button>
+  </div>
+  <div class="segments box-switch" role="group" aria-label="What the video shows">
+    <button type="button" id="me" aria-pressed="true" title="The video shows you, across the whole screen">Me</button>
+    <button type="button" id="screen" aria-pressed="false" title="The video shows the screen, with your face in the corner">Screen</button>
+  </div>
+  <div class="box-row box-toggles">
+    <button type="button" class="box-toggle" id="bubble" aria-pressed="true" title="Your face in the corner of the screen, in the video">Face</button>
+    <button type="button" class="box-toggle" id="sound" aria-pressed="false" title="What the computer plays, such as a video on screen, in the video">Sound</button>
+    <button type="button" class="box-toggle plain" id="back" title="Show the Vidlark window. Recording carries on, and the window is not in the video.">Vidlark</button>
+  </div>
+  <p class="box-note" id="note" role="status" aria-live="polite"></p>
+</main>
+<script src="box.js"></script>
+</body>
+</html>

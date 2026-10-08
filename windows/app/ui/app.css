@@ -1,0 +1,203 @@
+/* The Mac panel's face, on Windows: an anodised graphite body, engraved labels, lamps with a hot
+   centre, one red record button. Colours are the Mac app's Palette (Sources/Vidlark/Theme.swift). */
+:root {
+  --body: #0e1110; --face: #151917; --well: #070908; --raised: #1b201e;
+  --hairline: rgba(255, 255, 255, 0.075); --engraved: #86918b; --ink: #ecf1ee; --dim: #a3ada8;
+  --signal: #3dcc80; --signal-hot: #8cf0b8; --amber: #e8b34b; --red: #f04e3e; --glass: #050706;
+  --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--body) linear-gradient(rgba(255, 255, 255, 0.035), transparent 35%);
+  color: var(--ink); font: 14px/1.4 var(--sans); overflow: hidden; user-select: none;
+}
+.panel {
+  height: 100%; display: grid; gap: 18px 22px; padding: 18px 22px 22px;
+  grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "top top" "picture side";
+}
+.engraved {
+  font-size: 9.5px; font-weight: 600; letter-spacing: 1.3px; text-transform: uppercase; color: var(--engraved);
+}
+.top { grid-area: top; display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.title { display: flex; flex-direction: column; flex: 1; max-width: 560px; }
+.title input {
+  font: 600 20px var(--sans); letter-spacing: -0.01em; color: var(--ink); background: transparent;
+  border: 0; border-bottom: 1px solid transparent; padding: 2px 0 3px; margin-top: 2px; outline: none;
+}
+.title input::placeholder { color: var(--dim); }
+.title input:hover, .title input:focus { border-bottom-color: var(--hairline); }
+.tabs { display: flex; gap: 6px; }
+.tabs button, .refresh {
+  font: 600 12.5px var(--sans); color: var(--ink); background: var(--raised); border: 1px solid var(--hairline);
+  border-radius: 8px; padding: 7px 14px; cursor: pointer;
+}
+.tabs button:disabled { color: var(--engraved); cursor: default; }
+.refresh:hover { background: #222826; }
+.refresh:focus-visible, .tabs button:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+.picture { grid-area: picture; display: flex; flex-direction: column; gap: 12px; min-height: 0; container-type: size; }
+/* 16:9, as large as the space allows, leaving room for the note under it. */
+.glass {
+  flex: none; aspect-ratio: 16 / 9; width: min(100cqw, calc((100cqh - 40px) * 16 / 9));
+  background: var(--glass); border: 1px solid var(--hairline); border-radius: 12px;
+  display: grid; place-items: center; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.glass { position: relative; overflow: hidden; }
+.glass img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.glass .empty { color: var(--dim); font-size: 13px; position: absolute; }
+.countdown {
+  position: absolute; inset: 0; display: grid; place-items: center; background: rgba(5, 7, 6, 0.55);
+  font-size: 140px; font-weight: 300; font-variant-numeric: tabular-nums;
+}
+.preview-note { display: flex; align-items: center; gap: 9px; color: var(--dim); font-size: 12.5px; }
+
+.side {
+  grid-area: side; background: var(--face); border: 1px solid var(--hairline); border-radius: 14px;
+  padding: 16px; display: flex; flex-direction: column; gap: 12px; min-height: 0;
+}
+.sources { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.source { display: flex; align-items: center; gap: 11px; padding: 10px 6px; border-bottom: 1px solid var(--hairline); }
+.source:last-child { border-bottom: 0; }
+.source div, .source label { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.source.dim { opacity: 0.6; }
+.source select {
+  font: 12.5px var(--sans); color: var(--ink); background: var(--raised); border: 1px solid var(--hairline);
+  border-radius: 6px; padding: 4px 6px; margin-top: 3px; max-width: 100%;
+}
+.detail { color: var(--dim); font-size: 11.5px; margin-top: 2px; }
+.meter { display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; height: 8px; margin: 2px 6px 6px 25px; }
+.meter i { background: #26302b; border-radius: 1px; }
+.meter i.on { background: var(--signal); }
+.meter i.on.amber { background: var(--amber); }
+.meter i.on.red { background: var(--red); }
+.extras { margin: 0 6px 4px 25px; color: var(--dim); font-size: 12px; }
+.extras summary { cursor: pointer; color: var(--ink); font-weight: 600; }
+.extras .hint { margin: 6px 0; }
+.extras label { display: flex; gap: 8px; align-items: center; padding: 3px 0; color: var(--ink); }
+.status { min-height: 38px; color: var(--dim); font-size: 12.5px; }
+.status button { margin-top: 6px; }
+.status .bad { color: #ffa89c; }
+.source b { font-weight: 600; font-size: 13px; }
+.source .name { color: var(--dim); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.refresh { align-self: flex-start; }
+
+.lamp {
+  width: 8px; height: 8px; border-radius: 50%; flex: none; box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.45);
+  background: radial-gradient(circle at 38% 32%, #4a524e, #3a413d 60%);
+}
+.lamp.ok { background: radial-gradient(circle at 38% 32%, var(--signal-hot), var(--signal) 60%); }
+.lamp.warn { background: radial-gradient(circle at 38% 32%, #ffe2a0, var(--amber) 60%); }
+.lamp.fail { background: radial-gradient(circle at 38% 32%, #ffa89c, var(--red) 60%); }
+
+/* Share screen, and the screen row's Change. */
+.small {
+  font: 600 11.5px var(--sans); color: var(--ink); background: var(--raised); border: 1px solid var(--hairline);
+  border-radius: 6px; padding: 4px 10px; cursor: pointer; flex: none;
+}
+.small:disabled { color: var(--engraved); cursor: default; }
+.share { display: flex; flex-direction: column; gap: 6px; align-self: stretch; }
+.share-button {
+  font: 600 13.5px var(--sans); color: #06120b; background: var(--signal); border: 0; border-radius: 9px;
+  padding: 10px 14px; cursor: pointer;
+}
+.share-button:disabled { opacity: 0.6; cursor: default; }
+.hint { color: var(--dim); font-size: 12px; }
+.small:focus-visible, .share-button:focus-visible, .tile:focus-visible, .segments button:focus-visible {
+  outline: 2px solid var(--signal); outline-offset: 2px;
+}
+
+/* The picker: what to share, with a picture of each screen and window. */
+.picker-shade { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: grid; place-items: center; z-index: 10; }
+.picker {
+  width: min(760px, calc(100vw - 32px)); height: min(560px, calc(100vh - 32px)); display: flex; flex-direction: column;
+  background: var(--body); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 18px; padding: 24px; gap: 12px;
+}
+.picker h2 { font-size: 18px; font-weight: 600; }
+.segments { display: inline-flex; align-self: flex-start; gap: 2px; padding: 2px; background: var(--face); border: 1px solid var(--hairline); border-radius: 10px; }
+.segments button {
+  font: 600 12.5px var(--sans); color: var(--dim); background: transparent; border: 0; border-radius: 8px; padding: 6px 14px; cursor: pointer;
+}
+.segments button[aria-selected="true"] { color: var(--ink); background: var(--raised); }
+.tiles {
+  flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px 14px; align-content: start; padding: 2px;
+}
+.tiles .empty { grid-column: 1 / -1; color: var(--dim); text-align: center; padding-top: 80px; }
+.tile {
+  display: flex; flex-direction: column; gap: 6px; text-align: left; background: transparent; border: 0; padding: 0;
+  color: var(--dim); cursor: pointer; font: 12px var(--sans); min-width: 0;
+}
+.tile .thumb {
+  height: 124px; border-radius: 8px; background: var(--well); border: 1px solid var(--hairline);
+  display: grid; place-items: center; overflow: hidden;
+}
+.tile .thumb img { max-width: calc(100% - 12px); max-height: calc(100% - 12px); display: block; }
+.tile:hover .thumb { border-color: rgba(255, 255, 255, 0.2); }
+.tile[aria-selected="true"] .thumb { border: 2px solid var(--signal); }
+.tile[aria-selected="true"] b { color: var(--ink); }
+.tile b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .detail { color: var(--engraved); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
+.picker footer { display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--hairline); padding-top: 14px; }
+.picker .spacer { flex: 1; }
+.tick { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 12.5px; }
+.refresh.primary { background: var(--signal); color: #06120b; border-color: transparent; }
+.refresh.primary:disabled { opacity: 0.5; cursor: default; }
+
+/* The sources scroll when the window is short; the time and the record button always show. */
+.side-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; margin: 0 -4px; padding: 0 4px; }
+.rec { flex: none; display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 8px; }
+.timecode { font-size: 46px; font-weight: 300; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.record {
+  width: 84px; height: 84px; border-radius: 50%; border: 3px solid #2a302d; background: var(--red);
+  box-shadow: inset 0 -6px 12px rgba(0, 0, 0, 0.25), 0 0 0 6px var(--well); cursor: pointer;
+}
+.record:disabled { opacity: 0.45; cursor: default; }
+.record:focus-visible { outline: 2px solid var(--signal); outline-offset: 6px; }
+/* Recording: the button stops the take, like a camera's. */
+.record.stop { background: var(--well); display: grid; place-items: center; }
+.record.stop::after { content: ""; width: 30px; height: 30px; border-radius: 6px; background: var(--red); }
+.timecode.live { color: var(--ink); }
+.timecode.live::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--red); margin-right: 12px; vertical-align: middle; }
+
+@media (max-width: 900px) {
+  .panel { grid-template-columns: 1fr; grid-template-rows: auto auto auto; grid-template-areas: "top" "picture" "side"; overflow: auto; }
+  .picture { container-type: inline-size; }
+  .glass { width: 100%; }
+  body { overflow: auto; }
+}
+
+/* The recording box while the screen is shared. Dragged by its background. */
+.box-body { overflow: hidden; background: var(--glass); }
+.box {
+  height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; app-region: drag;
+}
+.box button { app-region: no-drag; }
+.box-row { display: flex; align-items: center; gap: 9px; }
+.box-time { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 54px; }
+.box-meter { flex: 1; grid-template-columns: repeat(12, 1fr); margin: 0; height: 7px; }
+.box-stop {
+  width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--well); display: grid; place-items: center;
+  cursor: pointer; flex: none; box-shadow: inset 0 0 0 1px var(--hairline);
+}
+.box-stop::after { content: ""; width: 13px; height: 13px; border-radius: 3px; background: var(--red); }
+.box-switch { align-self: stretch; display: flex; }
+.box-switch button { flex: 1; padding: 7px 0; font-size: 13px; }
+.box-switch button[aria-pressed="true"] { color: var(--ink); background: var(--raised); }
+.box-switch button:disabled { opacity: 0.45; cursor: default; }
+.box-toggles { gap: 6px; }
+.box-toggle {
+  flex: 1; font: 600 11.5px var(--sans); color: var(--dim); background: var(--face); border: 1px solid var(--hairline);
+  border-radius: 7px; padding: 5px 0; cursor: pointer;
+}
+.box-toggle[aria-pressed="true"] { color: #06120b; background: var(--signal); border-color: transparent; }
+.box-toggle:disabled { opacity: 0.45; cursor: default; }
+.box-toggle.plain { color: var(--ink); }
+.box-stop:focus-visible, .box-toggle:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.box-note { color: var(--dim); font-size: 11px; min-height: 13px; margin-top: -2px; }
+.lamp.breathing { animation: breathe 1.6s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .lamp.breathing { animation: none; } }

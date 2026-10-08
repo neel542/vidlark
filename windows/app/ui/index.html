@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vidlark</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<main class="panel">
+  <header class="top">
+    <label class="title">
+      <span class="engraved">Video</span>
+      <input id="video-title" type="text" placeholder="What is this video called?" maxlength="120" autocomplete="off" spellcheck="false">
+    </label>
+    <nav class="tabs" aria-label="Pages">
+      <button type="button" disabled title="Comes in a later build">Live</button>
+      <button type="button" disabled title="Comes in a later build">Recordings</button>
+      <button type="button" disabled title="Comes in a later build">Settings</button>
+    </nav>
+  </header>
+
+  <section class="picture" aria-label="Camera picture">
+    <div class="glass" id="glass">
+      <img id="preview" alt="Camera picture" hidden>
+      <p class="empty" id="picture-note">Opening the camera…</p>
+      <div class="countdown" id="countdown" hidden></div>
+    </div>
+    <p class="preview-note"><span class="lamp warn"></span>Windows beta: the camera, mics and screen record. Phones and live view come later.</p>
+  </section>
+
+  <aside class="side">
+    <div class="side-scroll">
+    <h2 class="engraved">Sources</h2>
+    <div class="source">
+      <span class="lamp off" id="camera-lamp"></span>
+      <label><b>Camera</b><select id="camera"></select><span class="detail" id="camera-detail"></span></label>
+    </div>
+    <div class="source">
+      <span class="lamp off" id="mic-lamp"></span>
+      <label><b>Microphone</b><select id="mic"></select></label>
+    </div>
+    <div class="meter" id="meter" aria-label="Microphone level"></div>
+    <details class="extras" id="extras-box" hidden>
+      <summary>More microphones</summary>
+      <p class="hint">Each ticked mic records to its own file.</p>
+      <div id="extras"></div>
+    </details>
+    <div class="source">
+      <span class="lamp off" id="screen-lamp"></span>
+      <div><b>Screen</b><span class="detail" id="screen-detail">Entire screen</span><span class="detail" id="screen-note">Recorded once you press Share screen</span></div>
+      <button type="button" class="small" id="choose-screen">Change</button>
+    </div>
+
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+    </div>
+
+    <div class="rec">
+      <div class="share" id="share-box" hidden>
+        <button type="button" class="share-button" id="share">Share screen</button>
+        <p class="hint" id="share-hint">Adds the screen to the video. This window then shrinks to a small box with Me, Screen and Stop.</p>
+      </div>
+      <div class="timecode" id="timecode" aria-label="Time recorded">00:00</div>
+      <button type="button" class="record" id="record" disabled aria-label="Record"></button>
+    </div>
+  </aside>
+</main>
+
+<div class="picker-shade" id="picker" hidden>
+  <div class="picker" role="dialog" aria-modal="true" aria-labelledby="picker-title">
+    <h2 id="picker-title">What to share</h2>
+    <p class="hint" id="picker-hint">Pick the whole screen or one window. Only what you pick goes into the video.</p>
+    <div class="segments" role="tablist" aria-label="What to share">
+      <button type="button" role="tab" id="tab-screen" aria-selected="true">Entire screen</button>
+      <button type="button" role="tab" id="tab-window" aria-selected="false">A window</button>
+    </div>
+    <div class="tiles" id="tiles" role="listbox" aria-label="Choices"></div>
+    <footer>
+      <label class="tick"><input type="checkbox" id="computer-sound"> Include the computer's sound</label>
+      <span class="spacer"></span>
+      <button type="button" class="refresh" id="picker-cancel">Cancel</button>
+      <button type="button" class="refresh primary" id="picker-go" disabled>Share</button>
+    </footer>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

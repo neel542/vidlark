@@ -13,8 +13,13 @@ if [ "${SKIP_FIXTURE:-0}" != "1" ]; then
 fi
 source "$OUT/expected.env"
 
-(cd "$ROOT" && swift build --product vidlark-finish 2>&1 | tail -1) || { echo "build failed"; exit 1; }
-BIN="$ROOT/.build/debug/vidlark-finish"
+# FINISH_BIN=<path> checks another build of the finisher instead, such as the C++ one in windows/.
+if [ -n "${FINISH_BIN:-}" ]; then
+    BIN="$FINISH_BIN"
+else
+    (cd "$ROOT" && swift build --product vidlark-finish 2>&1 | tail -1) || { echo "build failed"; exit 1; }
+    BIN="$ROOT/.build/debug/vidlark-finish"
+fi
 
 PASS=0
 FAILED=0
@@ -187,6 +192,8 @@ check "exit 0 and DONE line" done_ok noscreen
 check "sync method none, offset 0" py 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["method"]=="none" and d["screenOffsetSec"]==0 else 1)' "$OUT/noscreen/sync.json"
 check "chapters.txt is empty" bash -c "[ -f '$OUT/noscreen/chapters.txt' ] && [ ! -s '$OUT/noscreen/chapters.txt' ]"
 
+# The padding only comes from the Mac's camera writer, so the C++ finisher has nothing to take out.
+if [ -z "${FINISH_BIN:-}" ]; then
 # camera.mov padded the way the Mac's camera writer pads it: the finisher takes the padding out
 # before anything reads the file, and every packet stays as it was
 rm -rf "$OUT/padded"; mkdir -p "$OUT/padded"
@@ -200,6 +207,7 @@ check "padding taken out: camera.mov is back to its unpadded size" bash -c "[ \$
 check "every packet of camera.mov unchanged" bash -c "[ \"\$1\" = \"\$2\" ]" _ "$BEFORE_PACKETS" "$(packets "$OUT/padded/camera.mov")"
 check "offset within 10 ms of $EXPECTED_OFFSET_MAIN" offset_near "$OUT/padded" "$EXPECTED_OFFSET_MAIN"
 check "no tidy copy left behind" bash -c "! ls -a '$OUT/padded' | grep -q '\.tidy$'"
+fi
 
 # unreadable camera.mov
 run badcamera --no-transcribe
