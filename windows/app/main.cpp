@@ -108,6 +108,23 @@ void showPanel() {
     SetForegroundWindow(window);
 }
 
+// The question asked when Vidlark is closed during a take can sit over a shared screen, so like
+// Vidlark's other windows it is kept out of the video.
+HHOOK questionHook = nullptr;
+
+LRESULT CALLBACK keepQuestionOut(int code, WPARAM wParam, LPARAM lParam) {
+    if (code == HCBT_ACTIVATE) SetWindowDisplayAffinity(reinterpret_cast<HWND>(wParam), WDA_EXCLUDEFROMCAPTURE);
+    return CallNextHookEx(questionHook, code, wParam, lParam);
+}
+
+bool closeDuringTake(HWND hwnd) {
+    questionHook = SetWindowsHookExW(WH_CBT, keepQuestionOut, nullptr, GetCurrentThreadId());
+    const int answer = MessageBoxW(hwnd, L"A take is recording. Stop it and close Vidlark?", L"Vidlark", MB_YESNO | MB_ICONQUESTION);
+    if (questionHook) UnhookWindowsHookEx(questionHook);
+    questionHook = nullptr;
+    return answer == IDYES;
+}
+
 // The recording box: top right of the shared screen, over everything, kept out of the video.
 void openBox(const nlohmann::json& work) {
     if (box || !environment) return;
@@ -118,6 +135,11 @@ void openBox(const nlohmann::json& work) {
     box = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW, boxClass, L"Vidlark recording", WS_POPUP | WS_CLIPCHILDREN,
                           area.right - w - margin, area.top + margin, w, h, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
     if (!box) return;
+    // The shared screen's scale can differ from the panel's: the box takes the one it opened on.
+    if (const UINT boxDpi = std::max<UINT>(96, GetDpiForWindow(box)); boxDpi != dpi) {
+        const int bw = MulDiv(300, boxDpi, 96), bh = MulDiv(156, boxDpi, 96), bm = MulDiv(12, boxDpi, 96);
+        SetWindowPos(box, nullptr, area.right - bw - bm, area.top + bm, bw, bh, SWP_NOZORDER | SWP_NOACTIVATE);
+    }
     SetWindowDisplayAffinity(box, WDA_EXCLUDEFROMCAPTURE);
     const DWORD round = 2;  // DWMWCP_ROUND: Windows 11's rounded corners
     DwmSetWindowAttribute(box, 33 /* DWMWA_WINDOW_CORNER_PREFERENCE */, &round, sizeof round);
@@ -322,10 +344,7 @@ LRESULT CALLBACK windowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
         }
         return 0;
     case WM_CLOSE:
-        if (session && session->recording() &&
-            MessageBoxW(hwnd, L"A take is recording. Stop it and close Vidlark?", L"Vidlark", MB_YESNO | MB_ICONQUESTION) != IDYES) {
-            return 0;
-        }
+        if (session && session->recording() && !closeDuringTake(hwnd)) return 0;
         if (session) session->stop();
         DestroyWindow(hwnd);
         return 0;

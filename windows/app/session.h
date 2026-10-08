@@ -61,6 +61,7 @@ private:
     void onSound(const int16_t* samples, UINT32 frames, LONGLONG time, bool silent);
     void sendPreview(const BYTE* data, LONG pitch);
     void runFinisher(std::filesystem::path folder);
+    void finishTake(std::filesystem::path folder);
     void startScreen(Take* take, HMONITOR monitor, HWND window, std::string name, bool computerSound);
 
     Post post_;

@@ -423,8 +423,10 @@ void Overlay::cover(const RECT& area, const RECT& work) {
         work_ = work;
         covering_ = true;
     }
+    // On top when it first shows. Following a moved window, it keeps its place under the box and the panel.
+    const UINT order = IsWindowVisible(stage_) ? SWP_NOZORDER : 0;
     SetWindowPos(stage_, HWND_TOPMOST, area.left, area.top, area.right - area.left, area.bottom - area.top,
-                 SWP_NOACTIVATE | SWP_SHOWWINDOW);
+                 SWP_NOACTIVATE | SWP_SHOWWINDOW | order);
     placeBubble();
     {
         // Her camera across the area follows a shared window too.

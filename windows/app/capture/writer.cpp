@@ -37,6 +37,7 @@ ComPtr<IMFMediaType> videoType(const GUID& subtype, const VideoFormat& f, UINT32
     if (bitrate) {
         type->SetUINT32(MF_MT_AVG_BITRATE, bitrate);
         type->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_High);
+        type->SetUINT32(MF_MT_MAX_KEYFRAME_SPACING, f.fps * 2);
     } else {
         type->SetUINT32(MF_MT_DEFAULT_STRIDE, f.width);
         type->SetUINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, TRUE);

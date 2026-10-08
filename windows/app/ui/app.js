@@ -6,6 +6,7 @@ const send = (message) => bridge && bridge.postMessage(message);
 
 let devices = { cameras: [], microphones: [] };
 let opened = { camera: "", microphone: "" };
+let cameraAlive = true; // false once an opened camera stops sending pictures
 let phase = "idle"; // idle, countdown, recording, finishing
 let countdownTimer = null;
 
@@ -179,7 +180,7 @@ function setPhase(next) {
   const button = $("record");
   button.classList.toggle("stop", phase === "recording");
   button.setAttribute("aria-label", phase === "recording" ? "Stop" : phase === "countdown" ? "Call off the take" : "Record");
-  button.disabled = phase === "finishing" || (phase === "idle" && !(opened.camera && opened.microphone));
+  button.disabled = phase === "finishing" || (phase === "idle" && !(opened.camera && opened.microphone && cameraAlive));
   $("timecode").classList.toggle("live", phase === "recording");
   for (const control of [$("camera"), $("mic"), $("video-title")]) control.disabled = phase !== "idle";
   for (const box of document.querySelectorAll("#extras input")) box.disabled = phase !== "idle";
@@ -246,14 +247,19 @@ $("mic").addEventListener("change", () => send({ type: "open", camera: $("camera
 
 const handlers = {
   devices(m) {
+    // Asked for again every few seconds, so the lists are only rebuilt when something was plugged in or out.
+    const same = JSON.stringify([m.cameras, m.microphones, m.screens]) === JSON.stringify([devices.cameras, devices.microphones, devices.screens]);
     devices = m;
+    if (same) return;
     fill($("camera"), m.cameras || [], opened.camera);
     fill($("mic"), m.microphones || [], opened.microphone);
     showShareTarget();
     showExtras();
+    if (!cameraAlive) reopenCamera();
   },
   opened(m) {
     opened = m;
+    cameraAlive = true;
     fill($("camera"), devices.cameras || [], m.camera);
     fill($("mic"), devices.microphones || [], m.microphone);
     $("camera-lamp").className = "lamp " + (m.camera ? "ok" : "fail");
@@ -279,6 +285,15 @@ const handlers = {
     const lit = Math.round(Math.max(0, Math.min(1, (level + 60) / 60)) * segments.length);
     segments.forEach((segment, i) => segment.classList.toggle("on", i < lit));
     if (m.cameraOk === false && opened.camera) $("camera-lamp").className = "lamp fail";
+    if (typeof m.cameraOk === "boolean" && opened.camera && m.cameraOk !== cameraAlive) {
+      cameraAlive = m.cameraOk;
+      if (!cameraAlive && phase === "idle") {
+        $("preview").hidden = true;
+        $("picture-note").hidden = false;
+        $("picture-note").textContent = "The camera stopped. Check it is plugged in, and that Settings, Privacy & security, Camera lets apps use it. Vidlark tries it again when it is plugged back in, or when you come back to this window.";
+      }
+      setPhase(phase);
+    }
     if (phase === "recording" && typeof m.seconds === "number") $("timecode").textContent = timecode(m.seconds);
   },
   recording() {
@@ -331,6 +346,11 @@ const handlers = {
   },
 };
 
+// A camera that stopped (unplugged, or turned off in Windows' privacy settings) is opened again.
+function reopenCamera() {
+  if (phase === "idle" && opened.camera && devices.cameras && devices.cameras.length) send({ type: "open", camera: $("camera").value, microphone: $("mic").value });
+}
+
 function escape(text) {
   return String(text).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 }
@@ -341,5 +361,14 @@ if (bridge) {
     if (message && handlers[message.type]) handlers[message.type](message);
   });
   send({ type: "hello" });
+  // A camera or microphone plugged in later shows up without opening Vidlark again.
+  const refreshDevices = () => {
+    if (phase === "idle" && document.visibilityState === "visible") send({ type: "devices" });
+  };
+  window.addEventListener("focus", () => {
+    if (!cameraAlive) reopenCamera();
+    refreshDevices();
+  });
+  setInterval(refreshDevices, 3000);
 }
 setPhase("idle");

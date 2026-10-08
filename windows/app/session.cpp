@@ -353,7 +353,6 @@ void Session::startScreen(Take* take, HMONITOR monitor, HWND window, std::string
     CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     // At most a second for the stage to show her camera.
     for (int i = 0; i < 50 && !overlay_->ready(); i++) Sleep(20);
-    take->log->write({{"type", "screen-start"}, {"screen", "screen.mov"}, {"screenName", name}, {"macSound", computerSound}});
     std::unique_ptr<capture::ScreenRecorder> recorder;
     std::string problem;
     try {
@@ -367,6 +366,8 @@ void Session::startScreen(Take* take, HMONITOR monitor, HWND window, std::string
         problem = error.what();
     }
     if (recorder) {
+        // Written once the screen records, so a share that failed and was tried again counts from the try that worked.
+        take->log->write({{"type", "screen-start"}, {"screen", "screen.mov"}, {"screenName", name}, {"macSound", computerSound}});
         if (!recorder->hearsComputer()) take->log->write({{"type", "screen-error"}, {"message", "sound: " + recorder->problem()}});
         std::lock_guard lock(takeMutex_);
         take->screen = std::move(recorder);
@@ -511,11 +512,30 @@ void Session::stop() {
 }
 
 void Session::runFinisher(fs::path folder) {
+    // The take's files are already on disk, so a problem here is reported and never ends Vidlark.
+    try {
+        finishTake(folder);
+    } catch (const std::exception& error) {
+        post_({{"type", "finished"}, {"ok", false}, {"message", std::string("The take could not be finished: ") + error.what()},
+               {"folder", vl::utf8(folder)}});
+    } catch (...) {
+        post_({{"type", "finished"}, {"ok", false}, {"message", "The take could not be finished."}, {"folder", vl::utf8(folder)}});
+    }
+}
+
+void Session::finishTake(fs::path folder) {
     // The computer's sound into screen.mov first, so the folder holds the same files as a Mac take.
-    if (fs::exists(capture::ScreenRecorder::soundFile(folder / L"screen.mov"))) {
+    std::error_code unreadable;
+    if (fs::exists(capture::ScreenRecorder::soundFile(folder / L"screen.mov"), unreadable)) {
         post_({{"type", "finishing"}, {"line", "Putting the computer's sound into screen.mov"}});
         std::string problem;
-        if (!capture::ScreenRecorder::mergeSound(folder / L"screen.mov", &problem)) post_({{"type", "finishing"}, {"line", problem}});
+        bool merged = false;
+        try {
+            merged = capture::ScreenRecorder::mergeSound(folder / L"screen.mov", &problem);
+        } catch (const std::exception& error) {
+            problem = std::string("the computer's sound stays in screen-sound.m4a: ") + error.what();
+        }
+        if (!merged) post_({{"type", "finishing"}, {"line", problem}});
     }
     const fs::path tool = exeDir() / L"vidlark-finish.exe";
     std::wstring command = L"\"" + tool.wstring() + L"\" \"" + folder.wstring() + L"\"";
