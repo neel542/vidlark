@@ -1,7 +1,9 @@
 #include "devices.h"
 
 #include <windows.h>
+#include <propsys.h>
 #include <initguid.h>  // defines PKEY_Device_FriendlyName below, in this file only
+#include <propkeydef.h>
 #include <functiondiscoverykeys_devpkey.h>
 #include <mfapi.h>
 #include <mfidl.h>

@@ -30,12 +30,18 @@ jobs:
           $env:Path = "C:\ProgramData\chocolatey\bin;$env:Path"
           python windows\tests\e2e.py build\Release\vidlark-finish.exe
 
+      - name: Writer test (camera.mov, a crash, mic-N.m4a)
+        shell: pwsh
+        run: |
+          $env:Path = "C:\ProgramData\chocolatey\bin;$env:Path"
+          python windows\tests\writer_check.py build\app\Release\vidlark-writer-test.exe build\Release\vidlark-finish.exe
+
       - name: Package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
-          Copy-Item build\Release\vidlark-finish.exe dist\
-          if (Test-Path build\app\Release) { Copy-Item -Recurse build\app\Release\* dist\ }
+          Copy-Item build\app\Release\Vidlark.exe, build\app\Release\vidlark-finish.exe dist\
+          Copy-Item -Recurse build\app\Release\ui dist\ui
 
       - uses: actions/upload-artifact@v4
         with:
