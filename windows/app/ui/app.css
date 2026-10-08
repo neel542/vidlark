@@ -99,7 +99,7 @@ body {
   border-radius: 6px; padding: 4px 10px; cursor: pointer; flex: none;
 }
 .small:disabled { color: var(--engraved); cursor: default; }
-.share { display: flex; flex-direction: column; gap: 6px; padding: 4px 6px; }
+.share { display: flex; flex-direction: column; gap: 6px; align-self: stretch; }
 .share-button {
   font: 600 13.5px var(--sans); color: #06120b; background: var(--signal); border: 0; border-radius: 9px;
   padding: 10px 14px; cursor: pointer;
@@ -147,7 +147,9 @@ body {
 .refresh.primary { background: var(--signal); color: #06120b; border-color: transparent; }
 .refresh.primary:disabled { opacity: 0.5; cursor: default; }
 
-.rec { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 16px; padding-top: 12px; }
+/* The sources scroll when the window is short; the time and the record button always show. */
+.side-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; margin: 0 -4px; padding: 0 4px; }
+.rec { flex: none; display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 8px; }
 .timecode { font-size: 46px; font-weight: 300; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .record {
   width: 84px; height: 84px; border-radius: 50%; border: 3px solid #2a302d; background: var(--red);

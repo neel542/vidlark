@@ -1,4 +1,4 @@
-// vidlark-screen-test <out> <seconds> [--pattern] [--crash-after <seconds>]
+// vidlark-screen-test <out> <seconds> [--pattern] [--crash-after <seconds>] [--window]
 // Records the main screen into a screen.mov with capture::ScreenRecorder, the way the app does, so CI can
 // check the file on a Windows machine with no camera or mic:
 //   - the stage and face bubble windows (app::Overlay) show a made-up camera picture: plain green with a
@@ -10,6 +10,8 @@
 //     finisher can line the two files up; the second is the computer's sound, if this PC has any. That
 //     goes into screen.mov after Stop (ScreenRecorder::mergeSound), as in the app.
 // At the end it prints one line of JSON saying what it did, where the windows were and what went wrong.
+// --window shares one window instead (a large blue one in the middle), cut out of the screen as the app
+// does, with the stage over it and the bubble in its corner.
 // --pattern records a test picture instead of the screen. Without it, the test picture is used only when
 // Windows.Graphics.Capture cannot run here, and the JSON says why.
 
@@ -66,17 +68,18 @@ nlohmann::json box(const RECT& r, const RECT& origin) {
 
 int wmain(int argc, wchar_t** argv) {
     if (argc < 3) {
-        std::fprintf(stderr, "usage: vidlark-screen-test <out> <seconds> [--pattern] [--crash-after <seconds>]\n");
+        std::fprintf(stderr, "usage: vidlark-screen-test <out> <seconds> [--pattern] [--crash-after <seconds>] [--window]\n");
         return 2;
     }
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     const std::filesystem::path out = argv[1];
     const double seconds = _wtof(argv[2]);
-    bool pattern = false;
+    bool pattern = false, oneWindow = false;
     double crashAfter = -1;
     for (int i = 3; i < argc; i++) {
         std::wstring arg = argv[i];
         if (arg == L"--pattern") pattern = true;
+        if (arg == L"--window") oneWindow = true;
         if (arg == L"--crash-after" && i + 1 < argc) crashAfter = _wtof(argv[++i]);
     }
 
@@ -98,6 +101,15 @@ int wmain(int argc, wchar_t** argv) {
     solidWindow(L"VidlarkLetIn", RGB(0, 0, 255), plain);
     report["keptOut"] = box(keptOut, screen);
     report["plain"] = box(plain, screen);
+    // The window shared with --window: blue, in the middle, clear of the other two.
+    HWND shared = nullptr;
+    RECT area = screen;
+    if (oneWindow) {
+        const RECT r{screen.left + 390, screen.top + 120, screen.left + 990, screen.top + 520};
+        shared = solidWindow(L"VidlarkShared", RGB(0, 0, 255), r);
+        area = r;
+        report["shared"] = box(r, screen);
+    }
 
     // The made-up camera: 640 x 360 green (RGB 0, 200, 0 in BT.601 video range), a white stripe moving.
     std::atomic<bool> stopFeeds{false};
@@ -120,18 +132,19 @@ int wmain(int argc, wchar_t** argv) {
     });
 
     // Me first: the stage across the whole screen before the recording starts, as in the app.
-    overlay.cover(screen, info.rcWork);
+    overlay.cover(area, info.rcWork);
     overlay.showMe(false);
     for (int i = 0; i < 100 && !overlay.ready(); i++) pump(0.02);
     report["stageReady"] = overlay.ready();
     // Clicks go through the stage to what is under it.
-    const POINT middle{(screen.left + screen.right) / 2, (screen.top + screen.bottom) / 2};
+    const POINT middle{(area.left + area.right) / 2, (area.top + area.bottom) / 2};
     report["stageClickThrough"] = WindowFromPoint(middle) != overlay.stageWindow();
 
     std::unique_ptr<capture::ScreenRecorder> recorder;
     capture::ScreenRecorder::Options options;
     options.file = out;
     options.monitor = monitor;
+    options.window = shared;
     options.testPattern = pattern;
     std::string why;
     if (!pattern && !capture::ScreenRecorder::supported(&why)) options.testPattern = true;

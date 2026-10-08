@@ -30,6 +30,7 @@
   </section>
 
   <aside class="side">
+    <div class="side-scroll">
     <h2 class="engraved">Sources</h2>
     <div class="source">
       <span class="lamp off" id="camera-lamp"></span>
@@ -51,14 +52,14 @@
       <button type="button" class="small" id="choose-screen">Change</button>
     </div>
 
-    <div class="share" id="share-box" hidden>
-      <button type="button" class="share-button" id="share">Share screen</button>
-      <p class="hint" id="share-hint">Adds the screen to the video. This window then shrinks to a small box with Me, Screen and Stop.</p>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
     </div>
 
-    <div class="status" id="status" role="status" aria-live="polite"></div>
-
     <div class="rec">
+      <div class="share" id="share-box" hidden>
+        <button type="button" class="share-button" id="share">Share screen</button>
+        <p class="hint" id="share-hint">Adds the screen to the video. This window then shrinks to a small box with Me, Screen and Stop.</p>
+      </div>
       <div class="timecode" id="timecode" aria-label="Time recorded">00:00</div>
       <button type="button" class="record" id="record" disabled aria-label="Record"></button>
     </div>

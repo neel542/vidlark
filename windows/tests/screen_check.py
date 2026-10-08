@@ -7,6 +7,7 @@ recorder and its stage and face bubble windows, then checks the file:
     screen-sound.m4a during the take and is copied into screen.mov after Stop)
   - the picture: her made-up camera (green) across the screen for Me, then in the bubble for Screen;
     a window kept out of the capture (magenta) never shows; a window let in (blue) does
+  - one window, cut out of the screen, with the stage over it and the bubble in its corner
   - a recording cut off by a crash can still be read
   - vidlark-finish lines it up with a camera.mov made by vidlark-writer-test and makes video.mp4
 
@@ -169,6 +170,34 @@ def main():
             check("Screen: the kept-out window is not in the video", pink == 0, f"{pink} of 9 spots magenta")
             seen = sum(blue(at(later, p)) for p in spots(report["plain"]))
             check("Screen: an ordinary window is in the video", seen >= 7, f"{seen} of 9 spots blue")
+
+    # One window: cut out of the screen, with the stage over it for Me and the bubble in its corner.
+    one = os.path.join(root, "window.mov")
+    result, report2 = run_test(test, one, 5, "--window")
+    check("the one-window test runs", result.returncode == 0 and report2 is not None, (result.stderr or "").strip()[-300:])
+    if report2 and report2.get("capture") == "window":
+        s = report2["shared"]
+        info2 = probe(ffprobe, one)
+        v = [x for x in info2["streams"] if x["codec_type"] == "video"] if info2 else []
+        size = (v[0].get("width"), v[0].get("height")) if v else None
+        check("the file has the window's size", size == (s[2] - s[0], s[3] - s[1]), f"{size}, window {s}")
+        if size:
+            w2, h2 = size
+            me2 = frame(ffmpeg, one, 0.8, w2, h2)
+            spots2 = [(w2 * fx, h2 * fy) for fx in (0.25, 0.5, 0.75) for fy in (0.25, 0.5, 0.75)]
+            if me2:
+                greens = sum(green(me2(*p)) for p in spots2)
+                check("Me: her camera fills the shared window", greens >= 7, f"{greens} of 9 spots green")
+            later2 = frame(ffmpeg, one, 3.5, w2, h2)
+            if later2:
+                blues = sum(blue(later2(*p)) for p in spots2[:6])
+                check("Screen: the shared window is in the video", blues >= 5, f"{blues} of 6 spots blue")
+                b = report2["bubble"]
+                cx, cy = (b[0] + b[2]) / 2 - s[0], (b[1] + b[3]) / 2 - s[1]
+                face = later2(cx, cy)
+                check("Screen: her face is in the bubble in the window's corner", green(face), f"bubble at {b}, middle {face}")
+    elif report2:
+        print("        the one-window test recorded " + report2.get("capture", "?") + ": " + report2.get("why", ""))
 
     crashed = os.path.join(root, "crashed.mov")
     result, _ = run_test(test, crashed, 10, "--crash-after", "6")
