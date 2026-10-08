@@ -243,7 +243,8 @@ func buildReport(_ r: ReportInput) -> String {
         }
     } else if let problem = r.videoProblem {
         out.append("Not made, because \(problem). camera.mov and screen.mov are whole, so the video can still be edited from them.")
-    } else if r.videoWanted == false && r.screenDuration == nil {
+    } else if r.videoWanted || r.screenDuration == nil {
+        // Wanted but not made with no problem means a camera-only take whose picked mic could not be used.
         out.append("No screen in this take, so camera.mov is the video.")
     } else {
         out.append("Not made (finished with --no-video).")

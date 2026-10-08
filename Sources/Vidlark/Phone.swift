@@ -231,7 +231,12 @@ final class PhoneLink: @unchecked Sendable {
             guard let colon = line.firstIndex(of: ":") else { continue }
             headers[line[..<colon].lowercased()] = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
         }
-        let length = Int(headers["content-length"] ?? "0") ?? 0
+        // A length that is not a whole number of bytes (say, negative) is answered as not found, so
+        // nothing on the network can crash the app with a bad request.
+        guard let length = Int(headers["content-length"] ?? "0"), length >= 0 else {
+            buffer.removeAll()
+            return Request(method: "", path: "", headers: headers, body: Data())
+        }
         let bodyStart = end.upperBound
         guard buffer.distance(from: bodyStart, to: buffer.endIndex) >= length else { return nil }
         let body = Data(buffer[bodyStart..<buffer.index(bodyStart, offsetBy: length)])

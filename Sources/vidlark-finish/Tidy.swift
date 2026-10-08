@@ -261,6 +261,8 @@ private struct TidyPlan {
             if buffer.count >= 8 << 20 { try flush() }
         }
         try flush()
+        // On the disk itself, not just in the Mac's write cache, before the original is replaced.
+        if fcntl(out.fileDescriptor, F_FULLFSYNC) == -1 { try out.synchronize() }
     }
 
     private static func child(_ type: String, in box: Box, of data: Data) throws -> Box? {

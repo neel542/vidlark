@@ -435,7 +435,8 @@ std::string buildReport(const ReportInput& r) {
     } else if (r.videoProblem) {
         add("Not made, because " + *r.videoProblem +
             ". camera.mov and screen.mov are whole, so the video can still be edited from them.");
-    } else if (!r.videoWanted && !r.screenDuration) {
+    } else if (r.videoWanted || !r.screenDuration) {
+        // Wanted but not made with no problem means a camera-only take whose picked mic could not be used.
         add("No screen in this take, so camera.mov is the video.");
     } else {
         add("Not made (finished with --no-video).");

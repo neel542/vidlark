@@ -871,7 +871,12 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
         self.display = display
         started = false
         audioFormat = nil
-        queue.sync { soundEnd = .invalid }
+        // A new take has no sound source yet, so the app picked last time gets its own stream again.
+        queue.sync {
+            soundEnd = .invalid
+            soundOn = false
+            soundFrom = nil
+        }
         size = (Int(pixelSize.width) & ~1, Int(pixelSize.height) & ~1)
 
         let config = SCStreamConfiguration()
@@ -995,7 +1000,8 @@ final class ScreenRecorder: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
             defer { soundFrom = from }
             return soundFrom != from
         }
-        guard changed else { return }
+        // The same app again only needs a new stream when its old one has gone (say, the app quit).
+        guard changed || (app != nil && appStream == nil) else { return }
         if let old = appStream {
             appStream = nil
             try? await old.stopCapture()
