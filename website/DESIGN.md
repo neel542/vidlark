@@ -216,7 +216,7 @@ The four companion fields. Each owns whole bands and also serves as a small squa
 - **Candy Pink** (#ff74b0): the How to use it page head (and its theme colour), the microphones band on Home, camera file tags.
 - **Lime Zest** (#d6f64e): the closing free band on every page, chapters and retakes file tags, text selection, link hover in the footer.
 
-Each page claims one field for its head band and sets its browser theme colour to match: Home green, Features sky, How to use it pink. A new page takes a field not yet claimed as a page head (sun is free) and still closes on lime.
+Each page claims one field for its head band and sets its browser theme colour to match: Home green, Features sky, How to use it pink, Feedback sun. Every field is now claimed, so a new page shares one and still closes on lime.
 
 ### Tertiary
 - **Record Red** (#f04e3e): the record dot and the stop square in the drawn recording box, and the centre of the site mark. It is the same red the app uses, and it means recording.
@@ -339,6 +339,19 @@ Ink, three columns (brand and one line, Pages, Get it), Sage copy, links turning
 
 ### File Tags (signature)
 How the site talks about output. A file name in mono beside a small rounded colour square, either as a white keyline tag landing under the take or as a row in the files grid. The colour means what the file holds and stays the same everywhere: green for the finished video, pink for any camera, sky for the screen, sun for extra mics and the transcript, lime for chapters and retakes.
+
+### Mac and Windows
+- **Platform tabs:** How to use it's head band holds two paper tiles (20px radius, ink keyline, soft lift): an icon, the platform name with a status chip, one line. They are the page's tabs; the chosen one turns ink with paper text. Each guide is a panel with its own contents sidebar; without JavaScript both panels show with a visible "On a Mac" / "On Windows" title.
+- **Status chips:** small full pills with an ink keyline: green "Ready now", sun "Coming soon".
+- **Get Vidlark cards (Home, mist band):** one paper card per platform, 22px radius, ink keyline, a heading with icon and status chip, one sentence, a primary and a ghost button.
+- **A download that is not out yet:** the button keeps its shape with a dashed ink outline, Moss Ink label, no shadow, and cannot be pressed. `windowsDownload` at the top of site.js switches every Windows button, chip and note to ready in one place.
+
+### Feedback form
+- **Panel:** a paper panel, 22px radius, ink keyline, soft lift, at most 760px wide, fields 34px apart.
+- **Choices:** radio buttons drawn as full pills with an ink keyline; the picked one fills Signal Green. The 1 to 5 rating uses 52px pills with Poor and Great under the ends.
+- **Text fields:** 14px radius, 1.5px ink border, Body type.
+- **Screenshot box:** a mist box with a dashed ink outline; the whole box opens the file picker, takes a dropped image, and Command-V or Ctrl-V anywhere pastes one. A picked image shows a small preview with Remove. Errors are 700 weight in a dark red (#a3261b, readable on paper), never the record red.
+- **Sent:** a Signal Green panel replaces the form after FormSubmit sends people back with `?sent=1`.
 
 ### The Take (signature)
 The site's one authored motion, in the home hero. A drawn laptop shows a slide; the camera view sits clipped to a face circle at the bottom right; a dark recording box shows Me and Screen, a red dot, a mono timer and a level meter. It records, grows the camera to fill the screen (Me), shrinks it back (Screen), stops under a dark veil, and the file tags land underneath one after another, every 14 seconds. It moves only transform, opacity and clip-path (0.5s on the in-out ease for the camera, 0.4 to 0.5s for the files, staggered by 0.1s), plays only while on screen, and with reduced motion shows its final frame with the files already landed.

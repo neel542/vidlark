@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feedback: Vidlark, a free recorder for videos</title>
+<meta name="description" content="Vidlark is brand new. Send a bug, an idea or anything that would help, with a screenshot if you have one.">
+<meta name="theme-color" content="#ffd43d">
+<link rel="icon" href="/assets/mark.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css?v=3">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- Most icons are from Lucide (lucide.dev), ISC License: /assets/icons-license.txt -->
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-github" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></g></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></g></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></g></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/></g></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.54 21.69a.5.5 0 0 0 .94-.02l6.5-19a.5.5 0 0 0-.64-.64l-19 6.5a.5.5 0 0 0-.02.94l7.93 3.18a2 2 0 0 1 1.11 1.11z"/><path d="m21.85 2.15-10.94 10.94"/></g></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main">Skip to the content</a>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="/"><img class="brand-mark" src="/assets/mark.svg" alt="" width="30" height="30">Vidlark</a>
+    <span class="free-pill">Free</span>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="menu" aria-label="Menu"><svg width="22" height="22"><use href="#i-menu"/></svg></button>
+    <nav class="nav-links" id="menu" aria-label="Main">
+      <a href="/features">Features</a>
+      <a href="/how-to">How to use it</a>
+      <a href="/feedback" aria-current="page">Feedback</a>
+      <a class="btn" href="https://github.com/neel542/vidlark"><svg><use href="#i-github"/></svg>GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="band sun page-head">
+  <div class="wrap">
+    <h1>Feedback</h1>
+    <p>Vidlark is brand new. If you found a bug, have an idea, or have anything else that would help us make it better, tell us here. It goes straight to Neel.</p>
+  </div>
+</section>
+
+<section class="band" style="padding-top:72px">
+  <div class="wrap">
+    <div class="sent" id="sent" hidden>
+      <h2>Thank you.</h2>
+      <p>Your feedback is on its way to Neel.</p>
+      <a class="btn ghost" href="/feedback">Send more feedback<svg><use href="#i-arrow"/></svg></a>
+    </div>
+
+    <form class="form" id="feedback-form" action="https://formsubmit.co/__FORM_KEY__" method="POST" enctype="multipart/form-data">
+      <input type="hidden" name="_subject" value="Vidlark feedback">
+      <input type="hidden" name="_template" value="table">
+      <input type="hidden" name="_next" value="https://vidlark.vercel.app/feedback?sent=1">
+      <input type="text" name="_honey" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+      <fieldset class="field">
+        <legend>What is it about?</legend>
+        <div class="opt-row">
+          <label class="opt"><input type="radio" name="Topic" value="A bug" required><span>A bug</span></label>
+          <label class="opt"><input type="radio" name="Topic" value="An idea"><span>An idea</span></label>
+          <label class="opt"><input type="radio" name="Topic" value="A question"><span>A question</span></label>
+          <label class="opt"><input type="radio" name="Topic" value="Something else"><span>Something else</span></label>
+        </div>
+      </fieldset>
+
+      <fieldset class="field">
+        <legend>Which computer are you on?</legend>
+        <div class="opt-row">
+          <label class="opt"><input type="radio" name="Computer" value="Mac"><span>Mac</span></label>
+          <label class="opt"><input type="radio" name="Computer" value="Windows PC"><span>Windows PC</span></label>
+          <label class="opt"><input type="radio" name="Computer" value="Not installed yet"><span>Not installed yet</span></label>
+        </div>
+      </fieldset>
+
+      <fieldset class="field">
+        <legend>How is Vidlark so far?</legend>
+        <div class="rate">
+          <div class="opt-row">
+            <label class="opt num"><input type="radio" name="Rating" value="1 of 5"><span>1</span></label>
+            <label class="opt num"><input type="radio" name="Rating" value="2 of 5"><span>2</span></label>
+            <label class="opt num"><input type="radio" name="Rating" value="3 of 5"><span>3</span></label>
+            <label class="opt num"><input type="radio" name="Rating" value="4 of 5"><span>4</span></label>
+            <label class="opt num"><input type="radio" name="Rating" value="5 of 5"><span>5</span></label>
+          </div>
+          <p class="rate-ends" aria-hidden="true"><span>Poor</span><span>Great</span></p>
+        </div>
+      </fieldset>
+
+      <div class="field">
+        <label for="message">Tell us more</label>
+        <p class="hint" id="message-hint">For a bug: what you did, what happened, and what you expected.</p>
+        <textarea id="message" name="Message" required aria-describedby="message-hint" rows="6"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="shot">A screenshot <span class="optional">(if you have one)</span></label>
+        <div class="drop" id="drop">
+          <svg aria-hidden="true"><use href="#i-image"/></svg>
+          <p><b>Choose an image</b>, drop one here, or paste one with Command-V or Ctrl-V. Up to 10 MB.</p>
+          <input type="file" id="shot" name="attachment" accept="image/*">
+          <div class="drop-preview" hidden>
+            <img alt="The screenshot you picked">
+            <span class="drop-name"></span>
+            <button type="button" class="drop-remove">Remove</button>
+          </div>
+        </div>
+        <p class="field-error" id="shot-error" role="alert"></p>
+      </div>
+
+      <div class="field">
+        <label for="email">Your email <span class="optional">(only if you want a reply)</span></label>
+        <input class="input" type="email" id="email" name="email" autocomplete="email">
+      </div>
+
+      <div class="form-foot">
+        <button class="btn" type="submit"><svg><use href="#i-send"/></svg><span>Send feedback</span></button>
+        <p class="fine">It is sent by email to Neel through FormSubmit (formsubmit.co), which may ask you to tick "I'm not a robot" first. Leave out passwords and anything private.</p>
+        <p class="field-error" id="send-error" role="alert"></p>
+      </div>
+    </form>
+  </div>
+</section>
+
+<section class="band lime close">
+  <div class="wrap">
+    <h2>Free, from the first take.</h2>
+    <p>No account, no subscription, no watermark and no time limit.</p>
+    <div class="actions">
+      <a class="btn" href="https://github.com/neel542/vidlark"><svg><use href="#i-github"/></svg>Get it on GitHub</a>
+      <a class="btn ghost" href="/how-to">How to use it<svg><use href="#i-arrow"/></svg></a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div>
+      <a class="brand" href="/"><img class="brand-mark" src="/assets/mark.svg" alt="" width="30" height="30">Vidlark</a>
+      <p>A free app that records your face, voice and screen in one take. On a Mac now, Windows coming soon.</p>
+    </div>
+    <div>
+      <h3>Pages</h3>
+      <ul><li><a href="/">Home</a></li><li><a href="/features">Features</a></li><li><a href="/how-to">How to use it</a></li><li><a href="/feedback">Feedback</a></li><li><a href="/#who-built-it">Who built it</a></li></ul>
+    </div>
+    <div>
+      <h3>Get it</h3>
+      <ul><li><a href="https://github.com/neel542/vidlark">GitHub</a></li><li><a href="/how-to#mac">Mac install steps</a></li><li><a href="/how-to#windows">Windows steps</a></li></ul>
+    </div>
+    <p class="legal">© 2026 Neel Madhav. Free for everyone.</p>
+  </div>
+</footer>
+
+<script src="/assets/site.js?v=3" defer></script>
+</body>
+</html>

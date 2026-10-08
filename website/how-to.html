@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>How to use it: Vidlark, a free Mac recorder for videos</title>
-<meta name="description" content="Install Vidlark from GitHub, record your first video, add a phone camera or another mic, and watch live from another device. Free.">
+<title>How to use it: Vidlark, a free recorder for videos on a Mac, Windows soon</title>
+<meta name="description" content="Install Vidlark on a Mac from GitHub, record your first video, add a phone camera or another mic, and watch live from another device. Windows steps are ready for its download. Free.">
 <meta name="theme-color" content="#ff74b0">
 <link rel="icon" href="/assets/mark.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=2">
+<link rel="stylesheet" href="/assets/site.css?v=3">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -20,6 +20,9 @@
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-github" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></g></symbol>
     <symbol id="i-arrow" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></g></symbol>
+    <symbol id="i-laptop" viewBox="0 0 24 24"><path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-monitor" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></g></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></g></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></g></symbol>
   </defs>
 </svg>
@@ -34,6 +37,7 @@
     <nav class="nav-links" id="menu" aria-label="Main">
       <a href="/features">Features</a>
       <a href="/how-to" aria-current="page">How to use it</a>
+      <a href="/feedback">Feedback</a>
       <a class="btn" href="https://github.com/neel542/vidlark"><svg><use href="#i-github"/></svg>GitHub</a>
     </nav>
   </div>
@@ -45,11 +49,25 @@
   <div class="wrap">
     <h1>How to use it</h1>
     <p>Install it once from GitHub, then every video is one press of the record button. Everything here is free, including the tools it needs.</p>
+    <div class="platforms" role="tablist" aria-label="Your computer">
+      <button class="platform" type="button" role="tab" id="tab-mac" data-tab="mac" aria-controls="mac" aria-selected="true">
+        <svg aria-hidden="true"><use href="#i-laptop"/></svg>
+        <b>Mac <span class="status">Ready now</span></b>
+        <span>Built on your Mac from GitHub</span>
+      </button>
+      <button class="platform" type="button" role="tab" id="tab-windows" data-tab="windows" aria-controls="windows" aria-selected="false">
+        <svg aria-hidden="true"><use href="#i-monitor"/></svg>
+        <b>Windows <span class="status soon" data-windows-status>Coming soon</span></b>
+        <span>A download from GitHub</span>
+      </button>
+    </div>
   </div>
 </section>
 
 <section class="band" style="padding-top:72px">
-  <div class="wrap doc-layout">
+  <div class="wrap platform-panel" id="mac" data-platform="mac" role="tabpanel" aria-labelledby="tab-mac">
+  <h2 class="panel-title">On a Mac</h2>
+  <div class="doc-layout">
     <nav class="toc" aria-label="On this page">
       <a href="#need"><i style="background:var(--green)"></i>What you need</a>
       <a href="#with-claude"><i style="background:var(--sky)"></i>Install with Claude</a>
@@ -198,6 +216,69 @@ curl -L -o ~/.cache/whisper/ggml-large-v3-turbo-q5_0.bin https://huggingface.co/
       </section>
     </div>
   </div>
+  </div>
+
+  <div class="wrap platform-panel" id="windows" data-platform="windows" role="tabpanel" aria-labelledby="tab-windows">
+  <h2 class="panel-title">On Windows</h2>
+  <div class="doc-layout">
+    <nav class="toc" aria-label="On this page, for Windows">
+      <a href="#win-need"><i style="background:var(--green)"></i>What you need</a>
+      <a href="#win-download"><i style="background:var(--sky)"></i>Download and open</a>
+      <a href="#win-first"><i style="background:var(--pink)"></i>The first time</a>
+      <a href="#win-take"><i style="background:var(--sun)"></i>Your first video</a>
+      <a href="#win-files"><i style="background:var(--lime)"></i>Where files go</a>
+      <p class="toc-free">Vidlark for Windows is free. The tools that finish each take come inside the download.</p>
+    </nav>
+
+    <div class="doc">
+      <p class="note soon-note" data-windows-soon><b>Coming soon.</b> Vidlark for Windows is being built now. These steps are ready for the day its download goes up on GitHub.</p>
+
+      <section id="win-need">
+        <h2>What you need</h2>
+        <ul class="plain">
+          <li>A PC with Windows 11, 64-bit.</li>
+          <li>A webcam and a microphone, built in or plugged in.</li>
+          <li>Nothing else to install: ffmpeg and the speech tool come inside the download.</li>
+        </ul>
+      </section>
+
+      <section id="win-download">
+        <h2>Download and open</h2>
+        <ol class="steps">
+          <li><div>
+            <p><b>Download Vidlark for Windows.</b> It is one zip file from GitHub.</p>
+            <p class="dl"><a class="btn" data-windows-download aria-disabled="true"><svg><use href="#i-download"/></svg><span>Download: coming soon</span></a></p>
+          </div></li>
+          <li><div><p><b>Unzip it.</b> Right-click the zip, choose Extract All, then Extract. Keep the folder together: the app and its tools sit side by side in it.</p></div></li>
+          <li><div><p><b>Open <code>Vidlark.exe</code></b> in that folder.</p></div></li>
+          <li><div><p><b>Get past the one-time warning.</b> Windows says "Windows protected your PC", because the app is new and not signed yet. Click More info, then Run anyway.</p></div></li>
+        </ol>
+      </section>
+
+      <section id="win-first">
+        <h2>The first time</h2>
+        <ol class="steps">
+          <li><div><p><b>Check that apps may use the camera and the mic.</b> If the picture or the level meter stays empty, open Settings, then Privacy and security, then Camera, and switch on Let desktop apps access your camera. Do the same under Microphone.</p></div></li>
+        </ol>
+      </section>
+
+      <section id="win-take">
+        <h2>Your first video</h2>
+        <ol class="steps">
+          <li><div><p><b>Type a title and check your camera and mic.</b> Each has a lamp. Green means ready. Pick another one from its list to change it.</p></div></li>
+          <li><div><p><b>Press the red record button.</b> It counts down 3, 2, 1 with beeps. Start talking at the higher beep: that is when recording starts.</p></div></li>
+          <li><div><p><b>Press stop.</b> Vidlark lines up the files. Press Show the take to open its folder.</p></div></li>
+        </ol>
+      </section>
+
+      <section id="win-files">
+        <h2>Where your files go</h2>
+        <p>Every take gets its own folder, with the same files as on a Mac:</p>
+        <pre class="code"><code>C:\Users\Public\Videos\Vidlark Recordings\&lt;date&gt; &lt;title&gt;\recording-1\</code></pre>
+      </section>
+    </div>
+  </div>
+  </div>
 </section>
 
 <section class="band lime close">
@@ -217,20 +298,20 @@ curl -L -o ~/.cache/whisper/ggml-large-v3-turbo-q5_0.bin https://huggingface.co/
   <div class="wrap">
     <div>
       <a class="brand" href="/"><img class="brand-mark" src="/assets/mark.svg" alt="" width="30" height="30">Vidlark</a>
-      <p>A free Mac app that records your face, voice and screen in one take.</p>
+      <p>A free app that records your face, voice and screen in one take. On a Mac now, Windows coming soon.</p>
     </div>
     <div>
       <h3>Pages</h3>
-      <ul><li><a href="/">Home</a></li><li><a href="/features">Features</a></li><li><a href="/how-to">How to use it</a></li><li><a href="/#who-built-it">Who built it</a></li></ul>
+      <ul><li><a href="/">Home</a></li><li><a href="/features">Features</a></li><li><a href="/how-to">How to use it</a></li><li><a href="/feedback">Feedback</a></li><li><a href="/#who-built-it">Who built it</a></li></ul>
     </div>
     <div>
       <h3>Get it</h3>
-      <ul><li><a href="https://github.com/neel542/vidlark">GitHub</a></li><li><a href="/how-to#install">Install steps</a></li></ul>
+      <ul><li><a href="https://github.com/neel542/vidlark">GitHub</a></li><li><a href="/how-to#mac">Mac install steps</a></li><li><a href="/how-to#windows">Windows steps</a></li></ul>
     </div>
     <p class="legal">© 2026 Neel Madhav. Free for everyone.</p>
   </div>
 </footer>
 
-<script src="/assets/site.js?v=2" defer></script>
+<script src="/assets/site.js?v=3" defer></script>
 </body>
 </html>
