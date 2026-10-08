@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vidlark</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<main class="panel">
+  <header class="top">
+    <div class="title">
+      <span class="engraved">Video</span>
+      <h1 id="video-title">No video picked</h1>
+    </div>
+    <nav class="tabs" aria-label="Pages">
+      <button type="button" disabled title="Comes in a later build">Live</button>
+      <button type="button" disabled title="Comes in a later build">Recordings</button>
+      <button type="button" disabled title="Comes in a later build">Settings</button>
+    </nav>
+  </header>
+
+  <section class="picture" aria-label="Camera picture">
+    <div class="glass">
+      <p class="empty">The camera picture shows here once recording is built.</p>
+    </div>
+    <p class="preview-note"><span class="lamp warn"></span>Windows preview: this build shows what your PC can record from. Recording comes next.</p>
+  </section>
+
+  <aside class="side">
+    <h2 class="engraved">Sources</h2>
+    <ul class="sources" id="sources">
+      <li class="source"><span class="lamp off"></span><div><b>Camera</b><span class="name">Looking…</span></div></li>
+      <li class="source"><span class="lamp off"></span><div><b>Microphone</b><span class="name">Looking…</span></div></li>
+      <li class="source"><span class="lamp off"></span><div><b>Screen</b><span class="name">Looking…</span></div></li>
+    </ul>
+    <button type="button" class="refresh" id="refresh">Look again</button>
+
+    <div class="rec">
+      <div class="timecode" aria-label="Time recorded">00:00</div>
+      <button type="button" class="record" disabled aria-label="Record" title="Recording comes in the next build"></button>
+    </div>
+  </aside>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

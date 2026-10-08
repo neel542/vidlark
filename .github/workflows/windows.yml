@@ -1,0 +1,43 @@
+name: Windows
+
+on:
+  push:
+    branches: [windows]
+    paths: ["windows/**", ".github/workflows/windows.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S windows -B build -A x64
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Unit tests
+        run: build\Release\vidlark-tests.exe
+
+      - name: Install ffmpeg for the end-to-end test
+        run: choco install ffmpeg -y --no-progress
+
+      - name: End-to-end test of vidlark-finish
+        shell: pwsh
+        run: |
+          $env:Path = "C:\ProgramData\chocolatey\bin;$env:Path"
+          python windows\tests\e2e.py build\Release\vidlark-finish.exe
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item build\Release\vidlark-finish.exe dist\
+          if (Test-Path build\app\Release) { Copy-Item -Recurse build\app\Release\* dist\ }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vidlark-windows
+          path: dist
