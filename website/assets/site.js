@@ -7,7 +7,7 @@
   // When the Windows version is on GitHub Releases, paste its link here, for example
   // the release's Vidlark-Windows.zip download link,
   // and every Windows button, label and note on the site switches to "ready".
-  const windowsDownload = "https://github.com/neel542/vidlark/releases/download/windows-v0.1/Vidlark-Windows.zip";
+  const windowsDownload = "https://github.com/neel542/vidlark/releases/download/windows-v0.2/Vidlark-Windows.zip";
 
   if (windowsDownload) {
     document.querySelectorAll("[data-windows-download]").forEach((link) => {
