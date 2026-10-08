@@ -132,7 +132,7 @@ def main():
     check("chapters.txt written", os.path.isfile(os.path.join(take, "chapters.txt")))
     report = open(os.path.join(take, "report.md"), encoding="utf-8").read()
     check("report.md names the take", "Fix a listing, café" in report)
-    check("no em dashes", "—" not in report + result.stdout)
+    check("no em dashes", "\u2014" not in report + result.stdout)
 
     shutil.rmtree(root, ignore_errors=True)
     print(f"{len(failures)} failed")

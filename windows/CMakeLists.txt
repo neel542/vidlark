@@ -42,7 +42,7 @@ target_include_directories(finish_core PUBLIC finish)
 target_link_libraries(finish_core PUBLIC nlohmann_json::nlohmann_json)
 
 add_executable(vidlark-finish finish/main.cpp)
-target_link_libraries(vidlark-finish PRIVATE finish_core)
+target_link_libraries(vidlark-finish PRIVATE finish_core $<$<BOOL:${WIN32}>:shell32>)
 
 add_executable(vidlark-tests tests/unit.cpp tests/test_audio.cpp tests/test_text.cpp)
 target_link_libraries(vidlark-tests PRIVATE finish_core)
