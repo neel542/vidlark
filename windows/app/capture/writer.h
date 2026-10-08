@@ -58,6 +58,7 @@ public:
 
 private:
     static constexpr DWORD kNone = 0xFFFFFFFF;
+    Microsoft::WRL::ComPtr<IMFMediaSink> sink_;
     Microsoft::WRL::ComPtr<IMFSinkWriter> writer_;
     DWORD videoStream_ = kNone;
     std::vector<DWORD> audioStreams_;

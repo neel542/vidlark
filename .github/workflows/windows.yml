@@ -3,6 +3,8 @@ name: Windows
 on:
   push:
     branches: [windows]
+    # A tag like windows-v0.1 builds, tests and publishes a beta (the release job below).
+    tags: ["windows-v*"]
     paths: ["windows/**", ".github/workflows/windows.yml"]
   workflow_dispatch:
 
@@ -16,6 +18,7 @@ jobs:
         run: cmake -S windows -B build -A x64
 
       - name: Build
+        id: build
         run: cmake --build build --config Release --parallel
 
       - name: Unit tests
@@ -55,6 +58,7 @@ jobs:
           python windows\tests\writer_check.py build\app\Release\vidlark-writer-test.exe build\Release\vidlark-finish.exe
 
       - name: Screen test (screen.mov from the real screen, the stage and bubble, a crash, video.mp4)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         shell: pwsh
         run: |
           $env:Path = "$PWD\dist\Vidlark\tools;$env:Path"
@@ -94,3 +98,46 @@ jobs:
         with:
           name: vidlark-windows
           path: dist
+
+  # Only for tags named windows-v*: the tested build, zipped as Vidlark-Windows.zip, on a GitHub prerelease.
+  # The zip keeps that name in every release, so the download link never changes.
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/windows-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: vidlark-windows
+          path: dist
+
+      - name: Check what goes in the download
+        run: |
+          for file in Vidlark.exe vidlark-finish.exe ui/index.html ui/box.html ui/app.js ui/box.js ui/app.css \
+                      tools/ffmpeg.exe tools/ffprobe.exe tools/whisper-cli.exe THIRD-PARTY-NOTICES.txt LICENSE; do
+            test -e "dist/Vidlark/$file" || { echo "missing from the download: $file"; exit 1; }
+          done
+
+      - name: Zip
+        run: |
+          cd dist
+          zip -r -9 ../Vidlark-Windows.zip Vidlark
+          cd ..
+          unzip -l Vidlark-Windows.zip | tail -1
+
+      - name: Publish the beta
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${GITHUB_REF_NAME#windows-v}"
+          version="${version%-beta}"
+          gh release create "$GITHUB_REF_NAME" Vidlark-Windows.zip \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --prerelease \
+            --title "Vidlark for Windows $version beta" \
+            --notes-file windows/release-notes.md

@@ -9,6 +9,15 @@ let opened = { camera: "", microphone: "" };
 let phase = "idle"; // idle, countdown, recording, finishing
 let countdownTimer = null;
 
+// What Share screen records: a whole screen or one window, remembered for next time, and the take's
+// screen state from the C++ side.
+const load = (key) => { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } };
+const save = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* not kept */ } };
+let shareTarget = load("shareTarget");
+let computerSound = load("computerSound") === true;
+let take = { recording: false };
+const picker = { mode: "choose", tab: "screen", choices: null, picked: null };
+
 // The meter: 24 segments, green through amber to red, like the Mac panel's.
 const segments = Array.from({ length: 24 }, (_, i) => {
   const segment = document.createElement("i");
@@ -55,6 +64,112 @@ function showExtras() {
   }));
 }
 
+function showShareTarget() {
+  const screens = devices.screens || [];
+  if (!shareTarget || (shareTarget.kind === "screen" && !screens.some((s) => s.id === shareTarget.id))) {
+    const main = screens.find((s) => s.primary) || screens[0];
+    shareTarget = main ? { kind: "screen", id: main.id, name: main.name } : null;
+  }
+  $("screen-detail").textContent = !shareTarget ? "No screen found"
+    : shareTarget.kind === "screen" ? `Entire screen: ${shareTarget.name}` : `A window: ${shareTarget.name}`;
+  showShare();
+}
+
+function showShare() {
+  const canShare = phase === "recording" && take.recording && !take.hasScreen;
+  $("share-box").hidden = !canShare;
+  $("share").disabled = !!take.sharing;
+  $("share").textContent = take.sharing ? "Sharing the screen…" : "Share screen";
+  $("screen-note").textContent = take.hasScreen ? "Recording now" : "Recorded once you press Share screen";
+  $("screen-lamp").className = "lamp " + (take.hasScreen ? "fail" : shareTarget ? "ok" : "off");
+  $("choose-screen").disabled = phase !== "idle";
+}
+
+// The picker: every screen and open window, with a picture of each, the last pick already picked.
+function openPicker(mode) {
+  picker.mode = mode;
+  picker.choices = null;
+  picker.tab = shareTarget && shareTarget.kind === "window" ? "window" : "screen";
+  picker.picked = shareTarget ? `${shareTarget.kind}:${shareTarget.id}` : null;
+  $("picker-hint").textContent = mode === "share"
+    ? "Pick the whole screen or one window. Only what you pick goes into the video."
+    : "This is recorded once you press Share screen. Only what you pick goes into the video.";
+  $("picker-go").textContent = mode === "share" ? "Share" : "Use this";
+  $("computer-sound").checked = computerSound;
+  $("picker").hidden = false;
+  drawTiles();
+  send({ type: "share-choices" });
+}
+
+function closePicker() {
+  $("picker").hidden = true;
+}
+
+function pickerList() {
+  if (!picker.choices) return null;
+  return picker.tab === "screen" ? picker.choices.screens || [] : picker.choices.windows || [];
+}
+
+function chosen() {
+  return (pickerList() || []).find((c) => `${c.kind}:${c.id}` === picker.picked) || null;
+}
+
+function drawTiles() {
+  $("tab-screen").setAttribute("aria-selected", String(picker.tab === "screen"));
+  $("tab-window").setAttribute("aria-selected", String(picker.tab === "window"));
+  const list = pickerList();
+  const note = (text) => {
+    const p = document.createElement("p");
+    p.className = "empty";
+    p.textContent = text;
+    return p;
+  };
+  if (!list) {
+    $("tiles").replaceChildren(note("Looking at what is open…"));
+  } else if (!list.length) {
+    $("tiles").replaceChildren(note(picker.tab === "window" ? "No windows are open. Open the app you want to show, then come back." : "No screen found."));
+  } else {
+    $("tiles").replaceChildren(...list.map((c) => {
+      const key = `${c.kind}:${c.id}`;
+      const tile = document.createElement("button");
+      tile.type = "button";
+      tile.className = "tile";
+      tile.setAttribute("role", "option");
+      tile.setAttribute("aria-selected", String(key === picker.picked));
+      const frame = document.createElement("span");
+      frame.className = "thumb";
+      if (c.jpeg) {
+        const img = document.createElement("img");
+        img.alt = "";
+        img.src = "data:image/jpeg;base64," + c.jpeg;
+        frame.append(img);
+      }
+      const name = document.createElement("b");
+      name.textContent = c.name;
+      const detail = document.createElement("span");
+      detail.className = "detail";
+      detail.textContent = c.detail || "";
+      tile.append(frame, name, detail);
+      tile.addEventListener("click", () => { picker.picked = key; drawTiles(); });
+      tile.addEventListener("dblclick", () => { picker.picked = key; pickerDone(); });
+      return tile;
+    }));
+  }
+  $("picker-go").disabled = !chosen();
+}
+
+function pickerDone() {
+  const choice = chosen();
+  if (!choice) return;
+  shareTarget = { kind: choice.kind, id: choice.id, name: choice.kind === "window" ? choice.label || choice.name : choice.name };
+  computerSound = $("computer-sound").checked;
+  save("shareTarget", shareTarget);
+  save("computerSound", computerSound);
+  closePicker();
+  showShareTarget();
+  if (picker.mode === "share") send({ type: "share", target: shareTarget, sound: computerSound });
+}
+
 function status(html) {
   $("status").innerHTML = html;
 }
@@ -68,6 +183,7 @@ function setPhase(next) {
   $("timecode").classList.toggle("live", phase === "recording");
   for (const control of [$("camera"), $("mic"), $("video-title")]) control.disabled = phase !== "idle";
   for (const box of document.querySelectorAll("#extras input")) box.disabled = phase !== "idle";
+  showShare();
 }
 
 // The Mac's beeps: three short ones at 880 Hz, then a long one at 1320 Hz when the take starts.
@@ -116,6 +232,15 @@ $("record").addEventListener("click", () => {
   else if (phase === "countdown") cancelCountdown();
   else if (phase === "recording") send({ type: "stop" });
 });
+$("share").addEventListener("click", () => openPicker("share"));
+$("choose-screen").addEventListener("click", () => openPicker("choose"));
+$("tab-screen").addEventListener("click", () => { picker.tab = "screen"; drawTiles(); });
+$("tab-window").addEventListener("click", () => { picker.tab = "window"; drawTiles(); });
+$("picker-cancel").addEventListener("click", closePicker);
+$("picker-go").addEventListener("click", pickerDone);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !$("picker").hidden) closePicker();
+});
 $("camera").addEventListener("change", () => send({ type: "open", camera: $("camera").value, microphone: $("mic").value }));
 $("mic").addEventListener("change", () => send({ type: "open", camera: $("camera").value, microphone: $("mic").value }));
 
@@ -124,8 +249,7 @@ const handlers = {
     devices = m;
     fill($("camera"), m.cameras || [], opened.camera);
     fill($("mic"), m.microphones || [], opened.microphone);
-    const screen = (m.screens || []).find((s) => s.primary) || (m.screens || [])[0];
-    if (screen) $("screen-detail").textContent = `${screen.width} × ${screen.height}. Recording it comes in the next build.`;
+    showShareTarget();
     showExtras();
   },
   opened(m) {
@@ -171,6 +295,32 @@ const handlers = {
   },
   finishing(m) {
     status(`Finishing: ${escape(m.line)}`);
+  },
+  "share-choices"(m) {
+    picker.choices = m;
+    // A window remembered from before has a new number now: find it again by its name.
+    if (!chosen() && shareTarget && shareTarget.kind === "window") {
+      const again = (m.windows || []).find((w) => w.label === shareTarget.name || w.name === shareTarget.name);
+      if (again) picker.picked = `window:${again.id}`;
+    }
+    if (!chosen()) {
+      const main = (m.screens || []).find((s) => s.primary) || (m.screens || [])[0];
+      if (main && picker.tab === "screen") picker.picked = `screen:${main.id}`;
+    }
+    drawTiles();
+  },
+  take(m) {
+    take = m;
+    showShare();
+  },
+  sharing(m) {
+    status(`Sharing ${escape(m.name)}…`);
+  },
+  shared(m) {
+    status(`Recording ${escape(m.name)} too. The small box switches between Me and Screen.`);
+  },
+  "share-failed"(m) {
+    status(`<span class="bad">${escape(m.message)}</span>`);
   },
   finished(m) {
     setPhase("idle");

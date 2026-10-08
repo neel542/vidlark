@@ -138,6 +138,7 @@ int wmain(int argc, wchar_t** argv) {
         recorder = std::make_unique<capture::ScreenRecorder>(options);
     } catch (const std::exception& error) {
         why = error.what();
+        std::fprintf(stderr, "recording the screen failed: %s\n", error.what());
         if (options.testPattern) {
             std::fprintf(stderr, "%s\n", error.what());
             return 1;

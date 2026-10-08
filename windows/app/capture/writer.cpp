@@ -105,8 +105,16 @@ MovieWriter::MovieWriter(const std::filesystem::path& path, std::optional<VideoF
     // The sink is made here, not by the sink writer, so it can be told to cut a piece at every key frame.
     ComPtr<IMFByteStream> file;
     check(MFCreateFile(MF_ACCESSMODE_READWRITE, MF_OPENMODE_DELETE_IF_EXIST, MF_FILEFLAGS_NONE, path.c_str(), &file), "making the file");
-    ComPtr<IMFMediaSink> sink;
+    ComPtr<IMFMediaSink>& sink = sink_;
     check(MFCreateFMPEG4MediaSink(file.Get(), videoOut.Get(), audioOut.empty() ? nullptr : audioOut[0].Get(), &sink), "starting the file");
+    // If anything below fails, the file is closed again rather than left open until Vidlark quits.
+    struct CloseOnFailure {
+        ComPtr<IMFMediaSink>& sink;
+        bool armed = true;
+        ~CloseOnFailure() {
+            if (armed && sink) sink->Shutdown();
+        }
+    } closeOnFailure{sink};
     // Further sound tracks are added to the sink after the first.
     for (size_t i = 1; i < audioOut.size(); i++) {
         DWORD count = 0;
@@ -147,6 +155,7 @@ MovieWriter::MovieWriter(const std::filesystem::path& path, std::optional<VideoF
         audioStreams_.push_back(stream);
     }
     check(writer_->BeginWriting(), "starting to write");
+    closeOnFailure.armed = false;
 }
 
 MovieWriter::~MovieWriter() {
@@ -154,6 +163,9 @@ MovieWriter::~MovieWriter() {
         finish();
     } catch (...) {
     }
+    // The sink was made here, so it is shut down here; that closes the file even if finishing failed.
+    writer_.Reset();
+    if (sink_) sink_->Shutdown();
 }
 
 void MovieWriter::writeVideo(const BYTE* nv12, LONG stride, LONGLONG time) {
