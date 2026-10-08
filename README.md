@@ -1,8 +1,8 @@
 # Vidlark
 
-A free, private Loom replacement for filming YouTube videos on a Mac. One button records the camera, the mic and the screen as separate files that stay in sync. When you stop, it writes a transcript, YouTube chapters and a list of retakes, ready for editing.
+A free, open source Loom replacement for filming videos, on a Mac and on Windows (beta). One button records the camera, the mic and the screen as separate files that stay in sync. When you stop, it writes a transcript, YouTube chapters and a list of retakes, ready for editing.
 
-Built by Neel Madhav. You are welcome to build your own copy and change it.
+Built by Neel Madhav. Website: [vidlark.vercel.app](https://vidlark.vercel.app). You are welcome to build your own copy and change it, and [Claude Code can do the changing for you](#change-it-with-claude).
 
 ![The panel](previews/fullscreen.png)
 
@@ -51,6 +51,12 @@ open "dist/Vidlark.app"
 
 The first time, allow the camera and the microphone, then click the red **Record** row and allow screen recording in System Settings. Quit and open the app again. [HOW-TO-FILM.md](HOW-TO-FILM.md) walks through a filming day.
 
+## Windows (beta)
+
+Download `Vidlark-Windows.zip` from [the latest release](https://github.com/neel542/vidlark/releases/latest), right-click it, Extract All, and open `Vidlark.exe`. It needs Windows 11, 64-bit, and nothing else: ffmpeg and the speech tool come inside. The first time, Windows says "Windows protected your PC" because the app is not signed yet: click More info, then Run anyway. Takes are saved in `C:\Users\Public\Videos\Vidlark Recordings`, with the same files as on a Mac.
+
+To build it yourself, see [windows/PLAN.md](windows/PLAN.md).
+
 ## Using an iPhone as the camera
 
 Plug the iPhone into the Mac with a cable, lock it, and stand it on a tripod in landscape with the rear camera facing you. It appears as a camera on its own through Continuity Camera. This only works when the Mac user and the iPhone are signed in to the same Apple ID.
@@ -59,7 +65,17 @@ Plug the iPhone into the Mac with a cable, lock it, and stand it on a tripod in 
 
 `/Users/Shared/Vidlark Recordings/<date> <title>/recording-N/`. The folder is shared, so a second Mac user can record into it too. [PLAN.md](PLAN.md) lists every file and what is in it.
 
-## Make it yours
+## Change it with Claude
+
+Don't like a feature, or want one Vidlark does not have? Open this folder in [Claude Code](https://claude.com/claude-code) and ask in plain words, for example:
+
+- "Make the countdown 5 seconds instead of 3."
+- "Save my takes in my Movies folder."
+- "Add a button that pauses the take."
+
+Claude reads [CLAUDE.md](CLAUDE.md), which explains how the project fits together, makes the change, builds Vidlark and runs the tests. Claude Code needs a paid Claude plan.
+
+## Make it yours by hand
 
 - **Name and bundle id:** `Tools/Info.plist`.
 - **Recording folder:** `Library.root` in `Sources/Vidlark/Library.swift`.

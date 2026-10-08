@@ -88,6 +88,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         <li><svg><use href="#i-check"/></svg>No account</li>
         <li><svg><use href="#i-check"/></svg>No watermark</li>
         <li><svg><use href="#i-check"/></svg>No time limit</li>
+        <li><svg><use href="#i-check"/></svg>Open source</li>
       </ul>
       <p class="needs">For Macs with Apple silicon on macOS 15 or later. <a href="#download" data-windows-soon>Windows is coming soon.</a></p>
     </div>
@@ -276,6 +277,43 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <li><svg><use href="#i-check"/></svg>No ads</li>
       <li><svg><use href="#i-check"/></svg>Recordings stay on your Mac</li>
     </ul>
+  </div>
+</section>
+
+<section class="band ink" id="open-source">
+  <div class="wrap split">
+    <div>
+      <h2>Open source. Make it yours.</h2>
+      <p class="ink-lead">The code is on GitHub under the MIT licence: free to read, change and share. Don't like something, or want something new? Ask Claude Code, and it changes Vidlark for you.</p>
+      <ul class="points on-ink">
+        <li><svg><use href="#i-check"/></svg><span>Ask in plain words, like "make the countdown 5 seconds".</span></li>
+        <li><svg><use href="#i-check"/></svg><span>Claude reads the code, makes the change, then builds and tests it.</span></li>
+        <li><svg><use href="#i-check"/></svg><span>Your version is yours to keep, change again or share.</span></li>
+      </ul>
+      <div class="actions ink-actions">
+        <a class="btn lime" href="/how-to#change">Change it with Claude<svg><use href="#i-arrow"/></svg></a>
+        <a class="btn ghost light" href="https://github.com/neel542/vidlark"><svg><use href="#i-github"/></svg>See the code</a>
+      </div>
+    </div>
+    <div>
+      <figure class="chat" aria-label="An animation: a request typed to Claude Code, the files it changes, and a 10 minute timer appearing on Vidlark's record button" style="margin:0">
+        <div class="chat-head"><span class="chat-dots" aria-hidden="true"><i></i><i></i><i></i></span>Claude Code<span class="chat-path">vidlark</span></div>
+        <div class="chat-body" aria-hidden="true">
+          <p class="chat-you"><span class="chat-typed" data-text="Add a 10 minute timer to the record button">Add a 10 minute timer to the record button</span><i class="caret"></i></p>
+          <div class="chat-claude">
+            <p class="chat-step c1"><i class="spin"></i>Reading the panel's code</p>
+            <p class="chat-file c2"><code>Sources/Vidlark/PanelView.swift</code><b>Edited</b></p>
+            <p class="chat-file c3"><code>Sources/Vidlark/Studio.swift</code><b>Edited</b></p>
+            <p class="chat-step c4"><i class="spin"></i>Building and running the tests</p>
+            <p class="chat-done c5"><svg><use href="#i-check"/></svg>Done. Open Vidlark to try it.</p>
+          </div>
+        </div>
+        <div class="chat-result" aria-hidden="true">
+          <div class="rec-ring"><svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="44"/><circle class="arc" cx="50" cy="50" r="44"/></svg><span class="rec-core"></span></div>
+          <div><b class="rec-time">10:00</b><small>left in this take</small></div>
+        </div>
+      </figure>
+    </div>
   </div>
 </section>
 

@@ -346,6 +346,9 @@ How the site talks about output. A file name in mono beside a small rounded colo
 - **Get Vidlark cards (Home, mist band):** one paper card per platform, 22px radius, ink keyline, a heading with icon and status chip, one sentence, a primary and a ghost button.
 - **A download that is not out yet:** the button keeps its shape with a dashed ink outline, Moss Ink label, no shadow, and cannot be pressed. `windowsDownload` at the top of site.js switches every Windows button, chip and note to ready in one place.
 
+### Open source band (Home, ink)
+The second ink band: "Open source. Make it yours." with ink-band points (lime checks, white hairlines), a lime primary button and a light ghost button. Beside it, a night card titled "Claude Code" acts out one change: a request types into a lime bubble, the files Claude edits land as rows with a green "Edited" chip, spinners turn into rings as each step finishes, then a 10 minute timer appears on a record button and counts down. It loops every 16 s only while on screen and shows its finished state for less motion or without JavaScript. How to use it closes with a mist "Change it with Claude" band: steps plus example requests as paper speech chips.
+
 ### Feedback form
 - **Panel:** a paper panel, 22px radius, ink keyline, soft lift, at most 760px wide, fields 34px apart.
 - **Choices:** radio buttons drawn as full pills with an ink keyline; the picked one fills Signal Green. The 1 to 5 rating uses 52px pills with Poor and Great under the ends.

@@ -361,4 +361,48 @@
     whileSeen(strip, () => { timer = setInterval(() => { t++; show([voice(0, 12), voice(1.7, 9), voice(3.1, 7)]); }, 110); },
                      () => { clearInterval(timer); show([0, 0, 0]); });
   });
+
+  // Open source: a request is typed to Claude Code, the files it edits appear, and the timer it
+  // added starts counting down. Shown finished for less motion or without JavaScript.
+  document.querySelectorAll(".chat").forEach((chat) => {
+    if (!motion) return;
+    const typed = chat.querySelector(".chat-typed");
+    const text = typed.dataset.text;
+    const lines = [...chat.querySelectorAll(".chat-claude > *")];
+    const time = chat.querySelector(".rec-time");
+    const ring = chat.querySelector(".rec-ring");
+    let timers = [];
+    const later = (ms, run) => timers.push(setTimeout(run, ms));
+    const reset = () => {
+      timers.forEach(clearTimeout); timers.forEach(clearInterval); timers = [];
+      chat.classList.remove("typing", "result", "playing");
+      lines.forEach((line) => line.classList.remove("shown", "past"));
+      typed.textContent = "";
+      time.textContent = "10:00";
+      ring.style.setProperty("--used", 0);
+    };
+    const play = () => {
+      reset();
+      chat.classList.add("typing", "playing");
+      [...text].forEach((_, i) => later(300 + i * 38, () => { typed.textContent = text.slice(0, i + 1); }));
+      const typedAt = 300 + text.length * 38 + 350;
+      later(typedAt, () => chat.classList.remove("typing"));
+      [0, 900, 1500, 2200, 3700].forEach((delay, i) => later(typedAt + delay, () => {
+        lines[i].classList.add("shown");
+        lines.slice(0, i).forEach((line) => line.classList.add("past"));
+      }));
+      later(typedAt + 4300, () => {
+        chat.classList.add("result");
+        let left = 600;
+        timers.push(setInterval(() => {
+          left -= 1;
+          time.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+          ring.style.setProperty("--used", (276.5 * (600 - left) / 600).toFixed(1));
+        }, 1000));
+      });
+    };
+    let loop = null;
+    whileSeen(chat, () => { play(); loop = setInterval(play, 16000); },
+                    () => { clearInterval(loop); reset(); });
+  });
 })();

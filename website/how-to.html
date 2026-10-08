@@ -78,6 +78,7 @@
       <a href="#mic"><i style="background:var(--green)"></i>Add a microphone</a>
       <a href="#live"><i style="background:var(--sky)"></i>Watch live</a>
       <a href="#files"><i style="background:var(--pink)"></i>Where files go</a>
+      <a href="#change"><i style="background:var(--green)"></i>Change it with Claude</a>
       <p class="toc-free">Vidlark is free. So are Xcode, Homebrew and every tool in the steps by hand.</p>
     </nav>
 
@@ -227,6 +228,7 @@ curl -L -o ~/.cache/whisper/ggml-large-v3-turbo-q5_0.bin https://huggingface.co/
       <a href="#win-first"><i style="background:var(--pink)"></i>The first time</a>
       <a href="#win-take"><i style="background:var(--sun)"></i>Your first video</a>
       <a href="#win-files"><i style="background:var(--lime)"></i>Where files go</a>
+      <a href="#change"><i style="background:var(--green)"></i>Change it with Claude</a>
       <p class="toc-free">Vidlark for Windows is free. The tools that finish each take come inside the download.</p>
     </nav>
 
@@ -278,6 +280,28 @@ curl -L -o ~/.cache/whisper/ggml-large-v3-turbo-q5_0.bin https://huggingface.co/
       </section>
     </div>
   </div>
+  </div>
+</section>
+
+<section class="band mist" id="change">
+  <div class="wrap change">
+    <div class="head">
+      <h2>Change it with Claude</h2>
+      <p class="muted">Vidlark is open source under the MIT licence. If you do not like a feature, or want one it does not have, Claude Code can change it for you.</p>
+    </div>
+    <ol class="steps change-steps">
+      <li><div><p><b>Get Claude Code.</b> It is Anthropic's coding assistant, in the Claude desktop app or in a terminal, on a Mac or on Windows. It needs a paid Claude plan.</p></div></li>
+      <li><div><p><b>Download the code.</b> Or ask Claude to do it for you.</p><pre class="code"><code>git clone https://github.com/neel542/vidlark.git</code></pre></div></li>
+      <li><div><p><b>Open the folder in Claude Code and say what you want,</b> in plain words.</p>
+        <ul class="asks">
+          <li>"Make the countdown 5 seconds instead of 3."</li>
+          <li>"Save my takes in my Movies folder."</li>
+          <li>"Add a button that pauses the take."</li>
+          <li>"Make the app purple instead of green."</li>
+        </ul></div></li>
+      <li><div><p><b>Claude makes the change, builds Vidlark and runs its tests.</b> The CLAUDE.md file in the code tells it how, and it asks before installing anything.</p></div></li>
+      <li><div><p><b>Try your version.</b> Keep it, change it again, or share it: the MIT licence allows all three, as long as the licence notice stays with the code.</p></div></li>
+    </ol>
   </div>
 </section>
 

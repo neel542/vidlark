@@ -637,3 +637,55 @@ code, .mono { font-family: var(--mono); font-size: 0.86em; }
 @media (prefers-reduced-motion: reduce) {
   .shape i, .aspect-frame, .aspect-label span, .mic-meter i { transition: none; }
 }
+
+/* ---------- Open source ---------- */
+
+.ink-lead { font-size: 1.2rem; margin-top: 20px; max-width: 46ch; color: #dfe9e3; }
+.points.on-ink li { border-color: rgba(255, 255, 255, 0.16); }
+.points.on-ink svg { color: var(--lime); }
+.ink-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+.btn.lime { background: var(--lime); color: var(--ink); border-color: var(--lime); }
+.btn.ghost.light { color: var(--paper); border-color: rgba(255, 255, 255, 0.6); }
+.btn.ghost.light:hover { background: rgba(255, 255, 255, 0.1); }
+
+/* Claude Code changing Vidlark: a request is typed, files are edited, the change appears. */
+.chat { background: var(--night); color: #e9f3ed; border: 1.5px solid rgba(255, 255, 255, 0.14); border-radius: var(--radius); overflow: hidden; box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.85); }
+.chat-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); font-weight: 800; font-size: 0.92rem; }
+.chat-dots { display: inline-flex; gap: 6px; }
+.chat-dots i { width: 10px; height: 10px; border-radius: 50%; background: #3a413e; }
+.chat-path { margin-left: auto; font-family: var(--mono); font-weight: 400; font-size: 0.78rem; color: #93a69b; }
+.chat-body { padding: 20px; display: grid; gap: 16px; align-content: start; min-height: 262px; }
+.chat-you { justify-self: end; max-width: 92%; background: var(--lime); color: var(--ink); padding: 12px 16px; border-radius: 16px 16px 4px 16px; font-weight: 700; line-height: 1.35; }
+.caret { display: none; width: 2px; height: 1.05em; margin-left: 2px; background: var(--ink); vertical-align: text-bottom; }
+.chat.typing .caret { display: inline-block; animation: caret 0.9s steps(1) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
+.chat-claude { display: grid; gap: 8px; font-size: 0.95rem; }
+.chat-step { display: flex; align-items: center; gap: 10px; color: #b9c9c0; font-weight: 600; }
+.spin { flex: none; width: 13px; height: 13px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.18); border-top-color: var(--green); }
+.chat-step:not(.past) .spin { animation: spin 0.8s linear infinite; }
+.chat-step.past .spin, .chat:not(.playing) .spin { border-color: var(--green); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.chat-file { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #161c19; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 8px 12px; }
+.chat-file code { font-size: 0.8rem; color: #e9f3ed; overflow-wrap: anywhere; min-width: 0; }
+.chat-file b { flex: none; font-size: 0.72rem; color: var(--ink); background: var(--green); border-radius: 999px; padding: 2px 9px; }
+.chat-done { display: flex; align-items: center; gap: 8px; font-weight: 800; color: var(--lime); }
+.chat-done svg { width: 18px; height: 18px; }
+.chat-result { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-top: 1px solid rgba(255, 255, 255, 0.08); background: #121715; transition: opacity 0.4s var(--ease-out); }
+.rec-ring { position: relative; width: 64px; height: 64px; flex: none; }
+.rec-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.rec-ring circle { fill: none; stroke-width: 6; }
+.rec-ring .track { stroke: rgba(255, 255, 255, 0.12); }
+.rec-ring .arc { stroke: var(--green); stroke-linecap: round; stroke-dasharray: 276.5; stroke-dashoffset: var(--used, 0); transition: stroke-dashoffset 1s linear; }
+.rec-core { position: absolute; inset: 21px; border-radius: 50%; background: var(--rec); box-shadow: 0 0 0 4px rgba(240, 78, 62, 0.22); }
+.rec-time { display: block; font-family: var(--mono); font-weight: 500; font-size: 1.7rem; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.chat-result small { color: #93a69b; font-weight: 600; font-size: 0.85rem; }
+.motion .chat .chat-claude > *:not(.shown) { opacity: 0; transform: translateY(6px); }
+.motion .chat .chat-claude > * { transition: opacity 0.35s var(--ease-out), transform 0.45s var(--ease-out); }
+.motion .chat:not(.result) .chat-result { opacity: 0.3; }
+.motion .chat.result .chat-result { animation: pick 0.4s var(--ease-out); }
+
+/* How to use it: Change it with Claude */
+.change .head { margin-bottom: 8px; }
+.change-steps { max-width: 70ch; margin-top: 30px; }
+.asks { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.asks li { background: var(--paper); border: 1.5px solid var(--ink); border-radius: 14px 14px 14px 4px; padding: 8px 12px; font-weight: 700; font-size: 0.95rem; }
