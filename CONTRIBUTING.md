@@ -6,7 +6,7 @@ Thank you for helping. Vidlark is small and friendly to newcomers: many changes 
 
 - **Report a problem** with the [bug form](https://github.com/neel542/vidlark/issues/new?template=bug_report.yml). Say what happened, on a Mac or on Windows, and the steps to make it happen again.
 - **Suggest an idea** with the [idea form](https://github.com/neel542/vidlark/issues/new?template=feature_request.yml).
-- **No GitHub account?** Use the [feedback page](https://vidlark.vercel.app/feedback).
+- **No GitHub account?** Use the [feedback page](https://vidlark.neelmadhav.dev/feedback).
 - **Test the Windows beta** on a real laptop with [windows/TESTING.md](windows/TESTING.md). It takes about 40 minutes.
 - **Change the code** and send a pull request (below).
 
@@ -19,7 +19,7 @@ Please never attach a recording you would not want public, and never post a live
 - `Sources/Vidlark/`: the Mac app (Swift, SwiftUI, AVFoundation, ScreenCaptureKit).
 - `Sources/vidlark-finish/`: the after-stop tool the app runs on every take. It calls ffmpeg and whisper-cpp.
 - `windows/`: the Windows app (C++20, CMake, Media Foundation, WebView2) and a C++ port of the after-stop tool. [windows/PLAN.md](windows/PLAN.md) explains it.
-- `website/`: the static website at vidlark.vercel.app.
+- `website/`: the static website at vidlark.neelmadhav.dev.
 - `Tests/`: the after-stop tool's tests.
 - [PLAN.md](PLAN.md): the take folder contract, every file a take leaves and what is in it. The Mac and Windows apps write the same folder, so a change to it is a change to both.
 

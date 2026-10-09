@@ -82,7 +82,7 @@ function cardHtml({ title, category, field, width, height }) {
 <div class="card">
   <div class="top"><span class="brand">${mark}Vidlark</span><span class="cat"><i></i>${escapeHtml(category)}</span></div>
   <div class="stage"><h1 id="t">${escapeHtml(title)}</h1></div>
-  <div class="bottom">${tags.map(([c, n]) => `<span class="tag"><i style="background:${c}"></i>${n}</span>`).join("")}<span class="site">vidlark.vercel.app</span></div>
+  <div class="bottom">${tags.map(([c, n]) => `<span class="tag"><i style="background:${c}"></i>${n}</span>`).join("")}<span class="site">vidlark.neelmadhav.dev</span></div>
 </div>
 <script>
   // The title takes the biggest size that fits in four lines without breaking a word.

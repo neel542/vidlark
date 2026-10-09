@@ -21,7 +21,7 @@ in plain words.
 - `windows/`: the Windows app (C++20, CMake, Media Foundation, a WebView2 window whose screens are
   in `windows/app/ui/`) and a C++ port of the after-stop tool in `windows/finish/`. See
   `windows/PLAN.md`.
-- `website/`: the static website at vidlark.vercel.app. `website/DESIGN.md` explains its look.
+- `website/`: the static website at vidlark.neelmadhav.dev. `website/DESIGN.md` explains its look.
 - `content/blog/`: the blog's posts, in Markdown. `python3 Tools/blog.py` builds them into
   `website/blog/`, the RSS feed, `website/sitemap.xml` and the home page's blog strip, then checks
   the whole site. `content/blog/README.md` explains how to write a post.

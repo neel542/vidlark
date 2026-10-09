@@ -4,7 +4,7 @@
 
 [![MIT licence](https://img.shields.io/github/license/neel542/vidlark?color=3ecf8e&label=licence)](LICENSE) [![Mac: macOS 15 or later](https://img.shields.io/badge/Mac-macOS%2015%2B-1f2321)](#install-on-a-mac) [![Latest Windows beta](https://img.shields.io/github/v/release/neel542/vidlark?include_prereleases&filter=windows-v*&label=Windows%20beta&color=1f2321)](https://github.com/neel542/vidlark/releases)
 
-**[Website](https://vidlark.vercel.app)** · **[Download for Windows (beta)](https://github.com/neel542/vidlark/releases)** · **[How to use](docs/guide.md)** · **[Feedback](https://vidlark.vercel.app/feedback)**
+**[Website](https://vidlark.neelmadhav.dev)** · **[Download for Windows (beta)](https://github.com/neel542/vidlark/releases)** · **[How to use](docs/guide.md)** · **[Feedback](https://vidlark.neelmadhav.dev/feedback)**
 
 <p align="center">
   <img src="docs/images/hero.png" alt="The Vidlark window during a take: the camera picture, the Sources list, the prompter, the timer and the stop button" width="900">
@@ -172,7 +172,7 @@ Your recordings and settings are kept.
 
 ## Install on Windows (beta)
 
-Vidlark for Windows is new. It records your camera, your mics and your screen and makes the finished video, but it has only been tried on a few PCs so far. Keep a copy of any take that matters, and [tell us what goes wrong](https://vidlark.vercel.app/feedback).
+Vidlark for Windows is new. It records your camera, your mics and your screen and makes the finished video, but it has only been tried on a few PCs so far. Keep a copy of any take that matters, and [tell us what goes wrong](https://vidlark.neelmadhav.dev/feedback).
 
 It needs Windows 11, 64-bit, and a webcam and a mic. There is nothing else to install: ffmpeg comes inside the download.
 
@@ -344,7 +344,7 @@ If the camera stops sending pictures, Vidlark stops the take within a few second
 The warning appears because Vidlark is new and not signed yet: click **More info**, then **Run anyway**. If the camera picture or the mic meter stays empty, open Windows Settings, Privacy & security, Camera, and switch on **Let desktop apps access your camera**. Do the same under Microphone.
 </details>
 
-Still stuck? [Send feedback](https://vidlark.vercel.app/feedback) (no GitHub account needed) or [open an issue](https://github.com/neel542/vidlark/issues/new/choose).
+Still stuck? [Send feedback](https://vidlark.neelmadhav.dev/feedback) (no GitHub account needed) or [open an issue](https://github.com/neel542/vidlark/issues/new/choose).
 
 ## Privacy
 

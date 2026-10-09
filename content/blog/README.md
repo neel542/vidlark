@@ -1,7 +1,7 @@
 # Writing a post for the Vidlark blog
 
 Every post is one Markdown file in this folder. `python3 Tools/blog.py` turns them into pages on
-the website at `vidlark.vercel.app/blog`. The pages it writes are committed, because Vercel serves
+the website at `vidlark.neelmadhav.dev/blog`. The pages it writes are committed, because Vercel serves
 the `website/` folder as it is, with no build step.
 
 ## Add a post in four steps

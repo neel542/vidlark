@@ -37,7 +37,7 @@ SITE = ROOT / "website"
 BLOG_OUT = SITE / "blog"
 HOME = SITE / "index.html"
 
-BASE = "https://vidlark.vercel.app"
+BASE = "https://vidlark.neelmadhav.dev"
 GITHUB = "https://github.com/neel542/vidlark"
 AUTHOR = "Neel Madhav"
 AUTHOR_URL = "https://github.com/neel542"
