@@ -66,7 +66,7 @@ There is no Mac download yet. You build Vidlark on your own Mac from this code, 
 - The **Xcode** app from the App Store. It is free, and it is the biggest download, so start it first.
 - An Apple ID. The free one you already use for the App Store is fine.
 
-### With Claude Code
+### Tell your AI to set it up
 
 [Claude Code](https://claude.com/claude-code) is Anthropic's coding assistant, in the Claude desktop app or in Terminal. It needs a paid Claude plan; the steps by hand cost nothing. Paste this into Claude Code and answer its questions:
 
