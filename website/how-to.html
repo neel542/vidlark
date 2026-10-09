@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>How to use it: Vidlark, a free recorder for videos on Mac and Windows</title>
-<meta name="description" content="Install Vidlark on a Mac from GitHub, record your first video, add a phone camera or another mic, and watch live from another device. Or download the Windows beta. Free and open source.">
+<meta name="description" content="A step-by-step guide with a picture of every screen: install Vidlark on a Mac, allow the camera, mic and screen, record your first video, add a phone camera, and more. Or download the Windows beta. Free and open source.">
 <meta name="theme-color" content="#ff74b0">
 <link rel="icon" href="/assets/mark.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=5">
+<link rel="stylesheet" href="/assets/site.css?v=6">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -20,6 +20,7 @@
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-github" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></g></symbol>
     <symbol id="i-arrow" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></g></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-laptop" viewBox="0 0 24 24"><path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-monitor" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></g></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></g></symbol>
@@ -48,7 +49,7 @@
 <section class="band pink page-head">
   <div class="wrap">
     <h1>How to use it</h1>
-    <p>Install it once from GitHub, then every video is one press of the record button. Everything here is free, including the tools it needs.</p>
+    <p>A step-by-step guide, with a picture of every screen. Install Vidlark once, then every video is one press of the red button. Vidlark and every tool it needs are free.</p>
     <div class="platforms" role="tablist" aria-label="Your computer">
       <button class="platform" type="button" role="tab" id="tab-mac" data-tab="mac" aria-controls="mac" aria-selected="true">
         <svg aria-hidden="true"><use href="#i-laptop"/></svg>
@@ -71,35 +72,47 @@
     <nav class="toc" aria-label="On this page">
       <a href="#need"><i style="background:var(--green)"></i>What you need</a>
       <a href="#with-claude"><i style="background:var(--sky)"></i>Install with Claude</a>
-      <a href="#by-hand"><i style="background:var(--sun)"></i>Install by hand</a>
-      <a href="#first"><i style="background:var(--pink)"></i>The first time</a>
-      <a href="#take"><i style="background:var(--sun)"></i>Your first video</a>
-      <a href="#phone"><i style="background:var(--lime)"></i>Add a phone camera</a>
-      <a href="#mic"><i style="background:var(--green)"></i>Add a microphone</a>
-      <a href="#live"><i style="background:var(--sky)"></i>Watch live</a>
-      <a href="#files"><i style="background:var(--pink)"></i>Where files go</a>
-      <a href="#change"><i style="background:var(--green)"></i>Change it with Claude</a>
+      <a href="#by-hand"><i style="background:var(--pink)"></i>Install by hand</a>
+      <a href="#certificate"><i style="background:var(--sun)"></i>The free certificate</a>
+      <a href="#first"><i style="background:var(--lime)"></i>The first time</a>
+      <a href="#take"><i style="background:var(--green)"></i>Your first video</a>
+      <a href="#files"><i style="background:var(--sky)"></i>Where files go</a>
+      <a href="#phone"><i style="background:var(--pink)"></i>Add a phone camera</a>
+      <a href="#mic"><i style="background:var(--sun)"></i>Microphones</a>
+      <a href="#prompter"><i style="background:var(--lime)"></i>The prompter</a>
+      <a href="#live"><i style="background:var(--green)"></i>Watch live</a>
+      <a href="#recordings"><i style="background:var(--sky)"></i>Recordings</a>
+      <a href="#settings"><i style="background:var(--pink)"></i>Settings</a>
+      <a href="#help"><i style="background:var(--sun)"></i>If something goes wrong</a>
+      <a href="#change"><i style="background:var(--lime)"></i>Change it with Claude</a>
       <p class="toc-free">Vidlark is free. So are Xcode, Homebrew and every tool in the steps by hand.</p>
     </nav>
 
-    <div class="doc">
+    <div class="doc guide">
       <section id="need">
-        <h2>What you need</h2>
-        <ul class="plain">
-          <li>A Mac with Apple silicon on macOS 15 or later.</li>
-          <li>The Xcode app from the App Store, for the free certificate in step 3.</li>
-          <li>Start the Xcode download first: it is the largest part of the install.</li>
-          <li>For a phone camera or phone mic: the phone and the Mac on the same Wi-Fi.</li>
+        <h2>What you need <a class="anchor" href="#need" aria-label="Link to What you need">#</a></h2>
+        <ul class="points">
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg><span><b>A Mac with Apple silicon on macOS 15 or later.</b> To check, open the Apple menu, then About This Mac. Chip should say Apple M1 or newer, and macOS should be 15 (Sequoia) or later.</span></li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg><span><b>The Xcode app,</b> free from the App Store. It is big, so start its download first.</span></li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg><span><b>Your Apple ID,</b> the one you use for the App Store. It gets you the free certificate that lets Vidlark record the screen.</span></li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg><span><b>Free space for your videos.</b> A 15 minute take needs about 3 GB.</span></li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg><span><b>For a phone camera or a phone mic:</b> the phone and the Mac on the same Wi-Fi. An iPhone needs iOS 16.4 or newer. An Android phone needs Chrome.</span></li>
         </ul>
       </section>
 
       <section id="install">
-        <h2>Install</h2>
-        <p>Vidlark is built on your own Mac from its code on GitHub. Claude Code can do the whole install for you, or you can follow the steps by hand. Both end with the same app.</p>
+        <h2>Install <a class="anchor" href="#install" aria-label="Link to Install">#</a></h2>
+        <p>Vidlark is built on your own Mac from its code on GitHub. There are two ways to do it, and both end with the same app. Claude Code can do almost all of it for you. Or you can follow the steps by hand, which cost nothing.</p>
 
-        <h3 id="with-claude">With Claude Code</h3>
-        <p>Claude Code is Anthropic's coding assistant, in the Claude desktop app or in Terminal. It needs a paid Claude plan; the steps by hand cost nothing. Paste this into Claude Code and answer its questions.</p>
-        <pre class="code prompt"><code>Set up Vidlark on my Mac for me. Vidlark is a free screen and camera recorder, and its code is at https://github.com/neel542/vidlark
+        <h3 id="with-claude">With Claude Code <a class="anchor" href="#with-claude" aria-label="Link to With Claude Code">#</a></h3>
+        <p>Claude Code is Anthropic's coding assistant. It runs in the Claude desktop app or in the Terminal app, and it needs a paid Claude plan.</p>
+        <ol class="steps">
+          <li id="claude-xcode"><div class="step"><div>
+            <p><b>Install Xcode from the App Store, and open it once.</b> Claude cannot install apps from the App Store, so this one is yours. When Xcode has finished setting up, you can close it.</p>
+          </div></div></li>
+          <li id="claude-paste"><div class="step"><div>
+            <p><b>Open Claude Code and paste this in.</b> Press the Copy button, then paste.</p>
+            <pre class="code prompt"><code>Set up Vidlark on my Mac for me. Vidlark is a free screen and camera recorder, and its code is at https://github.com/neel542/vidlark
 
 1. Check that this Mac has Apple silicon and macOS 15 or later. If it does not, stop and tell me.
 2. Install what it needs: Xcode's command line tools, Homebrew, then ffmpeg and whisper-cpp with Homebrew. Skip anything already installed.
@@ -109,100 +122,208 @@
 6. Open dist/Vidlark.app
 
 Before you install anything, tell me what it is and wait for my yes. If a step needs my password, give me the exact command to run in Terminal myself. When it is done, tell me what is left for me to do.</code></pre>
-        <p class="note"><b>One step stays yours:</b> adding your Apple ID in Xcode for the free certificate. Claude tells you where to click, waits for you, then builds the app again.</p>
+          </div></div></li>
+          <li id="claude-answer"><div class="step"><div>
+            <p><b>Answer its questions.</b> It tells you what each tool is and waits for your yes before installing it.</p>
+            <p>If a step needs your Mac password, Claude gives you a command to run in Terminal yourself. When you type the password there, nothing shows on screen, not even dots. That is normal. Type it and press Return.</p>
+          </div></div></li>
+          <li id="claude-certificate"><div class="step"><div>
+            <p><b>Add the free certificate when Claude asks.</b> This is the one step only you can do, because it signs in with your Apple ID. Follow <a href="#certificate">the certificate steps</a> below, then tell Claude you are done. It builds the app again.</p>
+          </div></div></li>
+          <li id="claude-done"><div class="step"><div>
+            <p><b>Vidlark opens.</b> Go on to <a href="#first">The first time</a>.</p>
+          </div></div></li>
+        </ol>
 
-        <h3 id="by-hand">By hand</h3>
-        <p>Open the Terminal app and follow these steps in order.</p>
+        <h3 id="by-hand">By hand <a class="anchor" href="#by-hand" aria-label="Link to By hand">#</a></h3>
+        <p>Every command below goes into the Terminal app. Press its Copy button, paste it into Terminal with <kbd>Command</kbd> <kbd>V</kbd>, press <kbd>Return</kbd>, and wait until Terminal is ready for the next one.</p>
         <ol class="steps">
-          <li><div>
-            <p><b>Install Xcode's command line tools.</b> If they are already installed, Terminal says so.</p>
+          <li id="hand-xcode"><div class="step"><div>
+            <p><b>Install Xcode.</b> Open the App Store, search for Xcode, and press Get. It is free, and big, so it takes a while.</p>
+            <p>Open Xcode once and wait until it finishes setting up. If it asks which platforms you want, macOS is enough. Then close it.</p>
+          </div></div></li>
+          <li id="hand-terminal"><div class="step"><div>
+            <p><b>Open Terminal.</b> Press <kbd>Command</kbd> <kbd>Space</kbd>, type Terminal, and press <kbd>Return</kbd>.</p>
+          </div></div></li>
+          <li id="hand-tools"><div class="step"><div>
+            <p><b>Install Xcode's command line tools.</b> If a window asks, press Install. If Terminal says they are already installed, that is fine: go on.</p>
             <pre class="code"><code>xcode-select --install</code></pre>
-          </div></li>
-          <li><div>
-            <p><b>Install Homebrew, then the two tools that finish each take.</b> ffmpeg makes the finished video, and whisper-cpp writes the transcript.</p>
+          </div></div></li>
+          <li id="hand-homebrew"><div class="step"><div>
+            <p><b>Install Homebrew,</b> the free tool that installs the other tools. It asks for your Mac password. Nothing shows as you type it: that is normal. Type it and press <kbd>Return</kbd>.</p>
             <pre class="code"><code>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code></pre>
+            <p>When it finishes, run this once, so Terminal can find Homebrew:</p>
+            <pre class="code"><code>echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' &gt;&gt; ~/.zprofile
+eval "$(/opt/homebrew/bin/brew shellenv)"</code></pre>
+          </div></div></li>
+          <li id="hand-ffmpeg"><div class="step"><div>
+            <p><b>Install the two tools that finish each take.</b> ffmpeg makes the finished video, and whisper-cpp writes the transcript.</p>
             <pre class="code"><code>brew install ffmpeg whisper-cpp</code></pre>
-          </div></li>
-          <li><div>
-            <p><b>Get a free Apple Development certificate.</b> macOS only lets an app record the screen when it has one. In Xcode, open Settings, then Accounts, add your Apple ID, then Manage Certificates, the + button, and Apple Development.</p>
-          </div></li>
-          <li><div>
-            <p><b>Download the code.</b></p>
+          </div></div></li>
+          <li id="certificate"><div class="step"><div>
+            <p><b>Get the free Apple Development certificate.</b> This is the step people find confusing, so take it slowly. macOS only lets an app record the screen when the app is signed with a certificate. Apple gives one away free with any Apple ID. You do not need to pay for the Apple Developer Program.</p>
+            <ol class="substeps">
+              <li><p><b>Open Xcode.</b> In the menu bar at the top of the screen, click Xcode, then Settings. Or press <kbd>Command</kbd> <kbd>,</kbd> (the comma key).</p></li>
+              <li><p><b>Click Accounts,</b> at the top of the Settings window.</p></li>
+              <li><div><p><b>Add your Apple ID.</b> Click the <b>+</b> button at the bottom left, choose Apple ID, click Continue, and sign in.</p>
+                <ol class="path" aria-label="Where to click">
+                  <li><span>Xcode</span></li>
+                  <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>Settings</span></li>
+                  <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>Accounts</span></li>
+                  <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>+</span></li>
+                  <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>Apple ID</span></li>
+                </ol></div></li>
+              <li><p><b>Pick your account.</b> Your Apple ID now shows in the list on the left. Click it. On the right is a team with your name and Personal Team.</p></li>
+              <li><div><p><b>Make the certificate.</b> Click Manage Certificates. In the small window, click the <b>+</b> at the bottom left, then Apple Development.</p>
+                <ol class="path" aria-label="Where to click">
+                  <li><span>Manage Certificates</span></li>
+                  <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>+</span></li>
+                  <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>Apple Development</span></li>
+                </ol></div></li>
+              <li><p><b>Check it is there.</b> A certificate with your name appears in the list. Click Done and close Xcode. You only ever do this once.</p></li>
+            </ol>
+          </div></div></li>
+          <li id="hand-download"><div class="step"><div>
+            <p><b>Download Vidlark's code</b> into a folder called vidlark, in your home folder.</p>
             <pre class="code"><code>git clone https://github.com/neel542/vidlark.git
 cd vidlark</code></pre>
-          </div></li>
-          <li><div>
-            <p><b>Build the app and open it.</b> The build finds your certificate on its own.</p>
-            <pre class="code"><code>bash Tools/build.sh
-open "dist/Vidlark.app"</code></pre>
-          </div></li>
-          <li><div>
-            <p><b>For transcripts, download the speech model</b> (about 550 MB). Without it, everything records and only the transcript and the retakes list are skipped.</p>
+          </div></div></li>
+          <li id="hand-build"><div class="step"><div>
+            <p><b>Build the app.</b> The first build takes a few minutes. If a box asks to let codesign use your keychain, type your Mac password and click Always Allow.</p>
+            <pre class="code"><code>bash Tools/build.sh</code></pre>
+            <p>Look at the last lines. <code>Signed with: Apple Development</code> means it worked. If it says <code>warning: no Apple Development certificate found</code>, go back to <a href="#certificate">the certificate step</a>, then build again.</p>
+          </div></div></li>
+          <li id="hand-open"><div class="step"><div>
+            <p><b>Open Vidlark.</b></p>
+            <pre class="code"><code>open dist/Vidlark.app</code></pre>
+            <p>Next time, open it from Finder: your home folder, then vidlark, then dist, then Vidlark. To keep it handy, right-click its icon in the Dock, then Options, then Keep in Dock.</p>
+          </div></div></li>
+          <li id="hand-model"><div class="step"><div>
+            <p><b>For transcripts, download the speech model.</b> It is about 550 MB. Without it, everything still records, and only the transcript and the list of retakes are skipped.</p>
             <pre class="code"><code>mkdir -p ~/.cache/whisper
 curl -L -o ~/.cache/whisper/ggml-large-v3-turbo-q5_0.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin</code></pre>
-          </div></li>
+          </div></div></li>
         </ol>
       </section>
 
       <section id="first">
-        <h2>The first time</h2>
+        <h2>The first time <a class="anchor" href="#first" aria-label="Link to The first time">#</a></h2>
+        <p>macOS asks you to allow the camera, the microphone and the screen. You only do this once.</p>
         <ol class="steps">
-          <li><div><p><b>Allow the camera and the microphone</b> when macOS asks.</p></div></li>
-          <li><div><p><b>Allow screen recording.</b> When the app asks, switch on Vidlark in System Settings, under Privacy and Security, Screen and System Audio Recording. Then quit the app and open it again.</p></div></li>
+          <li id="first-camera"><div class="step"><div>
+            <p><b>Allow the camera and the microphone.</b> When Vidlark opens, macOS asks twice. Click Allow each time. On some Macs the button says OK.</p>
+          </div></div></li>
+          <li id="first-screen"><div class="step"><div>
+            <p><b>Allow screen recording.</b> Under the Sources list, a note says the screen is not allowed yet. Click Allow in that note.</p>
+          </div></div></li>
+          <li id="first-settings"><div class="step"><div>
+            <p><b>Switch on Vidlark in System Settings.</b> System Settings opens on the right page. If macOS asks first, click Open System Settings. Then switch on Vidlark in the list.</p>
+            <ol class="path" aria-label="Where it is in System Settings">
+              <li><span>System Settings</span></li>
+              <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>Privacy &amp; Security</span></li>
+              <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>Screen &amp; System Audio Recording</span></li>
+              <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>Vidlark</span></li>
+            </ol>
+          </div></div></li>
+          <li id="first-reopen"><div class="step"><div>
+            <p><b>Quit Vidlark and open it again.</b> macOS offers a Quit &amp; Reopen button: click it. Every lamp in the Sources list turns green, and the panel says "Ready. Press the red button to record."</p>
+          </div></div></li>
         </ol>
+        <div class="pair">
+          <figure class="fig">
+            <figcaption><span class="status soon">Before</span>The screen is not allowed yet</figcaption>
+            <div class="shot"><img src="/assets/img/guide-first-before.webp" alt="Vidlark's Sources list before the screen is allowed. Screen says Not allowed yet with a red lamp, and a note says: Screen recording is not allowed yet, so Screen cannot share during a take. Your camera still records. Allow." width="740" height="670" loading="lazy"></div>
+          </figure>
+          <figure class="fig">
+            <figcaption><span class="status">After</span>Every lamp is green</figcaption>
+            <div class="shot"><img src="/assets/img/guide-first-after.webp" alt="Vidlark's Sources list when everything is allowed: Camera, Microphone with a moving level meter, and Screen, each with a green lamp" width="740" height="448" loading="lazy"></div>
+          </figure>
+        </div>
       </section>
 
       <section id="take">
-        <h2>Your first video</h2>
+        <h2>Your first video <a class="anchor" href="#take" aria-label="Link to Your first video">#</a></h2>
+        <p class="intro">Every take starts on your face. You add the screen when you want it, and Vidlark makes the finished video when you stop.</p>
         <ol class="steps">
-          <li><div><p><b>Check the Sources list.</b> It shows your camera, mic and screen, each with a lamp. Green means ready. Click a row to change it.</p></div></li>
-          <li><div><p><b>Press the red record button.</b> It counts down 3, 2, 1 with beeps. Start talking at the higher beep: that is when recording starts.</p></div></li>
-          <li><div><p><b>Share your screen when you want it in the video.</b> Press Share screen, pick the entire screen or one window, then Share. The window shrinks to a small box with Me, Screen and the stop button.</p></div></li>
-          <li><div><p><b>Click Me or Screen</b> to switch what the video shows. Your camera grows to fill the screen, or shrinks back into the circle.</p></div></li>
-          <li><div><p><b>Press stop.</b> The app lines up the files and, if you shared your screen, makes the finished video. Open Recordings (Command-Shift-R) to watch it.</p></div></li>
+          <li id="take-title"><div class="step"><div>
+            <p><b>Give the video a name, if you like.</b> Click the title at the top left. Until you add a script, it says No script. Choose Add script file or Paste script, or drop a script file onto the window.</p>
+            <p>A line that starts with <code>#</code> at the top of the script becomes the title, and the take's folder gets that name too. No script? That is fine: the take is saved as Quick recording with the time. See <a href="#prompter">The prompter</a> for how a script looks.</p>
+            <figure class="fig narrow"><div class="shot"><img src="/assets/img/guide-title.webp" alt="The top of the Vidlark panel: No script, Drop a script here to add one, and the Live, Recordings and Settings buttons" width="740" height="96" loading="lazy"></div></figure>
+          </div></div></li>
+          <li id="take-sources"><div class="step side"><div>
+            <p><b>Check the Sources list.</b> It shows your camera, microphone and screen, each with a lamp. Green means ready.</p>
+            <p>Say a few words: the meter under Microphone moves. To use another camera, mic or screen, click its row and pick one.</p>
+          </div>
+          <figure class="fig narrow"><div class="shot"><img src="/assets/img/guide-first-after.webp" alt="The Sources list: Camera, Microphone with its level meter, and Screen, each with a green lamp" width="740" height="448" loading="lazy"></div></figure></div></li>
+          <li id="take-record"><div class="step side"><div>
+            <p><b>Press the big red button.</b> Vidlark counts down 3, 2, 1 with three short beeps. A higher beep means recording has started: start talking then. The count itself is not recorded.</p>
+            <p>Changed your mind? Press the button again during the count to cancel.</p>
+          </div>
+          <figure class="fig narrow"><div class="shot"><img src="/assets/img/guide-countdown.webp" alt="The camera picture showing a big number 2 during the countdown" width="740" height="430" loading="lazy"></div></figure></div></li>
+          <li id="take-rolling"><div class="step side"><div>
+            <p><b>You are recording, on your face.</b> The picture shows REC and the time counts up. The window stays where it is, and a Share screen button appears.</p>
+            <p>For a video of just you, keep talking and skip to <a href="#take-stop">Stop</a>.</p>
+          </div>
+          <figure class="fig narrow"><div class="shot"><img src="/assets/img/guide-recording.webp" alt="The bottom of the panel during a take: a Share screen button, the time 07:42, the stop button and the words Recording. Press to stop." width="740" height="471" loading="lazy"></div></figure></div></li>
+          <li id="take-share"><div class="step"><div>
+            <p><b>Press Share screen when you want the screen in the video.</b> A window called What to share opens. Pick Entire screen, or A window to show only one window, like your browser. Then press Share.</p>
+            <p>Your pick is remembered, so next time it is one click on Share. Only what you pick goes into the video.</p>
+            <figure class="fig"><div class="shot"><img src="/assets/img/guide-share-picker.webp" alt="The What to share window: Entire screen and A window at the top, pictures of four open windows with the first one picked, and Cancel and Share buttons" width="1200" height="884" loading="lazy"></div></figure>
+          </div></div></li>
+          <li id="take-box"><div class="step side"><div>
+            <p><b>The window shrinks to a small recording box</b> at the top right of your screen. The box is only on your screen, never in the video. From top to bottom:</p>
+            <ul class="parts">
+              <li><b>Back to the recorder</b> brings the Vidlark window back. The take carries on.</li>
+              <li><b>Me and Screen</b> pick what the video shows.</li>
+              <li><b>Mac sound</b> adds what the Mac plays, from every app or only one, like a video in your browser.</li>
+              <li><b>The red dot and the time</b> show the take is recording, and the meter shows your voice.</li>
+              <li><b>The face button</b> puts your face in the video, or takes it out.</li>
+              <li><b>The minus button</b> hides the picture of your face in the box. Click the picture to switch between your face and the whole camera view.</li>
+              <li><b>The red square</b> stops the take.</li>
+            </ul>
+          </div>
+          <figure class="fig narrow"><div class="shot"><img src="/assets/img/guide-box-screen.webp" alt="The recording box: Back to the recorder, Me and Screen with Screen picked, Mac sound Off, the time 05:12, a level meter, the face, minus and stop buttons, and a picture of the camera that says Looking for a face" width="504" height="828" loading="lazy"></div></figure></div></li>
+          <li id="take-me-screen"><div class="step side"><div>
+            <p><b>Click Me or Screen</b> to switch what the video shows. Me fills the video with your camera. Screen shows your screen again.</p>
+            <p>The finished video follows your clicks, so there is nothing to cut afterwards. Both the camera and the screen keep recording the whole time, as their own files.</p>
+          </div>
+          <figure class="fig narrow"><div class="shot"><img src="/assets/img/guide-box-me.webp" alt="The recording box with Me picked: Back to the recorder, Me and Screen, Mac sound Off, the time, the meter and the stop button" width="504" height="340" loading="lazy"></div></figure></div></li>
+          <li id="take-face"><div class="step"><div>
+            <p><b>Want your face on the screen too?</b> Open Settings (the gear, or <kbd>Command</kbd> <kbd>,</kbd>), then In the video. Under Your face on the screen, pick Circle, Square, Oval or Wide. None keeps your face out.</p>
+            <p>During a take, the face button in the box puts your face in or takes it out, and you can drag it anywhere on the screen. Your camera is always saved as its own file too, so the shape can still change when you edit.</p>
+            <figure class="fig"><div class="shot"><img src="/assets/img/guide-face-shapes.webp" alt="Settings, In the video: Your face on the screen, with the shapes None, Circle, Square, Oval and Wide, and Circle picked" width="1228" height="359" loading="lazy"></div></figure>
+          </div></div></li>
+          <li id="take-stop"><div class="step"><div>
+            <p><b>Press stop.</b> Use the red square in the box, or the big button in the Vidlark window. Everything stops together.</p>
+          </div></div></li>
+          <li id="take-finishing"><div class="step side"><div>
+            <p><b>Wait while Vidlark finishes the take.</b> The window comes back and says each step as it works, like "Writing the transcript." It lines up the files by their sound, makes the finished video and writes the transcript. After a long take this takes a minute or two.</p>
+          </div>
+          <figure class="fig narrow"><div class="shot"><img src="/assets/img/guide-finishing.webp" alt="The panel while it finishes: the time 15:05, a green ring around the record button, and the words Writing the transcript." width="740" height="260" loading="lazy"></div></figure></div></li>
+          <li id="take-done"><div class="step side"><div>
+            <p><b>Done.</b> The panel says "Saved and finished." Click Open folder to see the files. The one to upload is <code>video.mp4</code>.</p>
+            <p>To record again, press the red button. Each take gets its own folder, so nothing is ever replaced.</p>
+          </div>
+          <figure class="fig narrow"><div class="shot"><img src="/assets/img/guide-done.webp" alt="The panel after a take: Saved and finished. Transcript, chapters and retakes are in the folder. Open folder. Next video." width="740" height="340" loading="lazy"></div></figure></div></li>
         </ol>
-        <p class="note"><b>Made a mistake?</b> Say "retake" and repeat the line. The take keeps going, and <code>retakes.json</code> lists where every retake is.</p>
-      </section>
-
-      <section id="phone">
-        <h2>Add a phone camera</h2>
-        <ol class="steps">
-          <li><div><p><b>Press + Add, then Add a phone with a QR code.</b> A window shows a QR code.</p></div></li>
-          <li><div><p><b>Point the phone's camera at the code</b> and tap the link that appears. It works with an iPhone or an Android phone, with no app to install.</p></div></li>
-          <li><div><p><b>Get past the one-time warning.</b> The phone says the connection is not private, because the link is the app's own, on your Wi-Fi only. On an iPhone, tap Show Details, then visit this website, then Visit Website. On Android, tap Advanced, then Proceed.</p></div></li>
-          <li><div><p><b>Pick Wide 16:9 or Tall 9:16, then tap Start camera.</b> The window on the Mac says Connected.</p></div></li>
-        </ol>
-        <p class="note">Each phone records its own file, <code>camera-2.mov</code> and on, lined up with the main camera by sound. Add up to four phones the same way.</p>
-      </section>
-
-      <section id="mic">
-        <h2>Add a microphone</h2>
-        <ol class="steps">
-          <li><div><p><b>Plug in the mic or connect it,</b> then press + Add and pick it under Another microphone.</p></div></li>
-          <li><div><p><b>For a phone as a wireless mic,</b> pick A phone as a microphone, with a QR code. Scan it, tap Start microphone, then Allow, and keep the phone about a hand's width from your mouth.</p></div></li>
-          <li><div><p><b>To use that mic in the finished video,</b> open its row's menu and pick Use for the video's sound.</p></div></li>
-        </ol>
-        <p class="note">Every mic records its own file, <code>mic-2.m4a</code> and on, whichever one the video uses.</p>
-      </section>
-
-      <section id="live">
-        <h2>Watch live from another device</h2>
-        <ol class="steps">
-          <li><div><p><b>Open Settings</b> (the gear, or Command-Comma), then Live view, and pick Home Wi-Fi.</p></div></li>
-          <li><div><p><b>Press Copy link</b> and open it in a browser on another laptop or phone on the same Wi-Fi. There is no login.</p></div></li>
-          <li><div><p><b>For other networks, pick Anywhere.</b> It needs one more free tool:</p><pre class="code"><code>brew install cloudflared</code></pre></div></li>
-        </ol>
-        <p class="note"><b>Keep the link private.</b> Anyone with it sees your screen. New link stops every old link working.</p>
+        <p class="note"><b>Made a mistake?</b> Say "retake" and repeat the line. The take keeps going, and <code>retakes.json</code> lists where every retake is, so you can find them when you edit.</p>
       </section>
 
       <section id="files">
-        <h2>Where your files go</h2>
-        <p>Every take gets its own folder:</p>
-        <pre class="code"><code>/Users/Shared/Vidlark Recordings/&lt;date&gt; &lt;title&gt;/recording-1/</code></pre>
+        <h2>Where your files go <a class="anchor" href="#files" aria-label="Link to Where your files go">#</a></h2>
+        <p>Every take gets its own folder, in a folder all the Mac's users share. Open folder, after a take, takes you straight there. In Finder it is:</p>
+        <ol class="path" aria-label="Where the recordings are in Finder">
+          <li><span>Macintosh HD</span></li>
+          <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>Users</span></li>
+          <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>Shared</span></li>
+          <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>Vidlark Recordings</span></li>
+          <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>the date and title</span></li>
+          <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>recording-1</span></li>
+        </ol>
         <table class="table">
           <thead><tr><th>File</th><th>What it is</th></tr></thead>
           <tbody>
-            <tr><td><code>video.mp4</code></td><td>The finished video, made when you share your screen.</td></tr>
+            <tr><td><code>video.mp4</code></td><td>The finished video, ready to upload. Made when you shared your screen.</td></tr>
             <tr><td><code>camera.mov</code></td><td>Your camera, with your voice.</td></tr>
             <tr><td><code>screen.mov</code></td><td>Your screen, with your voice and the Mac's sound if it was on.</td></tr>
             <tr><td><code>camera-2.mov</code></td><td>Each extra camera or phone.</td></tr>
@@ -214,6 +335,200 @@ curl -L -o ~/.cache/whisper/ggml-large-v3-turbo-q5_0.bin https://huggingface.co/
             <tr><td><code>report.md</code></td><td>A plain summary of the take.</td></tr>
           </tbody>
         </table>
+      </section>
+
+      <section id="phone">
+        <h2>Add a phone camera <a class="anchor" href="#phone" aria-label="Link to Add a phone camera">#</a></h2>
+        <p>Any iPhone or Android phone can film another angle, over your Wi-Fi. There is no app to install and no cable.</p>
+        <ol class="steps">
+          <li id="phone-code"><div class="step"><div>
+            <p><b>Press + Add,</b> above the Sources list, then Add a phone with a QR code. A window shows a QR code.</p>
+            <figure class="fig"><div class="shot"><img src="/assets/img/guide-phone-code.webp" alt="The Connect a phone window: a QR code, Copy the link, three numbered steps, and Waiting for the phone" width="1200" height="833" loading="lazy"></div></figure>
+          </div></div></li>
+          <li id="phone-scan"><div class="step"><div>
+            <p><b>Point the phone's camera at the code,</b> and tap the link that appears. The phone needs to be on the same Wi-Fi as the Mac.</p>
+          </div></div></li>
+          <li id="phone-warning"><div class="step"><div>
+            <p><b>Get past the one-time warning.</b> The first time, the phone says the connection is not private. The link is Vidlark's own, and it only works on your Wi-Fi.</p>
+            <p>On an iPhone, tap Show Details, then "visit this website", then Visit Website. On Android, tap Advanced, then Proceed.</p>
+          </div></div></li>
+          <li id="phone-start"><div class="step side"><div>
+            <p><b>Pick the shape, then tap Start camera.</b> Wide 16:9 is for YouTube. Tall 9:16 is for Shorts and Reels. Then tap Allow, so the page can use the camera.</p>
+            <p>The picture keeps that shape however the phone turns. Put the phone in a stand, keep the page open, and plug it in for a long take.</p>
+          </div>
+          <figure class="fig phone"><div class="shot"><img src="/assets/img/guide-phone-page.webp" alt="The page on the phone: Vidlark camera, Phone 1, This phone becomes a camera for Vidlark, the shapes Wide 16:9 YouTube and Tall 9:16 Shorts, Reels, and a green Start camera button" width="780" height="1160" loading="lazy"></div></figure></div></li>
+          <li id="phone-connected"><div class="step"><div>
+            <p><b>The Mac says Connected.</b> Press Done.</p>
+            <figure class="fig"><div class="shot"><img src="/assets/img/phone-code-connected.webp" alt="The Connect a phone window when the phone is connected: Connected, Wide 16:9, 1080p, 30 frames a second, and a Done button" width="1480" height="1000" loading="lazy"></div></figure>
+          </div></div></li>
+          <li id="phone-row"><div class="step side"><div>
+            <p><b>The phone is now a source,</b> called Camera 2. It records its own file, <code>camera-2.mov</code>, lined up with the main camera by sound, so you pick the angle when you edit.</p>
+            <p>Add up to four phones the same way. To film with a phone as the main camera instead, click the Camera row and pick the phone there.</p>
+          </div>
+          <figure class="fig narrow"><div class="shot"><img src="/assets/img/sources-angles.webp" alt="The Sources list with the Mac's camera, Camera 2 Phone 1 at 1080p, Camera 3 Phone 2 at 1080p tall, a microphone and the screen" width="800" height="942" loading="lazy"></div></figure></div></li>
+        </ol>
+      </section>
+
+      <section id="mic">
+        <h2>Microphones <a class="anchor" href="#mic" aria-label="Link to Microphones">#</a></h2>
+        <p>A better mic makes the biggest difference to a video. Vidlark can record several at once, each to its own file.</p>
+        <ol class="steps">
+          <li id="mic-add"><div class="step side"><div>
+            <p><b>Plug in or connect the mic,</b> then press + Add and pick it under Another microphone. It gets its own row, its own meter and its own file, <code>mic-2.m4a</code> and on.</p>
+            <p>The main mic is the Microphone row. Click it to pick a different one.</p>
+          </div>
+          <figure class="fig narrow"><div class="shot"><img src="/assets/img/sources-mics.webp" alt="The Sources list with a camera, a phone, and four microphones, each with its own level meter" width="800" height="942" loading="lazy"></div></figure></div></li>
+          <li id="mic-phone"><div class="step"><div>
+            <p><b>Use a phone as a wireless mic.</b> Press + Add, then A phone as a microphone, with a QR code. Scan the code with the phone, tap Start microphone, then Allow. Keep the phone about a hand's width from your mouth.</p>
+            <p>A phone that already films an angle can record its sound too: open its row's menu and pick Record this phone's sound too.</p>
+            <figure class="fig"><div class="shot"><img src="/assets/img/guide-phone-mic.webp" alt="The Connect phone 3 window for a phone microphone: a QR code, three steps, and Connected, Sending its sound" width="1200" height="833" loading="lazy"></div></figure>
+          </div></div></li>
+          <li id="mic-video"><div class="step"><div>
+            <p><b>Pick the mic for the finished video.</b> Open that mic's row menu, with the arrows at its right, and pick Use for the video's sound. The row then says "The video's sound". Every mic records either way.</p>
+          </div></div></li>
+          <li id="mic-mute"><div class="step"><div>
+            <p><b>Mute a phone's mic</b> by tapping Mute on the phone, or by picking Mute the phone's mic in its row on the Mac. Either side can turn it back on.</p>
+          </div></div></li>
+        </ol>
+        <p class="note"><b>AirPods and other Bluetooth mics</b> record at phone call quality. A USB mic or a wireless mic kit sounds better.</p>
+      </section>
+
+      <section id="prompter">
+        <h2>The prompter <a class="anchor" href="#prompter" aria-label="Link to The prompter">#</a></h2>
+        <p>The prompter shows your script one line at a time, in a strip at the top of the screen that is never recorded.</p>
+        <ol class="steps">
+          <li id="prompter-write"><div class="step"><div>
+            <p><b>Write a script</b> as a plain text file. The first line is the title. Written-out paragraphs show word for word. Each bullet shows on its own, for you to talk around.</p>
+            <pre class="code"><code># My first video
+Target: 15 min
+
+## Hook
+Written out word for word. It shows a little at a time.
+
+## The main part
+- One bullet per line
+- You talk around each one</code></pre>
+          </div></div></li>
+          <li id="prompter-add"><div class="step"><div>
+            <p><b>Add it to Vidlark.</b> Click the title at the top left, then Add script file or Paste script, or drop the file onto the window. Add several scripts to make a list for the day: the panel then says Video 1 of 3.</p>
+          </div></div></li>
+          <li id="prompter-on"><div class="step"><div>
+            <p><b>Switch the prompter on.</b> Open Settings, then Prompter and remote, and switch on Show the prompter during takes. It starts switched off.</p>
+            <p>Then pick how it moves on. My voice listens and moves on as you finish each line. Key moves on only when you press the key under <kbd>Esc</kbd> (hold <kbd>Shift</kbd> with it to go back). By itself scrolls at a steady speed. A Bluetooth remote can move it too: set its buttons under Remote buttons.</p>
+            <figure class="fig"><div class="shot"><img src="/assets/img/guide-prompter-settings.webp" alt="Settings, Prompter and remote: Show the prompter during takes, How it moves on with My voice, Key and By itself, Scrolling speed, Text size, and Keyboard" width="1232" height="924" loading="lazy"></div></figure>
+          </div></div></li>
+          <li id="prompter-read"><div class="step"><div>
+            <p><b>Read from the strip during the take.</b> Drag it next to the camera, so your eyes stay close to the lens. Drag its edge to make it taller. The line under the words shows how far through the script you are.</p>
+            <figure class="fig"><div class="shot"><img src="/assets/img/guide-prompter.webp" alt="The prompter strip showing the first line of a script in big white words, with a progress line and Hook, 1 of 10 under it" width="1200" height="300" loading="lazy"></div></figure>
+          </div></div></li>
+        </ol>
+      </section>
+
+      <section id="live">
+        <h2>Watch live from another device <a class="anchor" href="#live" aria-label="Link to Watch live">#</a></h2>
+        <p>Someone helping you can watch the shoot on a laptop or phone, in a web browser, with no login.</p>
+        <ol class="steps">
+          <li id="live-on"><div class="step"><div>
+            <p><b>Open Settings, then Live view, and pick Home Wi-Fi.</b></p>
+            <figure class="fig"><div class="shot"><img src="/assets/img/guide-live.webp" alt="Settings, Live view: a switch with Off, Home Wi-Fi and Anywhere, and Home Wi-Fi picked" width="1232" height="198" loading="lazy"></div></figure>
+          </div></div></li>
+          <li id="live-link"><div class="step"><div>
+            <p><b>Press Copy link</b> and open it in a browser on another laptop or phone on the same Wi-Fi. It shows every camera, the screen while you record, the mic level and the checks.</p>
+            <p>Listen plays the mic as it records: use headphones. Pin makes one picture big, and Full screen fills the screen with it.</p>
+          </div></div></li>
+          <li id="live-anywhere"><div class="step"><div>
+            <p><b>Away from home, pick Anywhere.</b> It works from any internet connection, through a free secure link that changes each time it starts. It needs one more free tool:</p>
+            <pre class="code"><code>brew install cloudflared</code></pre>
+          </div></div></li>
+        </ol>
+        <p class="note"><b>Keep the link private.</b> Anyone with it sees your screen, including anything private on it. New link stops every old link working.</p>
+      </section>
+
+      <section id="recordings">
+        <h2>The Recordings page <a class="anchor" href="#recordings" aria-label="Link to The Recordings page">#</a></h2>
+        <ol class="steps">
+          <li id="recordings-open"><div class="step side"><div>
+            <p><b>Open it with the Recordings button</b> at the top right of the panel, or press <kbd>Command</kbd> <kbd>Shift</kbd> <kbd>R</kbd>. Every take shows with a picture, its length and its size.</p>
+            <p>Search by name, or filter by All, This week, Not finished, With screen or Camera only.</p>
+          </div>
+          <figure class="fig narrow"><div class="shot"><img src="/assets/img/guide-recordings.webp" alt="The Recordings page: a search box, filters, and takes with a picture, a title, the date and take number, Recording or Finished, and the size" width="800" height="930" loading="lazy"></div></figure></div></li>
+          <li id="recordings-watch"><div class="step"><div>
+            <p><b>Click a take to watch it.</b> Video plays the finished video, and Camera and Screen play those files, at the same moment. The mic choices at the bottom right play any mic under any picture. Open in QuickTime Player and Show in Finder are at the bottom left.</p>
+          </div></div></li>
+          <li id="recordings-menu"><div class="step"><div>
+            <p><b>Rename, copy or delete</b> with the button with three dots on a take: Watch, Show in Finder, Rename, Save a Copy and Delete. A deleted take goes to the Trash, so you can still get it back.</p>
+          </div></div></li>
+        </ol>
+      </section>
+
+      <section id="settings">
+        <h2>Settings worth knowing <a class="anchor" href="#settings" aria-label="Link to Settings worth knowing">#</a></h2>
+        <p>Open Settings with the gear, or <kbd>Command</kbd> <kbd>,</kbd>. Every option says in one sentence what it does.</p>
+        <figure class="fig" style="margin-top:18px"><div class="shot"><img src="/assets/img/guide-settings.webp" alt="The Settings window: a list of pages on the left, and After each take on the right with Transcript and chapters, Finished video, and Where recordings go with an Open folder button" width="1200" height="457" loading="lazy"></div></figure>
+        <table class="table">
+          <thead><tr><th>Page</th><th>Worth knowing</th></tr></thead>
+          <tbody>
+            <tr><td><b>In the video</b></td><td>Your face's shape on the screen. Keep my face framed in the video follows your face when the camera fills the video. Include the Mac's sound.</td></tr>
+            <tr><td><b>Camera quality</b></td><td>Sharpness: Best it offers, 4K, 1080p or 720p. Smooth motion records 60 frames a second, with files about twice as big.</td></tr>
+            <tr><td><b>After each take</b></td><td>Turn off Transcript and chapters for a quick video. Open folder shows where recordings go.</td></tr>
+            <tr><td><b>Camera effects</b></td><td>Studio Light, Portrait and Center Stage, with what each one does. Open Video Effects switches them.</td></tr>
+            <tr><td><b>Prompter and remote</b></td><td>The prompter, and buttons on a Bluetooth remote.</td></tr>
+            <tr><td><b>Live view</b></td><td>Off, Home Wi-Fi or Anywhere.</td></tr>
+            <tr><td><b>This Mac</b></td><td>Free space, power and Low Power Mode. Light mode helps a slower Mac keep up.</td></tr>
+            <tr><td><b>Connect a camera</b></td><td>A guide for an iPhone, a USB webcam or a real camera, with the cameras the Mac sees right now.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="help">
+        <h2>If something goes wrong <a class="anchor" href="#help" aria-label="Link to If something goes wrong">#</a></h2>
+        <div class="fixes">
+          <div class="fix" id="help-screen">
+            <h3>Screen still says "Not allowed yet"</h3>
+            <p>Quit Vidlark and open it again: macOS only lets it record the screen after a restart. Check Vidlark is switched on in System Settings, Privacy &amp; Security, Screen &amp; System Audio Recording.</p>
+            <p>If it is on and still not allowed, the app was built without the certificate. Do <a href="#certificate">the certificate step</a> and build again. Then, in that list in System Settings, select Vidlark, remove it with the minus button, and allow it again.</p>
+          </div>
+          <div class="fix" id="help-allow">
+            <h3>"Vidlark is not allowed to use the camera yet"</h3>
+            <p>Click Allow under the message. System Settings opens on the right page: switch on Vidlark. The same goes for the microphone.</p>
+          </div>
+          <div class="fix" id="help-camera">
+            <h3>The Camera row says None connected</h3>
+            <p>Plug the camera in, or bring the iPhone close to the Mac. Quit other apps that may be using the camera, like FaceTime, Zoom or Photo Booth. Settings, Connect a camera has a guide for each kind of camera.</p>
+          </div>
+          <div class="fix" id="help-resting">
+            <h3>The picture says "Camera resting to save power"</h3>
+            <p>Click the picture to wake it. Vidlark rests the camera and mic while it sits behind other apps, and wakes them in about a second.</p>
+          </div>
+          <div class="fix" id="help-mic">
+            <h3>The mic says "Say something to test it." and the meter stays still</h3>
+            <p>Vidlark may be listening to a different mic. Click the Microphone row and pick the one you are talking into. Check the mic itself is switched on and not muted.</p>
+          </div>
+          <div class="fix" id="help-freeze">
+            <h3>The camera freezes once the screen is shared</h3>
+            <p>Low Power Mode is on. Plug in the charger, or switch Low Power Mode off in System Settings, Battery. The panel warns you about this before you start.</p>
+          </div>
+          <div class="fix" id="help-stopped">
+            <h3>The take stopped by itself</h3>
+            <p>If the camera stops sending pictures, Vidlark stops the take within a few seconds and says so, instead of filming on without a camera. Everything recorded up to then is kept. Check the camera's cable, then record again.</p>
+          </div>
+          <div class="fix" id="help-transcript">
+            <h3>There is no transcript</h3>
+            <p>Download the speech model, in <a href="#hand-model">the last install step</a>. Then check Transcript and chapters is on in Settings, After each take.</p>
+          </div>
+          <div class="fix" id="help-phone">
+            <h3>The phone will not connect</h3>
+            <p>Check the phone and the Mac are on the same Wi-Fi. Go past the warning as in <a href="#phone-warning">the phone steps</a>. An iPhone needs iOS 16.4 or newer, and an Android phone needs Chrome. On the Mac, the phone's row menu has Show the code again.</p>
+          </div>
+          <div class="fix" id="help-brew">
+            <h3>Terminal says "brew: command not found"</h3>
+            <p>Run the two lines at the end of <a href="#hand-homebrew">the Homebrew step</a>, then try again.</p>
+          </div>
+          <div class="fix" id="help-other">
+            <h3>Something else</h3>
+            <p>Tell us on the <a href="/feedback">Feedback page</a>. A screenshot of what you see helps.</p>
+          </div>
+        </div>
       </section>
     </div>
   </div>
@@ -228,57 +543,159 @@ curl -L -o ~/.cache/whisper/ggml-large-v3-turbo-q5_0.bin https://huggingface.co/
       <a href="#win-first"><i style="background:var(--pink)"></i>The first time</a>
       <a href="#win-take"><i style="background:var(--sun)"></i>Your first video</a>
       <a href="#win-files"><i style="background:var(--lime)"></i>Where files go</a>
-      <a href="#change"><i style="background:var(--green)"></i>Change it with Claude</a>
-      <p class="toc-free">Vidlark for Windows is free. The tools that finish each take come inside the download.</p>
+      <a href="#win-not-yet"><i style="background:var(--green)"></i>Not in the beta yet</a>
+      <a href="#win-help"><i style="background:var(--sky)"></i>If something goes wrong</a>
+      <a href="#change"><i style="background:var(--pink)"></i>Change it with Claude</a>
+      <p class="toc-free">Vidlark for Windows is free. The tool that finishes each take comes inside the download.</p>
     </nav>
 
-    <div class="doc">
+    <div class="doc guide">
       <p class="note soon-note" data-windows-soon><b>Coming soon.</b> Vidlark for Windows is being built now. These steps are ready for the day its download goes up on GitHub.</p>
+      <p class="note sun"><b>This is a beta.</b> Vidlark for Windows is new and has only been tried on a few PCs so far. It records your face, your voice and your screen. Keep a copy of any take that matters, and <a href="/feedback">tell us</a> what goes wrong.</p>
 
       <section id="win-need">
-        <h2>What you need</h2>
-        <ul class="plain">
-          <li>A PC with Windows 11, 64-bit.</li>
-          <li>A webcam and a microphone, built in or plugged in.</li>
-          <li>Nothing else to install: ffmpeg and the speech tool come inside the download.</li>
+        <h2>What you need <a class="anchor" href="#win-need" aria-label="Link to What you need, Windows">#</a></h2>
+        <ul class="points">
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg><span><b>A PC with Windows 11, 64-bit.</b> Settings, System, About shows it.</span></li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg><span><b>A webcam and a microphone,</b> built in or plugged in.</span></li>
+          <li><svg aria-hidden="true"><use href="#i-check"/></svg><span><b>Nothing else to install.</b> No admin rights are needed.</span></li>
         </ul>
       </section>
 
       <section id="win-download">
-        <h2>Download and open</h2>
+        <h2>Download and open <a class="anchor" href="#win-download" aria-label="Link to Download and open">#</a></h2>
         <ol class="steps">
-          <li><div>
-            <p><b>Download Vidlark for Windows.</b> It is one zip file from GitHub.</p>
+          <li id="win-get"><div class="step"><div>
+            <p><b>Download Vidlark for Windows.</b> It is one zip file from GitHub, with no sign-in.</p>
             <p class="dl"><a class="btn" data-windows-download aria-disabled="true"><svg><use href="#i-download"/></svg><span>Download: coming soon</span></a></p>
-          </div></li>
-          <li><div><p><b>Unzip it.</b> Right-click the zip, choose Extract All, then Extract. Keep the folder together: the app and its tools sit side by side in it.</p></div></li>
-          <li><div><p><b>Open <code>Vidlark.exe</code></b> in that folder.</p></div></li>
-          <li><div><p><b>Get past the one-time warning.</b> Windows says "Windows protected your PC", because the app is new and not signed yet. Click More info, then Run anyway.</p></div></li>
+          </div></div></li>
+          <li id="win-unzip"><div class="step"><div>
+            <p><b>Unzip it.</b> Right-click the zip, choose Extract All, then Extract. Keep the folder together: the app and its tools sit side by side in it.</p>
+          </div></div></li>
+          <li id="win-open"><div class="step"><div>
+            <p><b>Open the Vidlark folder and double-click <code>Vidlark.exe</code>.</b></p>
+          </div></div></li>
+          <li id="win-smartscreen"><div class="step"><div>
+            <p><b>Get past the one-time warning.</b> The first time, a blue window says "Windows protected your PC", because Vidlark is new and not signed yet. Click More info, under the message. Then click the Run anyway button that appears.</p>
+            <ol class="path" aria-label="Where to click">
+              <li><span>More info</span></li>
+              <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>Run anyway</span></li>
+            </ol>
+          </div></div></li>
         </ol>
       </section>
 
       <section id="win-first">
-        <h2>The first time</h2>
+        <h2>The first time <a class="anchor" href="#win-first" aria-label="Link to The first time, Windows">#</a></h2>
         <ol class="steps">
-          <li><div><p><b>Check that apps may use the camera and the mic.</b> If the picture or the level meter stays empty, open Settings, then Privacy and security, then Camera, and switch on Let desktop apps access your camera. Do the same under Microphone.</p></div></li>
+          <li id="win-privacy"><div class="step"><div>
+            <p><b>Check that apps may use the camera and the mic.</b> If the picture or the meter stays empty, Windows may be blocking them. Open Settings (<kbd>Windows</kbd> <kbd>I</kbd>), then Privacy &amp; security, then Camera. Switch on Camera access, and Let desktop apps access your camera.</p>
+            <ol class="path" aria-label="Where it is in Settings">
+              <li><span>Settings</span></li>
+              <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>Privacy &amp; security</span></li>
+              <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>Camera</span></li>
+              <li><svg aria-hidden="true"><use href="#i-chev"/></svg><span>Let desktop apps access your camera</span></li>
+            </ol>
+            <p>Do the same under Microphone: switch on Microphone access, and Let desktop apps access your microphone.</p>
+          </div></div></li>
         </ol>
       </section>
 
       <section id="win-take">
-        <h2>Your first video</h2>
+        <h2>Your first video <a class="anchor" href="#win-take" aria-label="Link to Your first video, Windows">#</a></h2>
         <ol class="steps">
-          <li><div><p><b>Type a title and check your camera and mic.</b> Each has a lamp. Green means ready. Pick another one from its list to change it.</p></div></li>
-          <li><div><p><b>Press the red record button.</b> It counts down 3, 2, 1 with beeps. Start talking at the higher beep: that is when recording starts.</p></div></li>
-          <li><div><p><b>Share your screen when you want it in the video.</b> Press Share screen and pick a screen or a window. A small box shows Me, Screen and Stop, and it never shows in the video.</p></div></li>
-          <li><div><p><b>Click Me or Screen</b> to switch what the video shows.</p></div></li>
-          <li><div><p><b>Press stop.</b> Vidlark lines up the files and, if you shared your screen, makes the finished video. Press Show the take to open its folder.</p></div></li>
+          <li id="win-title"><div class="step"><div>
+            <p><b>Type a title</b> at the top, where it asks "What is this video called?". The take's folder gets that name. Without one, it is saved as Quick recording with the time.</p>
+            <figure class="fig"><div class="shot"><img src="/assets/img/guide-win-ready.webp" alt="The Vidlark window on Windows: the title My first video, the camera picture, and the Sources side with Camera, Microphone, More microphones, Screen, the time and the red record button" width="1400" height="875" loading="lazy"></div></figure>
+          </div></div></li>
+          <li id="win-sources"><div class="step"><div>
+            <p><b>Check your camera and mic.</b> Each has a lamp, and green means ready. Talk, and the meter moves. Pick another camera or mic from its list to change it.</p>
+            <p>To record more mics, open More microphones and tick each one. Each records to its own file. The Change button by Screen picks what Share screen will share later.</p>
+          </div></div></li>
+          <li id="win-record"><div class="step side wide-fig"><div>
+            <p><b>Press the red button.</b> It counts down 3, 2, 1 with beeps. Start talking at the higher beep: that is when recording starts. Press the button again during the count to call it off.</p>
+          </div>
+          <figure class="fig"><div class="shot"><img src="/assets/img/guide-win-countdown.webp" alt="The camera picture on Windows with a big number 3 during the countdown" width="1000" height="564" loading="lazy"></div></figure></div></li>
+          <li id="win-rolling"><div class="step side"><div>
+            <p><b>You are recording, on your face.</b> The time counts up, and a green Share screen button appears.</p>
+            <p>For a video of just you, keep talking and press the square to stop.</p>
+          </div>
+          <figure class="fig narrow"><div class="shot"><img src="/assets/img/guide-win-recording.webp" alt="The bottom of the Sources side during a take on Windows: Recording, a green Share screen button with a note under it, the time 01:14 with a red dot, and the stop button" width="612" height="662" loading="lazy"></div></figure></div></li>
+          <li id="win-share"><div class="step"><div>
+            <p><b>Press Share screen when you want the screen in the video.</b> Pick Entire screen, or A window to show only one window. Tick Include the computer's sound to record what the PC plays, like a video. Then press Share.</p>
+            <figure class="fig"><div class="shot"><img src="/assets/img/guide-win-picker.webp" alt="The What to share window on Windows: Entire screen and A window, one screen called Display 1 picked, Include the computer's sound, and Cancel and Share" width="1200" height="886" loading="lazy"></div></figure>
+          </div></div></li>
+          <li id="win-box"><div class="step side wide-fig"><div>
+            <p><b>Vidlark shrinks to a small box</b> at the top right of the screen. The box is never in the video.</p>
+            <ul class="parts">
+              <li><b>Me</b> puts your camera across the whole video. <b>Screen</b> shows the screen, with your face in a round bubble in the corner. Drag the bubble to move it.</li>
+              <li><b>Face</b> puts the bubble in the video, or takes it out.</li>
+              <li><b>Sound</b> switches the computer's sound on or off during the take.</li>
+              <li><b>Vidlark</b> brings the Vidlark window back. It never shows in the video.</li>
+              <li><b>The red square</b> stops the take.</li>
+            </ul>
+          </div>
+          <figure class="fig"><div class="shot"><img src="/assets/img/guide-win-box.webp" alt="The recording box on Windows: a red dot, the time 01:14, a level meter, the stop button, Me and Screen with Screen picked, and Face, Sound and Vidlark buttons" width="600" height="312" loading="lazy"></div>
+          <figcaption>While the screen records, Windows 11 may draw a thin yellow frame around it. The frame is not in the video.</figcaption></figure></div></li>
+          <li id="win-stop"><div class="step side"><div>
+            <p><b>Press stop.</b> Vidlark comes back and says "Lining up and finishing the files", then "Every file is ready." This beta adds that there is no transcript yet.</p>
+            <p>Press Show the take to open the take's folder. The one to upload is <code>video.mp4</code>.</p>
+          </div>
+          <figure class="fig narrow"><div class="shot"><img src="/assets/img/guide-win-finished.webp" alt="The bottom of the Sources side after a take on Windows: Every file is ready. There is no transcript yet: the speech model is not downloaded. A Show the take button, the time and the record button." width="612" height="652" loading="lazy"></div></figure></div></li>
         </ol>
+        <p class="note">Closing the window during a take asks first: "A take is recording. Stop it and close Vidlark?"</p>
       </section>
 
       <section id="win-files">
-        <h2>Where your files go</h2>
-        <p>Every take gets its own folder, with the same files as on a Mac:</p>
+        <h2>Where your files go <a class="anchor" href="#win-files" aria-label="Link to Where your files go, Windows">#</a></h2>
+        <p>Every take gets its own folder. Show the take opens it. In File Explorer it is:</p>
         <pre class="code"><code>C:\Users\Public\Videos\Vidlark Recordings\&lt;date&gt; &lt;title&gt;\recording-1\</code></pre>
+        <table class="table">
+          <thead><tr><th>File</th><th>What it is</th></tr></thead>
+          <tbody>
+            <tr><td><code>video.mp4</code></td><td>The finished video, made when you shared your screen.</td></tr>
+            <tr><td><code>camera.mov</code></td><td>Your camera, with your voice.</td></tr>
+            <tr><td><code>screen.mov</code></td><td>Your screen, with your voice and the computer's sound if it was on.</td></tr>
+            <tr><td><code>mic-2.m4a</code></td><td>Each extra microphone.</td></tr>
+            <tr><td><code>report.md</code></td><td>A plain summary of the take.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="win-not-yet">
+        <h2>Not in the beta yet <a class="anchor" href="#win-not-yet" aria-label="Link to Not in the beta yet">#</a></h2>
+        <p>The Mac version does more. These parts are still to come on Windows:</p>
+        <ul class="plain">
+          <li>The transcript, and the retakes list that comes from it. The beta does not download the speech model yet, so takes finish without one.</li>
+          <li>Phones as cameras or microphones, and the live view.</li>
+          <li>The prompter.</li>
+          <li>Face framing: the bubble shows the middle of the camera picture.</li>
+          <li>The Recordings and Settings pages. Their buttons are greyed out for now.</li>
+          <li>Sound from one app only. It is all of the computer's sound, or none.</li>
+          <li>A signed app, so Windows still shows its warning the first time.</li>
+        </ul>
+      </section>
+
+      <section id="win-help">
+        <h2>If something goes wrong <a class="anchor" href="#win-help" aria-label="Link to If something goes wrong, Windows">#</a></h2>
+        <div class="fixes">
+          <div class="fix" id="win-help-camera">
+            <h3>"The camera stopped." or the picture stays empty</h3>
+            <p>Check the camera is plugged in, and that apps may use it, as in <a href="#win-privacy">the first time</a>. Vidlark tries the camera again when it is plugged back in, or when you come back to its window.</p>
+          </div>
+          <div class="fix" id="win-help-nocamera">
+            <h3>"No camera found."</h3>
+            <p>Plug in a webcam. A camera plugged in after Vidlark opens shows up in the list by itself.</p>
+          </div>
+          <div class="fix" id="win-help-mic">
+            <h3>The meter does not move</h3>
+            <p>Pick the mic you are talking into from the Microphone list, and check the Microphone privacy settings.</p>
+          </div>
+          <div class="fix" id="win-help-finish">
+            <h3>The take could not be finished</h3>
+            <p>Vidlark says so instead of closing, and the take's files are kept. Send us the message word for word on the <a href="/feedback">Feedback page</a>.</p>
+          </div>
+        </div>
       </section>
     </div>
   </div>
@@ -289,20 +706,20 @@ curl -L -o ~/.cache/whisper/ggml-large-v3-turbo-q5_0.bin https://huggingface.co/
   <div class="wrap change">
     <div class="head">
       <h2>Change it with Claude</h2>
-      <p class="muted">Vidlark is open source under the MIT licence. If you do not like a feature, or want one it does not have, Claude Code can change it for you.</p>
+      <p class="muted">Vidlark is open source under the MIT licence. If you do not like a feature, or want one it does not have, Claude Code can change your copy for you, in plain words.</p>
     </div>
     <ol class="steps change-steps">
       <li><div><p><b>Get Claude Code.</b> It is Anthropic's coding assistant, in the Claude desktop app or in a terminal, on a Mac or on Windows. It needs a paid Claude plan.</p></div></li>
-      <li><div><p><b>Download the code.</b> Or ask Claude to do it for you.</p><pre class="code"><code>git clone https://github.com/neel542/vidlark.git</code></pre></div></li>
-      <li><div><p><b>Open the folder in Claude Code and say what you want,</b> in plain words.</p>
+      <li><div><p><b>Have your own copy of the code.</b> If you installed Vidlark on a Mac, you already do: it is the vidlark folder in your home folder. If not, download it, or ask Claude to.</p><pre class="code"><code>git clone https://github.com/neel542/vidlark.git</code></pre></div></li>
+      <li><div><p><b>Open the folder in Claude Code and say what you want.</b> For example:</p>
         <ul class="asks">
           <li>"Make the countdown 5 seconds instead of 3."</li>
           <li>"Save my takes in my Movies folder."</li>
           <li>"Add a button that pauses the take."</li>
           <li>"Make the app purple instead of green."</li>
         </ul></div></li>
-      <li><div><p><b>Claude makes the change, builds Vidlark and runs its tests.</b> The CLAUDE.md file in the code tells it how, and it asks before installing anything.</p></div></li>
-      <li><div><p><b>Try your version.</b> Keep it, change it again, or share it: the MIT licence allows all three, as long as the licence notice stays with the code.</p></div></li>
+      <li><div><p><b>Claude makes the change, builds Vidlark and runs its tests.</b> The CLAUDE.md file in the code tells it how. It asks before installing anything, and says what it checked. Do not record while it builds: the build replaces the app.</p></div></li>
+      <li><div><p><b>Try your version.</b> Not quite right? Ask again, or ask Claude to put it back. Keep it, change it or share it: the MIT licence allows all three, as long as the licence notice stays with the code.</p></div></li>
     </ol>
   </div>
 </section>

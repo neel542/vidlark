@@ -328,6 +328,8 @@ Bold, inked and a little springy.
 ### Steps
 Numbered rows divided by hairlines. Each number is a 36px Signal Green circle with an ink keyline and an 800 numeral. The step opens with a bold instruction, then plain explanation, then any command.
 
+On How to use it, a step carries the app's own screen for that moment, cropped to what the step is about, in the Screen Night frame at a 16px radius. Tall crops sit in a 300px column beside the words on wide screens; wide ones run under them; everything stacks below 1120px. Every step has an id so it can be linked. Supporting pieces: a before and after pair captioned with status chips (sun Before, green After); a click path of paper chips with ink keylines and small chevrons, for where to click in Xcode, System Settings or Windows Settings; keys as small paper keycaps; smaller numbered sub-steps in paper circles (the certificate); a parts list of hairline rows naming each control on a screen; and an If something goes wrong list of problem headings, each with its fix.
+
 ### Code Blocks
 Ink wells with light text in mono at 0.88rem, 14px radius, wrapping long lines rather than scrolling. A small Copy button sits top right (dark green, turning Signal Green with "Copied" for under two seconds). Selection inside turns Signal Green.
 

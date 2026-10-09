@@ -689,3 +689,79 @@ code, .mono { font-family: var(--mono); font-size: 0.86em; }
 .change-steps { max-width: 70ch; margin-top: 30px; }
 .asks { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .asks li { background: var(--paper); border: 1.5px solid var(--ink); border-radius: 14px 14px 14px 4px; padding: 8px 12px; font-weight: 700; font-size: 0.95rem; }
+
+/* ---------- How to use it: the step-by-step guide ----------
+   Numbered steps, each with the app's own screen beside it (wide screens) or under it (narrow
+   ones). Tall captures sit beside the words; wide ones run under them. */
+
+.doc.guide { max-width: 880px; }
+.guide > section > p, .guide > section > ul.plain, .guide > section > .note, .guide h3 + p { max-width: 66ch; }
+.guide .intro { font-size: 1.12rem; color: var(--ink-soft); }
+.guide h3 { font-size: 1.32rem; }
+.anchor { margin-left: 0.25em; font-size: 0.55em; color: var(--ink-soft); text-decoration: none; opacity: 0; vertical-align: 0.2em; transition: opacity 0.2s; }
+.guide h2:hover .anchor, .guide h3:hover .anchor, .anchor:focus-visible { opacity: 1; }
+@media (hover: none) { .anchor { opacity: 0.5; } }
+
+.guide .steps > li { scroll-margin-top: 90px; }
+.step { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+.step.side { grid-template-columns: minmax(0, 1fr) minmax(0, 300px); gap: 28px; }
+.step.side.wide-fig { grid-template-columns: minmax(0, 1fr) minmax(0, 360px); }
+@media (max-width: 1120px) { .step.side, .step.side.wide-fig { grid-template-columns: minmax(0, 1fr); } }
+.step > div > p + p, .step > div > p + .code, .step > div > .code + p { margin-top: 10px; }
+.step .note { margin-top: 12px; }
+.step > div > .fig, .step > div > .parts { margin-top: 14px; }
+.path + p, .path + .note { margin-top: 12px; }
+
+.fig { margin: 0; min-width: 0; }
+.fig .shot { border-radius: 16px; box-shadow: 0 24px 44px -26px rgba(14, 31, 22, 0.75); }
+.fig.narrow { max-width: 380px; }
+.fig.phone { max-width: 300px; }
+.fig figcaption { margin-top: 10px; font-size: 0.9rem; font-weight: 600; line-height: 1.4; color: var(--ink-soft); }
+.fig figcaption .status { margin-right: 6px; vertical-align: 1px; }
+@media (max-width: 1120px) { .step.side .fig { max-width: 420px; } .step.side .fig.phone { max-width: 300px; } }
+
+/* Before and after, side by side. */
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 24px; align-items: start; max-width: 760px; }
+.pair .fig figcaption { margin: 0 0 10px; }
+@media (max-width: 640px) { .pair { grid-template-columns: minmax(0, 1fr); } }
+
+/* Where to click, one place after another. */
+.path { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 4px; }
+.path li { display: inline-flex; align-items: center; gap: 4px; }
+.path span { background: var(--paper); border: 1.5px solid var(--ink); border-radius: 10px; padding: 3px 10px; font-weight: 700; font-size: 0.95rem; line-height: 1.4; }
+.path svg { width: 16px; height: 16px; color: var(--ink-soft); flex: none; }
+
+kbd { font-family: var(--display); font-weight: 700; font-size: 0.86em; padding: 1px 7px; border: 1.5px solid var(--ink); border-bottom-width: 3px; border-radius: 7px; background: var(--paper); white-space: nowrap; }
+
+/* Smaller numbered steps inside a step: the certificate. */
+.substeps { margin: 14px 0 0; padding: 0; list-style: none; counter-reset: sub; display: grid; gap: 12px; }
+.substeps > li { counter-increment: sub; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; }
+.substeps > li::before {
+  content: counter(sub); width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--ink); background: var(--paper);
+  display: grid; place-items: center; font-weight: 800; font-size: 0.82rem; margin-top: 1px;
+}
+.substeps .path { margin-top: 8px; }
+
+/* The parts of a screen, one per row. */
+.parts { list-style: none; margin: 12px 0 0; padding: 0; }
+.parts li { padding: 9px 0; border-top: 1px solid var(--line); font-size: 1rem; }
+.parts li:last-child { border-bottom: 1px solid var(--line); }
+.parts b { font-weight: 800; }
+
+.note.sun { background: var(--sun); border-color: var(--ink); }
+.guide > .note.sun { margin: 0 0 56px; max-width: 66ch; }
+.note ul { margin: 8px 0 0; padding-left: 1.2em; }
+.note li + li { margin-top: 4px; }
+
+/* If something goes wrong: a problem, then its fix. */
+.fixes { margin-top: 18px; border-top: 1.5px solid var(--ink); }
+.fix { padding: 18px 0; border-bottom: 1px solid var(--line); scroll-margin-top: 90px; }
+.fix h3 { font-size: 1.12rem; margin: 0 0 6px; font-variation-settings: "opsz" 24, "wdth" 92; }
+.fix p { max-width: 66ch; }
+.fix p + p, .fix p + .code { margin-top: 8px; }
+
+/* The contents beside a long guide scroll on their own when the window is short. */
+@media (min-width: 901px) {
+  .doc-layout > .toc { max-height: calc(100vh - 110px); overflow-y: auto; overscroll-behavior: contain; padding-bottom: 4px; }
+  .doc-layout > .toc a { padding-block: 6px; }
+}

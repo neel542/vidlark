@@ -1,0 +1,4 @@
+{
+  "prompt": "Origin: not generated. The real Windows panel's own HTML and CSS (windows/app/ui/index.html), rendered headless in Chromium with Playwright on 9 Oct 2026, with the C++ side replaced by a stub that sends the page's own messages: sample devices (USB Camera, USB Microphone, one screen called Display 1), a plain placeholder camera picture and a mic level. Fonts fall back to the Mac's system font, as Segoe UI is a Windows font. The panel at 1280 x 800, resized to 1400 wide, with the title typed in.",
+  "createdAt": "2026-10-09T04:10:05.000Z"
+}
