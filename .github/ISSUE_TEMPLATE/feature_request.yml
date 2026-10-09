@@ -1,0 +1,40 @@
+name: An idea for Vidlark
+description: Suggest something Vidlark could do, or do better.
+title: "Idea: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What is your idea?
+      placeholder: A button that pauses the take.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: How would it help you?
+      description: What you are trying to do, and what gets in the way today.
+      placeholder: I often need to stop for a moment, and starting a new take splits my video in two.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: computer
+    attributes:
+      label: Mac, Windows or both?
+      options:
+        - Mac
+        - Windows
+        - Both
+    validations:
+      required: true
+
+  - type: textarea
+    id: picture
+    attributes:
+      label: A picture or example (optional)
+      description: Drag in a sketch or a screenshot of another app that does it well.
+    validations:
+      required: false

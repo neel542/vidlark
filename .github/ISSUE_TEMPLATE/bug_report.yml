@@ -1,0 +1,58 @@
+name: Something is not working
+description: Tell us what went wrong in Vidlark.
+title: "Problem: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for telling us. A few short answers are enough.
+        Please do not attach a recording you would not want public, and never paste a live view link.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What went wrong, and what you expected instead.
+      placeholder: I pressed Share screen and nothing happened. I expected the What to share window.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: computer
+    attributes:
+      label: Mac or Windows?
+      options:
+        - Mac
+        - Windows
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Which version?
+      description: "Windows: the beta's number, like 0.2. Mac: the day you built it, or run git log -1 --format=%h in the vidlark folder and paste what it prints."
+      placeholder: Windows 0.2 beta, or built on 9 October
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can we make it happen again?
+      description: The steps, one per line.
+      placeholder: |
+        1. Open Vidlark
+        2. Press the red button
+        3. Press Share screen
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot or report (optional)
+      description: Drag a screenshot here, or paste the take's report.md and any error message word for word.
+    validations:
+      required: false

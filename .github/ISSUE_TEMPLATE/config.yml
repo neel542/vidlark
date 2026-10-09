@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Send feedback without a GitHub account
+    url: https://vidlark.vercel.app/feedback
+    about: A short form on the Vidlark website, for a bug, an idea or a question.
+  - name: How to use Vidlark
+    url: https://vidlark.vercel.app/how-to
+    about: Install steps and your first video, on a Mac and on Windows.
