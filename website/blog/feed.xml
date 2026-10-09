@@ -8,22 +8,85 @@
     <language>en</language>
     <lastBuildDate>Fri, 09 Oct 2026 00:00:00 +0000</lastBuildDate>
     <item>
-      <title>How to use your phone as a webcam on a Mac, free</title>
-      <link>https://vidlark.vercel.app/blog/phone-as-webcam-on-mac</link>
-      <guid isPermaLink="true">https://vidlark.vercel.app/blog/phone-as-webcam-on-mac</guid>
+      <title>Use Your iPhone as a Webcam for YouTube Videos</title>
+      <link>https://vidlark.vercel.app/blog/iphone-webcam-youtube</link>
+      <guid isPermaLink="true">https://vidlark.vercel.app/blog/iphone-webcam-youtube</guid>
       <pubDate>Fri, 09 Oct 2026 00:00:00 +0000</pubDate>
       <category>Tutorials</category>
-      <description>Use any iPhone or Android phone as a webcam on a Mac, free, over Wi-Fi with no app to install and no cable. Film up to four angles at once with Vidlark.</description>
-      <enclosure url="https://vidlark.vercel.app/assets/img/blog/phone-as-webcam-on-mac.webp" length="53088" type="image/webp"/>
+      <description>Two ways to film YouTube videos with your iPhone as your Mac's camera: Continuity Camera, or Wi-Fi and a QR code with any Apple Account. Setup and framing tips.</description>
+      <enclosure url="https://vidlark.vercel.app/assets/img/blog/iphone-webcam-youtube.webp" length="57806" type="image/webp"/>
     </item>
     <item>
-      <title>How to record your camera and screen as separate files</title>
-      <link>https://vidlark.vercel.app/blog/record-camera-and-screen-separately</link>
-      <guid isPermaLink="true">https://vidlark.vercel.app/blog/record-camera-and-screen-separately</guid>
+      <title>Record a Video Podcast in One Room With Phones</title>
+      <link>https://vidlark.vercel.app/blog/video-podcast-one-room</link>
+      <guid isPermaLink="true">https://vidlark.vercel.app/blog/video-podcast-one-room</guid>
       <pubDate>Fri, 09 Oct 2026 00:00:00 +0000</pubDate>
-      <category>Guides</category>
-      <description>Record your camera and screen separately in one take, free on Mac and Windows. See every file Vidlark saves, where it goes and how the files stay in sync.</description>
-      <enclosure url="https://vidlark.vercel.app/assets/img/blog/record-camera-and-screen-separately.webp" length="58574" type="image/webp"/>
+      <category>Use cases</category>
+      <description>Film a two or three person video podcast with phones as cameras and a mic for each person, all on one Mac, every angle synced by sound. Setup to final edit.</description>
+      <enclosure url="https://vidlark.vercel.app/assets/img/blog/video-podcast-one-room.webp" length="63174" type="image/webp"/>
+    </item>
+    <item>
+      <title>Open Source Loom Alternatives, Compared Honestly</title>
+      <link>https://vidlark.vercel.app/blog/open-source-loom-alternatives</link>
+      <guid isPermaLink="true">https://vidlark.vercel.app/blog/open-source-loom-alternatives</guid>
+      <pubDate>Fri, 09 Oct 2026 00:00:00 +0000</pubDate>
+      <category>Comparisons</category>
+      <description>Cap, Screenity, OBS Studio and Vidlark compared: licences in plain words, share links, self-hosting, project health on GitHub, and which one fits your videos.</description>
+      <enclosure url="https://vidlark.vercel.app/assets/img/blog/open-source-loom-alternatives.webp" length="86298" type="image/webp"/>
+    </item>
+    <item>
+      <title>Loom Free Plan Limits in 2026, Checked</title>
+      <link>https://vidlark.vercel.app/blog/loom-free-plan-limits</link>
+      <guid isPermaLink="true">https://vidlark.vercel.app/blog/loom-free-plan-limits</guid>
+      <pubDate>Fri, 09 Oct 2026 00:00:00 +0000</pubDate>
+      <category>Comparisons</category>
+      <description>Loom's free Starter plan, checked on 9 October 2026: the 5 minute cap, the 25 video limit, 720p, no downloads, what Business costs, and free ways around each.</description>
+      <enclosure url="https://vidlark.vercel.app/assets/img/blog/loom-free-plan-limits.webp" length="51654" type="image/webp"/>
+    </item>
+    <item>
+      <title>How to Record a YouTube Video on a Mac</title>
+      <link>https://vidlark.vercel.app/blog/record-youtube-video-mac</link>
+      <guid isPermaLink="true">https://vidlark.vercel.app/blog/record-youtube-video-mac</guid>
+      <pubDate>Fri, 09 Oct 2026 00:00:00 +0000</pubDate>
+      <category>Tutorials</category>
+      <description>The whole path from script to upload on a Mac, with free tools: plan, light, record your face and screen, fix mistakes, add chapters and publish to YouTube.</description>
+      <enclosure url="https://vidlark.vercel.app/assets/img/blog/record-youtube-video-mac.webp" length="70202" type="image/webp"/>
+    </item>
+    <item>
+      <title>How to Record Yourself and Your Screen on a Mac</title>
+      <link>https://vidlark.vercel.app/blog/record-yourself-and-screen</link>
+      <guid isPermaLink="true">https://vidlark.vercel.app/blog/record-yourself-and-screen</guid>
+      <pubDate>Fri, 09 Oct 2026 00:00:00 +0000</pubDate>
+      <category>Tutorials</category>
+      <description>Three free ways to get your face and your screen in one video on a Mac: QuickTime's floating camera, the Screenshot toolbar, or one button in Vidlark.</description>
+      <enclosure url="https://vidlark.vercel.app/assets/img/blog/record-yourself-and-screen.webp" length="44258" type="image/webp"/>
+    </item>
+    <item>
+      <title>How to Record Online Course Videos at Home</title>
+      <link>https://vidlark.vercel.app/blog/online-course-videos</link>
+      <guid isPermaLink="true">https://vidlark.vercel.app/blog/online-course-videos</guid>
+      <pubDate>Fri, 09 Oct 2026 00:00:00 +0000</pubDate>
+      <category>Use cases</category>
+      <description>A repeatable home setup for recording course lessons in batches: plan short lessons, script each one, record a day's list, and upload in your platform's format.</description>
+      <enclosure url="https://vidlark.vercel.app/assets/img/blog/online-course-videos.webp" length="76176" type="image/webp"/>
+    </item>
+    <item>
+      <title>Free Mac Screen Recorders With No Watermark</title>
+      <link>https://vidlark.vercel.app/blog/free-mac-screen-recorder</link>
+      <guid isPermaLink="true">https://vidlark.vercel.app/blog/free-mac-screen-recorder</guid>
+      <pubDate>Fri, 09 Oct 2026 00:00:00 +0000</pubDate>
+      <category>Comparisons</category>
+      <description>The free Mac screen recorders with no watermark and no time limit, which ones also record your camera and the Mac's sound, and which Macs each one runs on.</description>
+      <enclosure url="https://vidlark.vercel.app/assets/img/blog/free-mac-screen-recorder.webp" length="47988" type="image/webp"/>
+    </item>
+    <item>
+      <title>Free Loom Alternatives With No Limit, No Catch</title>
+      <link>https://vidlark.vercel.app/blog/free-loom-alternatives</link>
+      <guid isPermaLink="true">https://vidlark.vercel.app/blog/free-loom-alternatives</guid>
+      <pubDate>Fri, 09 Oct 2026 00:00:00 +0000</pubDate>
+      <category>Comparisons</category>
+      <description>Free recorders with no time limit, no watermark and no account, and the one honest trade-off: no instant share link. Which fits your videos, and when Loom wins.</description>
+      <enclosure url="https://vidlark.vercel.app/assets/img/blog/free-loom-alternatives.webp" length="63488" type="image/webp"/>
     </item>
   </channel>
 </rss>
