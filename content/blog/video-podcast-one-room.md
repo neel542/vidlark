@@ -38,7 +38,7 @@ A single wide shot gets dull fast. Cutting between angles keeps viewers watching
 
 ## Phones as cameras: what you need
 
-- **A Mac with Vidlark.** Vidlark is free and open source, with no account, no watermark and no time limit. It needs Apple silicon (M1 or newer) and macOS 15 or later, and there is no download button yet: you build it once with Xcode and a free Apple Development certificate. See the [install guide](/how-to#install). (The Windows 11 beta does not support phones yet.)
+- **A Mac with [Vidlark](/features).** Vidlark is free and open source, with no account, no watermark and no time limit. It needs Apple silicon (M1 or newer) and macOS 15 or later, and there is no download button yet: you build it once with Xcode and a free Apple Development certificate. See the [install guide](/how-to#install). (The Windows 11 beta does not support phones yet.)
 - **Phones.** Any iPhone on iOS 16.4 or newer, or an Android phone with Chrome. Old phones from a drawer are perfect. Each films up to 1080p at 30 frames a second.
 - **The same Wi-Fi** for the Mac and every phone.
 - **A stand and a charger for each phone.** Long recordings drain batteries.
@@ -143,4 +143,4 @@ If your show mixes both, record the in-room people with phones in Vidlark and th
 
 Start with two phones and two mics, record a 10 minute test conversation, and edit it. You will learn more from that than from any gear list.
 
-Vidlark is free: the [phone camera steps](/how-to#phone) and [microphone steps](/how-to#mic) have a picture of every screen, and the code is on [GitHub](https://github.com/neel542/vidlark). For a solo video with your screen, see [How to record a YouTube video on a Mac](/blog/record-youtube-video-mac). To see how Vidlark compares with other open source recorders, read [Open source Loom alternatives, compared honestly](/blog/open-source-loom-alternatives).
+Vidlark is free: the [phone camera steps](/how-to#phone) and [microphone steps](/how-to#mic) have a picture of every screen, and the code is on [GitHub](https://github.com/neel542/vidlark). For a solo video with your screen, see [How to record a YouTube video on a Mac](/blog/record-youtube-video-mac), or the three free ways in [How to record yourself and your screen on a Mac](/blog/record-yourself-and-screen). Making lessons for a course instead? [How to record online course videos at home](/blog/online-course-videos) plans a batch day. To see how Vidlark compares with other open source recorders, read [Open source Loom alternatives, compared honestly](/blog/open-source-loom-alternatives).

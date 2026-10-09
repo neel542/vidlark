@@ -66,7 +66,7 @@ OBS can do almost anything, including live streaming, which none of the others d
 
 [Vidlark](/features) is the newest of the four. It is MIT licensed, free, with no account, no watermark and no time limit, and it saves everything on your computer. It was built to film YouTube videos, so it does a few things the others do not:
 
-- **Phones as cameras with no app.** Scan a QR code with any iPhone or Android phone on the same Wi-Fi and it films another angle, up to 1080p at 30 frames a second.
+- **Phones as cameras with no app.** Scan a QR code with an iPhone (iOS 16.4 or newer) or an Android phone on the same Wi-Fi and it films another angle, up to 1080p at 30 frames a second. [Use your iPhone as a webcam for YouTube videos](/blog/iphone-webcam-youtube) has the steps.
 - **Up to four phone angles synced by sound.** Each phone saves its own file, lined up with the main camera automatically. Our guide to [recording a video podcast in one room with phones](/blog/video-podcast-one-room) shows this in use.
 - **A prompter that follows your voice,** on a strip of the screen that is never recorded.
 - **A transcript made on your Mac,** with no cloud, plus YouTube chapters and a list of every place you said "retake".
@@ -74,7 +74,7 @@ OBS can do almost anything, including live streaming, which none of the others d
 
 ![The Vidlark Sources list with the Mac's camera, Camera 2 and Camera 3 from two phones (one 1080p, one 1080p tall), a wireless mic and the screen, above the record button](/assets/img/sources-angles.webp)
 
-**What it does not do:** no share links or cloud hosting, no editor, no self-hosted server, and no Intel Macs. On a Mac there is no download button yet: you build it once with Xcode and a free Apple Development certificate, on Apple silicon with macOS 15 or later ([install guide](/how-to#install)). Windows 11 has a beta zip without the transcript, phones, live view or prompter.
+**What it does not do:** no share links or cloud hosting, no editor, no self-hosted server, and no Intel Macs. On a Mac there is no download button yet: you build it once with Xcode and a free Apple Development certificate, on Apple silicon with macOS 15 or later ([install guide](/how-to#install)). Windows 11 has a beta zip without the transcript, phones, live view or prompter. On an Intel Mac, [free Mac screen recorders with no watermark](/blog/free-mac-screen-recorder) compares what runs on one.
 
 ## Licences side by side
 
@@ -119,7 +119,7 @@ Claude makes the change, builds Vidlark and runs its tests. Claude Code needs a 
 - **You need share links, like Loom:** Cap. Self-host it if your company wants the videos on its own storage.
 - **You only record in the browser, maybe on a Chromebook:** Screenity.
 - **You stream, or want full control of the layout:** OBS Studio.
-- **You film YouTube videos, lessons or podcasts and edit the files:** Vidlark on an Apple silicon Mac, or Cap's Studio Mode if you want an editor built in or use an Intel Mac.
+- **You film YouTube videos, lessons or podcasts and edit the files:** Vidlark on an Apple silicon Mac, or Cap's Studio Mode if you want an editor built in or use an Intel Mac. [How to record a YouTube video on a Mac](/blog/record-youtube-video-mac) walks through a whole video.
 - **You want to change the app without coding:** Vidlark, with Claude Code.
 
 ## What to do next

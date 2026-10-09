@@ -20,7 +20,7 @@ faq:
 related: ["record-youtube-video-mac", "video-podcast-one-room", "record-yourself-and-screen"]
 ---
 
-You can use your iPhone as a webcam for YouTube videos in two ways. If the iPhone and the Mac share an Apple Account, Apple's Continuity Camera connects them in seconds with no app. If they do not, a recorder like Vidlark can use the iPhone over Wi-Fi with a QR code, with any account and no app. Either way, mount the phone sideways at eye level with its back camera facing you, and plug it in.
+You can use your iPhone as a webcam for YouTube videos in two ways. If the iPhone and the Mac share an Apple Account, Apple's Continuity Camera connects them in seconds with no app. If they do not, a recorder like [Vidlark](/features) can use the iPhone over Wi-Fi with a QR code, with any account and no app. Either way, mount the phone sideways at eye level with its back camera facing you, and plug it in.
 
 ## Why an iPhone beats a laptop webcam
 
@@ -57,7 +57,7 @@ Vidlark's Settings, **Connect a camera**, has the same steps and lists every cam
 
 This is common: a family member's iPhone, a work Mac, or a phone on a parent's account. Continuity Camera refuses all of these. Vidlark's own studio hit exactly this problem, with the Mac on one person's account and the iPhone on another's, which is why it can use a phone over Wi-Fi.
 
-> **Before you start:** Vidlark is free and open source, but on a Mac there is no download button yet. You build it once with Xcode and add a free Apple Development certificate. It needs Apple silicon and macOS 15 or later. See the [install guide](/how-to#install).
+> **Before you start:** Vidlark is free and open source, but on a Mac there is no download button yet. You build it once with Xcode and add a free Apple Development certificate. It needs Apple silicon and macOS 15 or later (on an Intel Mac, [free Mac screen recorders with no watermark](/blog/free-mac-screen-recorder) lists what runs on one). See the [install guide](/how-to#install).
 
 1. **Put both on the same Wi-Fi.** The phone and the Mac must be on the same network.
 2. **Show the code.** Click the **Camera** row and pick **Phone over Wi-Fi** to make the phone your main camera. (To add it as an extra angle instead, press **+ Add**, then **Add a phone with a QR code**.)
@@ -124,4 +124,4 @@ Vidlark also has its own framing. When the finished video shows your camera acro
 
 If your iPhone and Mac share an account, try Continuity Camera today; it takes two minutes. If they do not, or you want more angles, try Vidlark free: the [phone camera steps](/how-to#phone) have a picture of each screen, and the code is on [GitHub](https://github.com/neel542/vidlark).
 
-Want your face and screen in one take? [How to record yourself and your screen on a Mac](/blog/record-yourself-and-screen) compares three free ways.
+Want your face and screen in one take? [How to record yourself and your screen on a Mac](/blog/record-yourself-and-screen) compares three free ways. Filming lessons for a course? [How to record online course videos at home](/blog/online-course-videos) shows how to set up once and record a batch of lessons.

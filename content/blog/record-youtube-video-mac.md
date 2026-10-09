@@ -20,7 +20,7 @@ faq:
 related: ["record-yourself-and-screen", "iphone-webcam-youtube", "online-course-videos"]
 ---
 
-To record a YouTube video on a Mac, write a short script, set up a light and a mic in front of you, record your face and your screen in one take, then upload the file with a title, description and chapters. Every step can be done with free software: QuickTime and iMovie come with your Mac, and free recorders like Vidlark add a prompter, a finished video and ready-made chapters.
+To record a YouTube video on a Mac, write a short script, set up a light and a mic in front of you, record your face and your screen in one take, then upload the file with a title, description and chapters. Every step can be done with free software: QuickTime and iMovie come with your Mac, and free recorders like [Vidlark](/features) add a prompter, a finished video and ready-made chapters.
 
 Here is the whole path, step by step, with the free option for each stage.
 
@@ -30,7 +30,7 @@ Here is the whole path, step by step, with the free option for each stage.
 
 - **A Mac.** Any recent one can record. Vidlark needs Apple silicon (M1 or newer) and macOS 15 or later.
 - **A camera.** The built-in camera works. An iPhone is a big step up and costs nothing if you already own one: see [Use your iPhone as a webcam for YouTube videos](/blog/iphone-webcam-youtube).
-- **A microphone close to your mouth.** This matters more than the camera. Viewers forgive a soft picture; they leave over bad sound. A USB mic or a wireless clip-on kit is the best money you can spend. A spare phone can work as a wireless mic in Vidlark too.
+- **A microphone close to your mouth.** This matters more than the camera. Viewers forgive a soft picture; they leave over bad sound. A USB mic or a wireless clip-on kit is the best money you can spend. A spare phone can work as a wireless mic in Vidlark too. Our guide to [recording a video podcast in one room with phones](/blog/video-podcast-one-room) shows spare phones used as cameras and mics.
 - **Light in front of you.** A window you face, or one lamp behind the laptop.
 - **Free disk space.** A 15 minute take in Vidlark needs about 3 GB, plus about 0.5 GB for the finished video.
 
@@ -145,4 +145,4 @@ The first video takes the longest because you are setting up. After that:
 
 Write a three-bullet script for a five minute video and record it today, with whatever camera you have. The second one will be better.
 
-To try Vidlark free, follow the [step-by-step guide](/how-to#first); the code is on [GitHub](https://github.com/neel542/vidlark). Still choosing a recorder? [Free Mac screen recorders with no watermark](/blog/free-mac-screen-recorder) compares the options, including what each one does better than Vidlark.
+To try Vidlark free, follow the [step-by-step guide](/how-to#first); the code is on [GitHub](https://github.com/neel542/vidlark). Still choosing a recorder? [Free Mac screen recorders with no watermark](/blog/free-mac-screen-recorder) compares the options, including what each one does better than Vidlark. Coming from Loom? [Loom free plan limits in 2026, checked](/blog/loom-free-plan-limits) shows why its 5 minute cap rarely fits a YouTube video.

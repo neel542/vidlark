@@ -60,7 +60,7 @@ Spend in this order, and stop when the budget runs out:
 
 You do not need to read every word. Write the opening word for word, so every lesson starts crisp, then bullets for the rest, which you talk around in your own words.
 
-Vidlark reads scripts as plain text files, one per lesson:
+[Vidlark](/features) reads scripts as plain text files, one per lesson:
 
 ```
 # Lesson 3: Pricing your first product
@@ -79,7 +79,7 @@ By the end of this lesson you will have a price you can defend.
 - `Target:` is the length you aim for. During the take, the timer shows your time against it ("of 8:00"), and the prompter shows how long each section has.
 - Each `##` section becomes a chapter.
 
-> **About Vidlark:** it is free and open source, with no account, no watermark and no time limit. On a Mac you build it once with Xcode and a free Apple Development certificate, as there is no download button yet; it needs Apple silicon and macOS 15 or later. The [install guide](/how-to#install) has every step. The Windows 11 beta does not have scripts or the prompter yet.
+> **About Vidlark:** it is free and open source, with no account, no watermark and no time limit. On a Mac you build it once with Xcode and a free Apple Development certificate, as there is no download button yet; it needs Apple silicon and macOS 15 or later (on an Intel Mac, [free Mac screen recorders with no watermark](/blog/free-mac-screen-recorder) lists what runs on one). The [install guide](/how-to#install) has every step. The Windows 11 beta does not have scripts or the prompter yet.
 
 ## Recording a batch in one sitting
 
@@ -164,4 +164,4 @@ Here is a realistic plan for a batch day. Your times will vary, so treat it as a
 
 Write the lesson list for your course today, and script the first three lessons. Then record them in one sitting, even if the setup is not perfect yet.
 
-Vidlark is free from the first take: the [how-to guide](/how-to#prompter) shows the scripts and prompter step by step, and the code is on [GitHub](https://github.com/neel542/vidlark). For one video start to finish, including upload, see [How to record a YouTube video on a Mac](/blog/record-youtube-video-mac). Teachers on a budget may also want to know [what Loom's free plan allows](/blog/loom-free-plan-limits), since its free education plan is closed to new sign-ups.
+Vidlark is free from the first take: the [how-to guide](/how-to#prompter) shows the scripts and prompter step by step, and the code is on [GitHub](https://github.com/neel542/vidlark). For one video start to finish, including upload, see [How to record a YouTube video on a Mac](/blog/record-youtube-video-mac). Teachers on a budget may also want to know [what Loom's free plan allows](/blog/loom-free-plan-limits), since its free education plan is closed to new sign-ups. If you would rather skip Loom, [Free Loom Alternatives With No Limit, No Catch](/blog/free-loom-alternatives) compares the options.

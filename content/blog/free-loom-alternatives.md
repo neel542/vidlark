@@ -52,7 +52,7 @@ The paid Business plan is $18 per creator per month, or about $15 a month billed
 ![The Vidlark recording box: Back to the recorder, Me and Screen with Screen picked, Mac sound Off, the time 05:12, a mic level and the stop button](/assets/img/recording-box.webp)
 
 - **No limits:** no account, no watermark, no time limit. Files stay on your computer.
-- **Extras Loom does not have:** phones as extra cameras over Wi-Fi with no app, a prompter that follows your voice, separate camera and screen files lined up by sound, the Mac's sound from every app or just one.
+- **Extras Loom does not have:** [phones as extra cameras over Wi-Fi with no app](/blog/iphone-webcam-youtube), a prompter that follows your voice, separate camera and screen files lined up by sound, the Mac's sound from every app or just one.
 - **Gives up:** there is no share link, no comments and no viewer analytics. You upload `video.mp4` yourself, to YouTube, Drive or Slack.
 - **The install:** on a Mac there is no download button yet. You build it once from its code with Xcode and a free Apple Development certificate, and it needs Apple silicon and macOS 15 or later. The [install guide](/how-to#install) covers it step by step. Windows 11 has a beta zip on [GitHub](https://github.com/neel542/vidlark/releases) that does not yet include the transcript, phones, live view or the prompter.
 
@@ -106,12 +106,12 @@ Be honest about how you use video. Loom is worth paying for when:
 - **Conversation happens on the video.** Comments and emoji reactions at a moment in the video are hard to replace with a file in Drive.
 - **Your team shares a library** of videos in one place.
 
-If that is you, a Business seat at about $15 a month billed yearly is cheaper than the time you would spend uploading files and pasting links. The free alternatives win when the video is the product: tutorials, YouTube videos, lessons, demos you edit.
+If that is you, a Business seat at about $15 a month billed yearly is cheaper than the time you would spend uploading files and pasting links. The free alternatives win when the video is the product: tutorials, YouTube videos, [lessons for an online course](/blog/online-course-videos), demos you edit.
 
 ## Which free alternative fits which job
 
 - **Quick async updates with a link:** Cap's free plan, if 5 minutes is enough and it is for personal use. Otherwise, pay for Loom.
-- **YouTube videos and tutorials with your face:** Vidlark (Mac). The finished video follows your Me and Screen clicks, and you also get chapters, a transcript and a retakes list. Our [free Mac screen recorders](/blog/free-mac-screen-recorder) comparison covers more Mac options.
+- **YouTube videos and tutorials with your face:** Vidlark (Mac). The finished video follows your Me and Screen clicks, and you also get chapters, a transcript and a retakes list. [How to record a YouTube video on a Mac](/blog/record-youtube-video-mac) walks through a whole video, and our [free Mac screen recorders](/blog/free-mac-screen-recorder) comparison covers more Mac options.
 - **Polished product demos with zooms:** Cap's Studio Mode.
 - **Browser recordings on any computer, including Chromebooks:** Screenity.
 - **Live streaming or complex layouts:** OBS Studio.
@@ -140,4 +140,4 @@ If that is you, a Business seat at about $15 a month billed yearly is cheaper th
 
 If you need share links and team comments, a paid Loom seat or Cap is the honest answer. If you make videos to publish, try a truly free recorder for a week.
 
-Vidlark is free from the first take: the [how-to guide](/how-to) shows every screen, and the code is on [GitHub](https://github.com/neel542/vidlark).
+Vidlark is free from the first take: the [how-to guide](/how-to) shows every screen, and the code is on [GitHub](https://github.com/neel542/vidlark). [Watch the two-minute tour on YouTube](https://youtu.be/Q45pCSwcf9s) first if you want to see it working.

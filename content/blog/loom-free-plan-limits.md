@@ -47,7 +47,7 @@ There is no grace period. If you are mid-sentence at 0:00, that is where the vid
 
 - **Plan for 4 minutes,** not 5, so you have room to finish.
 - **Split longer topics** into parts, each its own video. Each part also counts toward your 25.
-- **Tutorials, lessons and YouTube videos rarely fit.** A walkthrough that needs 12 minutes needs three Loom videos on Starter.
+- **Tutorials, lessons and YouTube videos rarely fit.** A walkthrough that needs 12 minutes needs three Loom videos on Starter. [How to record a YouTube video on a Mac](/blog/record-youtube-video-mac) shows a free way to record one in a single take.
 
 ## The 25 video cap, and what counts as a video
 
@@ -136,7 +136,7 @@ Each Starter limit has a free way around it. None of these replaces Loom's share
 | 720p | Local recorders record at your screen's real resolution. Cap's Studio Mode records up to 4K. |
 | Share link | Cap's free plan makes share links of up to 5 minutes, for personal use. Or upload a file to YouTube (Unlisted) or Google Drive and share that link. |
 
-**Vidlark** is one of those local recorders: free and open source, with no account, no watermark and no time limit. It records your camera, mic and screen with one button, and the timer simply keeps counting past 5:00.
+**[Vidlark](/features)** is one of those local recorders: free and open source, with no account, no watermark and no time limit. It records your camera, mic and screen with one button, and the timer simply keeps counting past 5:00.
 
 ![The bottom of the Vidlark window during a take: a Share screen card, the timer at 07:42 of 15:00 with a progress line, the stop button, and Recording. Press to stop.](/assets/img/guide-recording.webp)
 
@@ -150,7 +150,7 @@ Every take is listed on the Recordings page, with its length and size.
 
 The honest trade-offs: Vidlark has no share link, comments or viewer stats, so you upload the file yourself. On a Mac there is no download button yet: you build it once with Xcode and a free certificate, on Apple silicon with macOS 15 or later (see the [install guide](/how-to#install)). The Windows 11 version is a beta.
 
-For a full comparison of the free options, including what Cap does better, read [Free Loom Alternatives With No Limit, No Catch](/blog/free-loom-alternatives). If open source matters to you, [Open source Loom alternatives, compared honestly](/blog/open-source-loom-alternatives) compares the licences too.
+For a full comparison of the free options, including what Cap does better, read [Free Loom Alternatives With No Limit, No Catch](/blog/free-loom-alternatives). For a Mac-only list, see [free Mac screen recorders with no watermark](/blog/free-mac-screen-recorder). If open source matters to you, [Open source Loom alternatives, compared honestly](/blog/open-source-loom-alternatives) compares the licences too.
 
 ## What to do next
 

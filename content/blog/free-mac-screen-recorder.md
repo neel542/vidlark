@@ -98,7 +98,7 @@ These are free to start but capped. Fine for the odd clip; frustrating for regul
 
 Paid Mac recorders are worth knowing about too. **CleanShot X** costs $35 once, with a year of updates, and records your camera and the computer's sound. **Screen Studio** is $29 a month, or $9 a month billed yearly, for its polished automatic zooms. Neither is free, but both are good at what they do.
 
-If you are leaving Loom specifically, [Free Loom Alternatives With No Limit, No Catch](/blog/free-loom-alternatives) goes deeper on share links.
+If you are leaving Loom specifically, [Free Loom Alternatives With No Limit, No Catch](/blog/free-loom-alternatives) goes deeper on share links, and [Loom free plan limits in 2026, checked](/blog/loom-free-plan-limits) lists every cap.
 
 ## The comparison table
 
@@ -136,10 +136,11 @@ A few checks save you from finding a problem at minute 20:
 ## Our pick by job
 
 - **A quick screen-only clip:** the Screenshot toolbar. It is already there.
-- **Your face and screen for YouTube, lessons or demos:** Vidlark on an Apple silicon Mac. [How to record a YouTube video on a Mac](/blog/record-youtube-video-mac) walks through a whole video with it.
+- **Your face and screen for YouTube, lessons or demos:** Vidlark on an Apple silicon Mac. [How to record a YouTube video on a Mac](/blog/record-youtube-video-mac) walks through a whole video with it, and [How to record online course videos at home](/blog/online-course-videos) does the same for lessons.
 - **Polished demos with automatic zooms, for free:** Cap's Studio Mode, for personal use.
 - **Live streaming or complex layouts:** OBS Studio.
 - **An Intel Mac, or recording in the browser:** OBS, Cap or Screenity.
+- **Open source you can read or change:** OBS, Cap, Screenity and Vidlark all are. [Open source Loom alternatives, compared honestly](/blog/open-source-loom-alternatives) compares their licences.
 
 ## What to do next
 

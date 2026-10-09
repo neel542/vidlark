@@ -68,7 +68,7 @@ The limits are the same as Method 1: your face is fixed in place. On macOS 27 or
 
 ## Method 3: Vidlark, camera and screen in one take
 
-[Vidlark](/features) is a free, open source recorder for videos. One red button records your camera and mic, you share your screen when you are ready, and when you stop it hands you a finished `video.mp4`. It also keeps your camera and your screen as their own files, lined up by sound, in case you want to edit.
+[Vidlark](/features) is a free, open source recorder for videos. One red button records your camera and mic, you share your screen when you are ready, and when you stop it hands you a finished `video.mp4`. It also keeps your camera and your screen as their own files, lined up by sound, in case you want to edit. [Open source Loom alternatives, compared honestly](/blog/open-source-loom-alternatives) compares it with Cap, Screenity and OBS Studio.
 
 > **Before you start: what Vidlark needs on a Mac**
 > - A Mac with Apple silicon (M1 or newer) on macOS 15 or later.
@@ -150,4 +150,4 @@ You can change it at any moment of the take, and your mic is always recorded eit
 
 For a quick clip, QuickTime is already on your Mac. For videos you will publish, try Vidlark free: the [step-by-step guide](/how-to#first) shows every screen, and the code is on [GitHub](https://github.com/neel542/vidlark).
 
-Making YouTube videos? [How to record a YouTube video on a Mac](/blog/record-youtube-video-mac) takes this further, with a script, a prompter and chapters. On a Windows 11 PC instead, the [Windows beta steps](/how-to#windows) work the same way, with fewer buttons. And if you want to compare every free option first, start with [free Mac screen recorders with no watermark](/blog/free-mac-screen-recorder).
+Making YouTube videos? [How to record a YouTube video on a Mac](/blog/record-youtube-video-mac) takes this further, with a script, a prompter and chapters. On a Windows 11 PC instead, the [Windows beta steps](/how-to#windows) work the same way, with fewer buttons. And if you want to compare every free option first, start with [free Mac screen recorders with no watermark](/blog/free-mac-screen-recorder). Leaving Loom? [Free Loom Alternatives With No Limit, No Catch](/blog/free-loom-alternatives) covers the options, and [How to record online course videos at home](/blog/online-course-videos) is for lessons.
