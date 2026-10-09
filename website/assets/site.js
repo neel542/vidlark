@@ -1,5 +1,5 @@
 // Vidlark website: the menu on phones, copy buttons, the take in the hero, the sync demo,
-// the Mac and Windows tabs, the Windows download and the feedback form.
+// the Mac and Windows tabs, the Windows download, the feedback form and the blog's filter.
 (function () {
   const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -262,6 +262,27 @@
     });
   }
 
+  // The blog: show the posts of one category. Without JavaScript the buttons stay hidden and
+  // every post shows. A link to /blog#guides opens with Guides picked.
+  const filter = document.querySelector(".cat-filter");
+  if (filter) {
+    const buttons = [...filter.querySelectorAll("button")];
+    const cards = [...document.querySelectorAll(".blog-list .post-card")];
+    filter.hidden = false;
+    const show = (name) => {
+      if (!buttons.some((b) => b.dataset.filter === name)) name = "all";
+      buttons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.filter === name)));
+      cards.forEach((card) => { card.hidden = name !== "all" && card.dataset.category !== name; });
+    };
+    const fromHash = () => show(decodeURIComponent(location.hash.slice(1)) || "all");
+    buttons.forEach((b) => b.addEventListener("click", () => {
+      show(b.dataset.filter);
+      history.replaceState(null, "", b.dataset.filter === "all" ? location.pathname : "#" + b.dataset.filter);
+    }));
+    window.addEventListener("hashchange", fromHash);
+    fromHash();
+  }
+
   // Motion. Things are recorded into view: screens open from a circle, lists land one by one, and
   // each band acts out its claim. Nothing is hidden unless this runs, and none of it runs for anyone
   // who asked for less motion. Loops run only while they can be seen.
@@ -315,7 +336,7 @@
       });
     });
     // List items land in order, at most eight steps of delay, so long lists do not keep you waiting.
-    [".filegrid > li", ".no-list > li", ".facts-row > li", ".points > li", ".feat-list > li", ".steps > li", ".get > .get-card"].forEach((selector) => {
+    [".filegrid > li", ".no-list > li", ".facts-row > li", ".points > li", ".feat-list > li", ".steps > li", ".get > .get-card", ".post-cards > .post-card"].forEach((selector) => {
       document.querySelectorAll(selector).forEach((item) => {
         const index = [...item.parentElement.children].indexOf(item);
         item.style.setProperty("--i", Math.min(index, 8));

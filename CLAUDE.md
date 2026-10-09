@@ -22,6 +22,9 @@ in plain words.
   in `windows/app/ui/`) and a C++ port of the after-stop tool in `windows/finish/`. See
   `windows/PLAN.md`.
 - `website/`: the static website at vidlark.vercel.app. `website/DESIGN.md` explains its look.
+- `content/blog/`: the blog's posts, in Markdown. `python3 Tools/blog.py` builds them into
+  `website/blog/`, the RSS feed, `website/sitemap.xml` and the home page's blog strip, then checks
+  the whole site. `content/blog/README.md` explains how to write a post.
 - `Tests/`: `run_tests.sh` runs the after-stop tool on test takes and checks every file it makes.
 - `PLAN.md`: the take folder contract, every file a take leaves and what is in it. The Mac and
   Windows apps write the same folder, so a change to it is a change to both.

@@ -216,7 +216,7 @@ The four companion fields. Each owns whole bands and also serves as a small squa
 - **Candy Pink** (#ff74b0): the How to use it page head (and its theme colour), the microphones band on Home, camera file tags.
 - **Lime Zest** (#d6f64e): the closing free band on every page, chapters and retakes file tags, text selection, link hover in the footer.
 
-Each page claims one field for its head band and sets its browser theme colour to match: Home green, Features sky, How to use it pink, Feedback sun. Every field is now claimed, so a new page shares one and still closes on lime.
+Each page claims one field for its head band and sets its browser theme colour to match: Home green, Features sky, How to use it pink, Feedback sun, the Blog sun. Every field is now claimed, so a new page shares one and still closes on lime. A blog post takes its category's field: Guides green, Comparisons sky, Tutorials pink, Use cases sun, Behind the build lime.
 
 ### Tertiary
 - **Record Red** (#f04e3e): the record dot and the stop square in the drawn recording box, and the centre of the site mark. It is the same red the app uses, and it means recording.
@@ -357,6 +357,16 @@ The second ink band: "Open source. Make it yours." with ink-band points (lime ch
 - **Text fields:** 14px radius, 1.5px ink border, Body type.
 - **Screenshot box:** a mist box with a dashed ink outline; the whole box opens the file picker, takes a dropped image, and Command-V or Ctrl-V anywhere pastes one. A picked image shows a small preview with Remove. Errors are 700 weight in a dark red (#a3261b, readable on paper), never the record red.
 - **Sent:** a Signal Green panel replaces the form after FormSubmit sends people back with `?sent=1`.
+
+### Blog
+Written in `content/blog/` and built by `Tools/blog.py`, which copies the header, footer and icons from the home page, so the blog cannot drift from the rest of the site.
+- **Post head:** a band in the category's field with a breadcrumb, a paper category chip with an ink keyline, the title at a step under Display Page (clamp(2.4rem, 5.4vw, 4.4rem)), the description as a lead, and a byline with the date and reading time.
+- **Post body:** the docs layout (a 230px sticky sidebar beside a 760px column). The sidebar holds the contents for long posts and the sun free note. The cover sits at the top of the column with an ink keyline and the product shadow. Body text holds to the column; app captures use the Screen Night frame at a 16px radius; quotes are notes; tables and code blocks are the site's own.
+- **Questions:** the If something goes wrong pattern, a 1.5px ink rule then hairline rows of a question heading and its answer. Home uses the same rows in its Questions band.
+- **Get Vidlark box:** a lime panel with an ink keyline at the end of every post, a primary GitHub pill and a ghost How to install it pill. It is the post's lime close.
+- **Post cards:** paper, 22px radius, ink keyline, ambient shadow, the cover across the top over an ink rule, then a colour-square category tag, the title at Title size, the description in Moss Ink and the date. The whole card is the link and lifts 3px on hover. Used on the blog, in Home's From the blog strip (mist band) and in Keep reading.
+- **Category filter:** pills like the feedback choices; the picked one fills its field (All fills ink). Hidden without JavaScript, when every post shows.
+- **Covers:** `Tools/blog_cover.js` renders a 1600x900 card in the category's field: the mark and name, a paper category chip, the title in Display type as large as fits in four lines, and three file tags. `Tools/og_cards.js` renders each main page's 1200x630 link preview the same way, with a real capture of the app.
 
 ### The Take (signature)
 The site's one authored motion, in the home hero. A drawn laptop shows a slide; the camera view sits clipped to a face circle at the bottom right; a dark recording box shows Me and Screen, a red dot, a mono timer and a level meter. It records, grows the camera to fill the screen (Me), shrinks it back (Screen), stops under a dark veil, and the file tags land underneath one after another, every 14 seconds. It moves only transform, opacity and clip-path (0.5s on the in-out ease for the camera, 0.4 to 0.5s for the files, staggered by 0.1s), plays only while on screen, and with reduced motion shows its final frame with the files already landed.

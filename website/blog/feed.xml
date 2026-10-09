@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Vidlark blog</title>
+    <link>https://vidlark.vercel.app/blog</link>
+    <atom:link href="https://vidlark.vercel.app/blog/feed.xml" rel="self" type="application/rss+xml"/>
+    <description>Guides, tutorials and comparisons for recording YouTube videos with your camera, mic and screen on a Mac or Windows PC, with Vidlark, the free recorder.</description>
+    <language>en</language>
+    <lastBuildDate>Fri, 09 Oct 2026 00:00:00 +0000</lastBuildDate>
+    <item>
+      <title>How to use your phone as a webcam on a Mac, free</title>
+      <link>https://vidlark.vercel.app/blog/phone-as-webcam-on-mac</link>
+      <guid isPermaLink="true">https://vidlark.vercel.app/blog/phone-as-webcam-on-mac</guid>
+      <pubDate>Fri, 09 Oct 2026 00:00:00 +0000</pubDate>
+      <category>Tutorials</category>
+      <description>Use any iPhone or Android phone as a webcam on a Mac, free, over Wi-Fi with no app to install and no cable. Film up to four angles at once with Vidlark.</description>
+      <enclosure url="https://vidlark.vercel.app/assets/img/blog/phone-as-webcam-on-mac.webp" length="53088" type="image/webp"/>
+    </item>
+    <item>
+      <title>How to record your camera and screen as separate files</title>
+      <link>https://vidlark.vercel.app/blog/record-camera-and-screen-separately</link>
+      <guid isPermaLink="true">https://vidlark.vercel.app/blog/record-camera-and-screen-separately</guid>
+      <pubDate>Fri, 09 Oct 2026 00:00:00 +0000</pubDate>
+      <category>Guides</category>
+      <description>Record your camera and screen separately in one take, free on Mac and Windows. See every file Vidlark saves, where it goes and how the files stay in sync.</description>
+      <enclosure url="https://vidlark.vercel.app/assets/img/blog/record-camera-and-screen-separately.webp" length="58574" type="image/webp"/>
+    </item>
+  </channel>
+</rss>

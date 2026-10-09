@@ -1,3 +1,4 @@
 .impeccable/
 DESIGN.md
 assets/img/*.json
+assets/img/**/*.json

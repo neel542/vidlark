@@ -8,6 +8,9 @@
       { "key": "X-Frame-Options", "value": "DENY" },
       { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
     ] },
-    { "source": "/assets/(.*)", "headers": [ { "key": "Cache-Control", "value": "public, max-age=3600" } ] }
+    { "source": "/assets/(.*)", "headers": [ { "key": "Cache-Control", "value": "public, max-age=3600" } ] },
+    { "source": "/assets/img/(.*)", "headers": [ { "key": "Cache-Control", "value": "public, max-age=604800, stale-while-revalidate=86400" } ] },
+    { "source": "/(favicon.ico|site.webmanifest)", "headers": [ { "key": "Cache-Control", "value": "public, max-age=86400" } ] },
+    { "source": "/blog/feed.xml", "headers": [ { "key": "Content-Type", "value": "application/rss+xml; charset=utf-8" } ] }
   ]
 }
